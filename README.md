@@ -1,4 +1,9 @@
 # Imager GUI  
+
+![image](docs/images/logo.png)
+
+
+
 *A cross-platform UI for Imager, built with Avalonia*
 
 
@@ -54,6 +59,12 @@ Follow these steps to install and run the project:
    ```bash
     dotnet publish ImagerAvalonia.Dekstop -r linux-x64 -p:PublishSingleFile=true --self-contained true  -o Release
    ``` 
+
+   This will create compiled binaries in the folder 'Release'
+
+## Documentation
+
+The full documentation about how to use the GUI can be found on the github pages
    
 
 
