@@ -1,16 +1,26 @@
 # Imager GUI  
 
-[<img src="docs/images/logo.png" align="right" width="100">]
 
 
-*A cross-platform UI for Imager, built with Avalonia*
+<img src="docs/images/logo.png" align="right" width="80">
 
+ *A cross-platform UI for Imager, built with Avalonia*
 
----
+This is the main repository containing the implementation of the graphical user interface for Imager. 
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Requirements](#requirements)
+- [Installation & Running](#installation--running)
+  - [Step 1: Clone the repository](#step-1-clone-the-repository)
+  - [Step 2: Build the project](#step-2)
+- [Documentation](#documentation)
 
 ## Overview
 
-This repository contains the Avalonia-based GUI for **Imager**, including UI components and communication utilities. It is designed to be cross-platform and developer-friendly.
+This repository contains the Avalonia-based GUI for **Imager**, including UI components and communication utilities. It is designed to be cross-platform and developer-friendly. 
+Our UI implementation includes various features such as an interactive experiment designer, live image viewer, acquisition tabs, and many other useful utilities! 
 
 ---
 
