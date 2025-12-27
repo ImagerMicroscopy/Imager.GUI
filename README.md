@@ -1,7 +1,6 @@
 # Imager GUI  
 
-![image](docs/images/logo.png)
-
+[<img src="docs/images/logo.png" align="right" width="100">]
 
 
 *A cross-platform UI for Imager, built with Avalonia*
