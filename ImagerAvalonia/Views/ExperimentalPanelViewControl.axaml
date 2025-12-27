@@ -1,0 +1,305 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+			
+             mc:Ignorable="d" d:DesignWidth="260" d:DesignHeight="450"
+			 xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			 xmlns:service_vm="clr-namespace:ImagerAvalonia.Services"
+
+             x:Class="ImagerAvalonia.Views.ExperimentalPanelViewControl"
+			 x:DataType="vm:ExperimentalPanelViewModel"
+			 xmlns:reactive="using:System.Reactive"
+			 Width="280"
+			 Background="#454545"
+			 PointerPressed="PanelPointerPressed"
+			 PointerReleased="PanelPointerReleased">
+
+
+
+	<UserControl.Styles>
+
+		<Style Selector="TreeViewItem">
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}">
+						<StackPanel>
+							<StackPanel Orientation="Horizontal">
+								<!-- Custom Chevron -->
+	
+								<ContentPresenter
+									Content="{TemplateBinding Header}"
+									VerticalAlignment="Center"/>
+							</StackPanel>
+
+							<ItemsPresenter
+								Margin="16,0,0,0"
+								IsVisible="{TemplateBinding IsExpanded}"/>
+						</StackPanel>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+	</UserControl.Styles>
+
+
+	<Grid>
+
+		<Grid.RowDefinitions>
+
+			<RowDefinition Height="400" />
+			<RowDefinition Height="20" />
+			<RowDefinition Height="20" />
+			<RowDefinition Height="Auto" />
+
+		</Grid.RowDefinitions>
+
+		
+		<TreeView Margin="2 2 0 0" PointerReleased="TreeViewPointerReleased"   Grid.Row="0" x:Name="ExperimentTreeView" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
+			<TreeView.Resources>
+				<x:Double x:Key="TreeViewItemExpandCollapseChevronSize">24</x:Double>
+			</TreeView.Resources>
+
+
+			<TreeView.Styles>
+				<Style Selector="TreeViewItem">
+					<Setter Property="MinHeight" Value="18"/>
+					<!--  PointerOver state  -->
+					<Style Selector="^ /template/ Border#PART_LayoutRoot:pointerover">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+					<!--  Pressed state  -->
+					<Style Selector="^:pressed /template/ Border#PART_LayoutRoot:pointerover">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+					<!--  Disabled state  -->
+					<Style Selector="^:disabled /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+					<!--  Selected state  -->
+					<Style Selector="^:selected /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+		
+
+
+					<!--  Selected PointerOver state  -->
+					<Style Selector="^:selected /template/ Border#PART_LayoutRoot:pointerover">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+					<!--  Selected Pressed state  -->
+					<Style Selector="^:pressed:selected /template/ Border#PART_LayoutRoot:pointerover">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+
+
+
+
+					<!--  Disabled Selected state  -->
+					<Style Selector="^:disabled:selected /template/ Border#PART_LayoutRoot">
+						<Setter Property="Background" Value="Transparent" />
+						<Setter Property="BorderBrush" Value="Transparent" />
+					</Style>
+
+				</Style>
+				
+			</TreeView.Styles>
+			<TreeView.ItemContainerTheme>
+				<ControlTheme TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
+					<Setter Property="IsExpanded" Value="True" />
+					<Setter Property="IsVisible" Value="True" />
+
+				</ControlTheme>
+			</TreeView.ItemContainerTheme>
+
+
+			<TreeView.DataTemplates>
+				<TreeDataTemplate  DataType="service_vm:ActionNode" ItemsSource="{Binding Children}">
+
+					
+					
+					<StackPanel ClipToBounds="False" IsHitTestVisible="True" Height="20" >
+
+						<StackPanel  PointerReleased="OnPointerReleased" HorizontalAlignment="Left" Grid.Row="1" Height="5" Opacity="0" PointerMoved="AddPointerMoved" PointerExited="AddPointerExited" IsHitTestVisible="True"  >
+							<StackPanel Margin="0 -3 0 0" Orientation="Horizontal">
+								<Ellipse Margin="0 0 0 0"   Width="5" Height="5" Fill="#ad76ea" />
+								<Rectangle Margin="-4 0 0 0"  Width="150" Height="7" Fill="#ad76ea" />
+							</StackPanel>
+
+							<Rectangle Margin="0 -5 0 0"  Width="150" Height="3" Fill="Red" Opacity="0" IsHitTestVisible="True"  />
+
+						</StackPanel>
+						<StackPanel ClipToBounds="False"  Orientation="Horizontal">
+						<ItemsControl  FlowDirection="RightToLeft" ItemsSource="{Binding SmartProgramBindings}" >
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<StackPanel Orientation="Horizontal"/>
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<Rectangle  Width="8" Height="8" Fill="{Binding SmartProgramColor}" IsHitTestVisible="True"  />
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+	
+						<Border x:Name="ActionBorder"
+								  
+								  Cursor="Hand" 
+								  PointerReleased="OnPointerReleased" 
+								  PointerPressed="OnPointerPressed" 
+								  DoubleTapped ="OnElementDoubleTapped"
+								  PointerExited="OnPointerExitedActionNode" 
+								  PointerEntered="OnPointerEnteredActionNode" 
+								  BorderThickness="1"
+								  BorderBrush="#2e2e2e"
+								  HorizontalAlignment="Left"  
+								  Height="15" 
+								  ClipToBounds="False"
+								  CornerRadius="3" 
+								  Width="210" Background="Gray">
+
+							<StackPanel  Width="200" Orientation="Horizontal">
+
+
+								<TextBlock  VerticalAlignment="Center"  Foreground="White" IsHitTestVisible="True" Margin="3 0 0 0 "  LineHeight="20"  HorizontalAlignment="Left"   FontSize="10" Text="{Binding Header}">	
+								
+							</TextBlock>
+							<TextBlock Margin="5 0 0 0"   TextTrimming="CharacterEllipsis" Width="100"  VerticalAlignment="Center" Foreground="White" FontSize="10"  Text="{Binding VisibleInfo}">
+							</TextBlock>
+							</StackPanel>
+						</Border>
+						</StackPanel>
+					</StackPanel>
+				</TreeDataTemplate>
+
+
+			</TreeView.DataTemplates>
+			<TreeView.DataTemplates>
+				<TreeDataTemplate DataType="service_vm:ExperimentNode" ItemsSource="{Binding Children}">
+					<StackPanel  ClipToBounds="false"  IsHitTestVisible="True" Height="20" >
+						
+						<StackPanel PointerReleased="OnPointerReleased" HorizontalAlignment="Left" Grid.Row="1" Height="5" Opacity="0" PointerMoved="AddPointerMoved" PointerExited="AddPointerExited" IsHitTestVisible="True"  >
+							<StackPanel Orientation="Horizontal">
+								<Ellipse Margin="0 -3 0 0"   Width="5" Height="5" Fill="#ad76ea" />
+								<Rectangle Margin="-5 0 0 0"  Width="150" Height="7" Fill="#ad76ea" />
+							</StackPanel>
+
+							<Rectangle Margin="0 -5 0 0"  Width="150" Height="10" Fill="Transparent" Opacity="0" IsHitTestVisible="True"  />
+
+						</StackPanel>
+
+
+							<Border ClipToBounds="False" PointerReleased="OnPointerReleasedAddWithin"  
+								PointerPressed="OnPointerPressed"  
+							    PointerExited="OnPointerExitedExperimentNode" 
+								PointerEntered="OnPointerEnteredExperimentNode"  
+								HorizontalAlignment="Left"  
+								Height="15" 
+								CornerRadius="3" 
+								Width="210" 
+								BorderThickness="1"
+								BorderBrush="#2e2e2e"
+								Background="Gray">
+							<StackPanel Width="200" Orientation="Horizontal">
+
+								<TextBlock Foreground="White"     IsHitTestVisible="True" Margin="3 0 0 0 "  LineHeight="20"  VerticalAlignment="Center"  FontSize="10" Grid.Row="0"  Text="{Binding Header}">
+							
+							</TextBlock>
+							<TextBlock Margin="5 0 0 0"  TextTrimming="CharacterEllipsis" Width="100"  VerticalAlignment="Center" Foreground="White" FontSize="10"   Text="{Binding VisibleInfo, Mode=TwoWay}">
+							</TextBlock>
+						   </StackPanel>
+
+						</Border>
+					</StackPanel> 
+				</TreeDataTemplate>
+
+
+			</TreeView.DataTemplates>
+
+
+
+			<TreeView.DataTemplates>
+				<TreeDataTemplate  DataType="service_vm:RootNode" ItemsSource="{Binding Children}">
+
+						<Border  ClipToBounds="False" PointerReleased="OnRootPointerReleased"   PointerPressed="OnPointerPressed" PointerExited="OnPointerExitedActionNode" PointerEntered="OnPointerEnteredActionNode"  BorderThickness="1" HorizontalAlignment="Left"  Height="15" 
+							BorderBrush="#2e2e2e"   CornerRadius="3" Width="120" Background="Gray">
+
+						
+						
+						<TextBlock Margin="3 0 0 0" VerticalAlignment="Center"  FontSize="10" Foreground="White"   Text="{Binding Header}">
+
+						</TextBlock>
+						</Border>
+				</TreeDataTemplate>
+			</TreeView.DataTemplates>
+
+
+		</TreeView>
+		<StackPanel Grid.Row="1" Margin="2 0 0 0" Orientation="Horizontal" VerticalAlignment="Bottom">
+		<Button Width="105" HorizontalContentAlignment="Center"  BorderBrush="#2e2e2e"  Content="Add element" VerticalAlignment="Bottom">
+			<Button.Flyout>
+				<MenuFlyout Placement="Top">
+					<MenuItem Header="Detection"
+							    Click ="OnAddElementClick"/>
+						<!--		Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="RelativeStageLoop"
+							  	Click ="OnAddElementClick"
+								IsEnabled="{Binding $parent[TreeView].((vm:ExperimentalPanelViewModel)DataContext).AreStagesAvailable}"/>
+						<!--		Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="StageLoop"
+							  	Click ="OnAddElementClick"
+								IsEnabled="{Binding $parent[TreeView].((vm:ExperimentalPanelViewModel)DataContext).AreStagesAvailable}"/>
+						<!--		Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="WaitForTime"
+							  	Click ="OnAddElementClick"/>
+						<!--		Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="Irradiation"
+								Click ="OnAddElementClick"/>
+						<!--	IsEnabled="{Binding $parent[TreeView].((vm:ExperimentalPanelViewModel)DataContext).AreSourcesAvailable}"
+								Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="DoTimes"
+							  	Click ="OnAddElementClick"/>
+						<!--	Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" /> -->
+					<MenuItem Header="TimeLapse"
+							  	Click ="OnAddElementClick"/>
+
+					<MenuItem Header="UpdateAcquisition"
+							  	Click ="OnAddElementClick"/>
+						<!--		Command="{Binding Root.AppendNextItemToNode}"
+								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" />-->
+				</MenuFlyout>
+			</Button.Flyout>
+		</Button>
+
+		<Button Width="105" HorizontalContentAlignment="Center" BorderBrush="#2e2e2e"  Margin="55 -7 0 0" Content="Delete element"
+		  HorizontalAlignment="Right"  Command="{Binding DeleteNode}" CommandParameter="True">			
+		</Button>
+		</StackPanel>
+
+		<Border Grid.Row="2" Height="10" Margin="0 5 2 0" BorderThickness="0 1 0 0" Width="250" BorderBrush="Gray">
+									
+		</Border>
+		<TransitioningContentControl Margin="4 -8 0 0"  Content="{Binding ContentPane}" Grid.Row="3">	</TransitioningContentControl>
+	</Grid>
+
+</UserControl>

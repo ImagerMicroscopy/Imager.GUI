@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			 x:Name="DagNode"
+			 Width="220"
+			 MinHeight="50"
+			 ClipToBounds="False"
+             x:Class="ImagerAvalonia.Views.DagNodeBase"
+			 x:DataType="vm:DagNodeViewModel"
+			 Background="Transparent">
+
+
+
+
+	
+	
+	<UserControl.DataTemplates>
+
+		<DataTemplate DataType="{x:Type vm:DagNodeInputViewModel}">
+			<views:DagNodeImageInputView />
+		</DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:DagNodeOutputViewModel}">
+			<views:DagNodeImageOutputView />
+		</DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:CategoricDagNodeParameters}">
+				<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+					<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ParameterName}" Width="80"/>
+					<ComboBox HorizontalAlignment="Right" Grid.Column="1" PointerPressed="OnComboBoxPointerPressed"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding SelectedCategory}" ItemsSource="{Binding Categories}" Width="90">
+						<ComboBox.Styles>
+							<Style Selector="ComboBox ContentPresenter">
+								<Setter Property="Margin" Value="5 0 0 0"/>
+							</Style>
+						</ComboBox.Styles>
+					</ComboBox>
+				</Grid>
+			
+		</DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:AcquisitionNameParameter}">
+			<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+				<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ParameterName}" Width="80"/>
+				<ComboBox HorizontalAlignment="Right" Grid.Column="1" PointerPressed="OnComboBoxPointerPressed" DisplayMemberBinding="{Binding Name}"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding AcquisitionInput}" ItemsSource="{Binding DefinedAcquisitions}" Width="90">
+					<ComboBox.Styles>
+						<Style Selector="ComboBox ContentPresenter">
+							<Setter Property="Margin" Value="5 0 0 0"/>
+						</Style>
+					</ComboBox.Styles>
+				</ComboBox>
+			</Grid>
+		</DataTemplate>
+
+
+		<DataTemplate DataType="{x:Type vm:DetectorNameParameter}">
+			<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+				<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ParameterName}" Width="80"/>
+				<ComboBox HorizontalAlignment="Right" Grid.Column="1" PointerPressed="OnComboBoxPointerPressed" DisplayMemberBinding="{Binding Name}"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding DetectorInput}" ItemsSource="{Binding DefinedDetectors}" Width="90">
+					<ComboBox.Styles>
+						<Style Selector="ComboBox ContentPresenter">
+							<Setter Property="Margin" Value="5 0 0 0"/>
+						</Style>
+					</ComboBox.Styles>
+				</ComboBox>
+			</Grid>
+		</DataTemplate>
+
+
+		<DataTemplate DataType="{x:Type vm:NumericDagNodeParameters}">
+			<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+				<TextBlock Grid.Column="0" Foreground="Black" FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ParameterName}" Width="80"/>
+				<NumericUpDown FontSize="8"  HorizontalAlignment="Right"  Grid.Column="1"   Height="17" Classes="custom-numeric-style" VerticalAlignment = "Center"  Margin="-10 0 0 0" Increment="0.0001" Value="{Binding Value}" Width="84"/>
+			</Grid>
+		</DataTemplate>
+
+	   <DataTemplate DataType="{x:Type vm:ImageInputDagNodeParameters }">
+			<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+				<TextBlock Grid.Column="0" Foreground="Black" FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Image path" Width="80"/>
+				<TextBox  FontSize="8"  HorizontalAlignment="Right"  Grid.Column="1"  MinHeight="17"  Height="17" VerticalAlignment = "Center"  Margin="-10 0 0 0" Text="{Binding ImageInput}" Width="84">
+					<TextBox.Styles>
+						<Style Selector="TextBox">
+							<Setter Property="Padding" Value="5,2,5,2"/>
+						</Style>
+						<Style Selector="TextBox /template/ ContentPresenter#PART_ContentPresenter">
+							<Setter Property="Margin" Value="0"/>
+						</Style>
+					</TextBox.Styles>
+				</TextBox>
+			</Grid>
+		</DataTemplate>
+
+		
+
+	</UserControl.DataTemplates>	
+	
+	
+		<Border x:Name="NodeBorder" Width="200"   Background="Gray" BorderBrush="Black" BorderThickness="2" CornerRadius="5">
+			<Border.Effect>
+				<DropShadowEffect BlurRadius="10" Color="Black" />
+			</Border.Effect>
+			<Border.RenderTransform>
+				<TransformGroup>
+					<TranslateTransform X="0" Y="0"/>
+				</TransformGroup>
+			</Border.RenderTransform>
+			<StackPanel>
+				<TextBlock FontSize="12" HorizontalAlignment="Center" Text="{Binding ApiPath}" />
+
+				<Grid ColumnDefinitions="65, 70, 65">
+					<ItemsControl x:Name="InputNodes" ItemsSource="{Binding DagNodeInputs}" Grid.Column="0"></ItemsControl>
+					<ItemsControl Grid.Column="1"></ItemsControl>
+					<ItemsControl HorizontalAlignment="Right" x:Name="OutputNodes" ItemsSource="{Binding DagNodeOutputs}" Grid.Column="2"></ItemsControl>
+
+				</Grid>
+				<Expander Margin="-10 0 0 0" IsExpanded="True" MinHeight="15" Width="200" Background="Transparent" BorderBrush="Transparent">
+					<Expander.Resources>
+						<SolidColorBrush x:Key="ExpanderHeaderBackgroundPointerOver" Color="Transparent"/>
+						<SolidColorBrush x:Key="ExpanderHeaderBackgroundPressed" Color="Transparent"/>
+
+						<SolidColorBrush x:Key="ExpanderHeaderBorderBrushPointerOver" Color="Transparent"/>
+						<SolidColorBrush x:Key="ExpanderHeaderBorderBrushPressed" Color="Transparent"/>
+
+						<SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Transparent"/>
+						<SolidColorBrush x:Key="ExpanderHeaderBorderBrush" Color="Transparent"/>
+						<Thickness x:Key="ExpanderHeaderBorderThickness">2</Thickness>
+
+						<SolidColorBrush x:Key="ExpanderChevronBorderBrush" Color="Transparent"/>
+						<SolidColorBrush x:Key="ExpanderChevronBackground" Color="Transparent"/>
+						<SolidColorBrush x:Key="ExpanderChevronForeground" Color="Black"/>
+						<SolidColorBrush x:Key="ExpanderChevronBackgroundPressed" Color="Transparent"/>
+
+						<Thickness x:Key="ExpanderChevronBorderThickness">0</Thickness>
+						<Thickness x:Key="ExpanderChevronMargin">2</Thickness>
+						<x:Double x:Key="ExpanderChevronButtonSize">16</x:Double>
+
+					</Expander.Resources>
+				
+
+
+					<Expander.Header >
+						<Border  HorizontalAlignment="Left" Height="15" Width="200" Background="Transparent">
+							<TextBlock Margin="0 0 60 0"
+									   FontSize="12">
+								Parameters
+							</TextBlock>
+						</Border>
+					</Expander.Header>
+
+					
+					
+					<!-- Content -->
+					<StackPanel Orientation="Vertical">
+						<ItemsControl Width="200" ItemsSource="{Binding DagNodeParameters}">
+							
+						</ItemsControl>
+						<!-- your content -->
+					</StackPanel>
+				</Expander>
+			</StackPanel>
+		</Border>
+
+
+
+
+
+
+
+
+
+</UserControl>

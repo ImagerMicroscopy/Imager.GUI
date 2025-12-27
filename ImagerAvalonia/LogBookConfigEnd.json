@@ -1,0 +1,6 @@
+{
+  "Clean Up": [ "Remove sample", "Clean up spills", "Put back equipment", "Clean up PC area", "Clean up sample prep area", "Clean objectives" ],
+  "Turn off equipment": [ "Oxxius box (Laser + Controller)", "Nikon (Microscope + Smartbox)","Camera" ],
+  "Manual optics": [ "1.5x/1.0x lens switch to 1.0x" ],
+  "Other": [ "Revert temperature", "Switch off plug","Shut down PC" ],
+}

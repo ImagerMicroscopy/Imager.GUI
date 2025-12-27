@@ -1,0 +1,17 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ImagerAvalonia.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:views="clr-namespace:ImagerAvalonia.Views"
+        mc:Ignorable="d" d:DesignWidth="1900" d:DesignHeight="800"
+        x:Class="ImagerAvalonia.Views.MainWindow"
+        Title="ImagerAvalonia"
+		RequestedThemeVariant="Dark"
+		Background="#333333"
+        Icon="/Assets/icons/IconImager.ico">
+
+
+
+		<views:MainView x:Name="MainUserAndExperimentControl" />
+</Window>

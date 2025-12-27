@@ -1,0 +1,254 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+
+			 xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1050"
+             x:Class="ImagerAvalonia.Views.ImageControlPanelView"
+             x:DataType="vm:ImageControlPanelViewModel"
+			 DragDrop.AllowDrop="True">
+
+
+    <UserControl.Resources>
+        <StreamGeometry x:Key="pause_regular">M17.75,7 C19.5449254,7 21,8.45507456 21,10.25 L21,37.75 C21,39.5449254 19.5449254,41 17.75,41 L12.25,41 C10.4550746,41 9,39.5449254 9,37.75 L9,10.25 C9,8.45507456 10.4550746,7 12.25,7 L17.75,7 Z M35.75,7 C37.5449254,7 39,8.45507456 39,10.25 L39,37.75 C39,39.5449254 37.5449254,41 35.75,41 L30.25,41 C28.4550746,41 27,39.5449254 27,37.75 L27,10.25 C27,8.45507456 28.4550746,7 30.25,7 L35.75,7 Z M17.75,9.5 L12.25,9.5 C11.8357864,9.5 11.5,9.83578644 11.5,10.25 L11.5,37.75 C11.5,38.1642136 11.8357864,38.5 12.25,38.5 L17.75,38.5 C18.1642136,38.5 18.5,38.1642136 18.5,37.75 L18.5,10.25 C18.5,9.83578644 18.1642136,9.5 17.75,9.5 Z M35.75,9.5 L30.25,9.5 C29.8357864,9.5 29.5,9.83578644 29.5,10.25 L29.5,37.75 C29.5,38.1642136 29.8357864,38.5 30.25,38.5 L35.75,38.5 C36.1642136,38.5 36.5,38.1642136 36.5,37.75 L36.5,10.25 C36.5,9.83578644 36.1642136,9.5 35.75,9.5 Z</StreamGeometry>
+        <StreamGeometry x:Key="play_circle_regular">M12,2 C17.5228475,2 22,6.4771525 22,12 C22,17.5228475 17.5228475,22 12,22 C6.4771525,22 2,17.5228475 2,12 C2,6.4771525 6.4771525,2 12,2 Z M12,3.5 C7.30557963,3.5 3.5,7.30557963 3.5,12 C3.5,16.6944204 7.30557963,20.5 12,20.5 C16.6944204,20.5 20.5,16.6944204 20.5,12 C20.5,7.30557963 16.6944204,3.5 12,3.5 Z M9.0527864,8.5854102 C9.1625594,8.3658642 9.41205933,8.26236922 9.63961698,8.328815 L9.7236068,8.3618034 L16.1055728,11.5527864 C16.2023365,11.6011683 16.2807978,11.6796295 16.3291796,11.7763932 C16.4389526,11.9959392 16.3720486,12.2576361 16.1823574,12.3998148 L16.1055728,12.4472136 L9.7236068,15.6381966 C9.65417908,15.6729105 9.57762255,15.690983 9.5,15.690983 C9.25454011,15.690983 9.05039163,15.5141078 9.00805567,15.2808586 L9,15.190983 L9,8.80901699 C9,8.73139445 9.01807255,8.65483791 9.0527864,8.5854102 Z</StreamGeometry>
+        <StreamGeometry x:Key="record_regular">M12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18Z M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM3.5 12C3.5 7.30558 7.30558 3.5 12 3.5C16.6944 3.5 20.5 7.30558 20.5 12C20.5 16.6944 16.6944 20.5 12 20.5C7.30558 20.5 3.5 16.6944 3.5 12Z</StreamGeometry>
+        <StreamGeometry x:Key="stop_regular">M19.25 4.5C19.3881 4.5 19.5 4.61193 19.5 4.75V19.25C19.5 19.3881 19.3881 19.5 19.25 19.5H4.75C4.61193 19.5 4.5 19.3881 4.5 19.25V4.75C4.5 4.61193 4.61193 4.5 4.75 4.5H19.25ZM4.75 3C3.7835 3 3 3.7835 3 4.75V19.25C3 20.2165 3.7835 21 4.75 21H19.25C20.2165 21 21 20.2165 21 19.25V4.75C21 3.7835 20.2165 3 19.25 3H4.75Z</StreamGeometry>
+
+    </UserControl.Resources>
+    
+	<UserControl.Styles>
+    <Style Selector="TabControl /template/ ItemsPresenter">
+        <Setter Property="ZIndex" Value="1" />
+    </Style>
+
+    <Style Selector="TabItem.LocalTabItem">
+        <Setter Property="Width" Value="150"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="ZIndex" Value="0"/> 
+        <Setter Property="Tag" Value="True"/>
+        <Setter Property="ClipToBounds" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderThickness="0.5,0.5,0.5,0.5" 
+                            BorderBrush="Gray" 
+                            Height="20" 
+                            CornerRadius="5 5 0 0" 
+                            Background="{TemplateBinding Background}">
+                        <Border BorderThickness="0,0,0,1" BorderBrush="#454545">
+                            <Grid HorizontalAlignment="Center" ColumnDefinitions="120,20">
+                                <TextBlock FontSize="13" Grid.Column="0"
+                                           FontWeight="Bold"
+                                           Margin="0 0 0 0"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center" 
+                                           Text="{TemplateBinding Header}"/>
+                            
+                                <Button x:Name="CloseButton"
+                                        Grid.Column="1"
+                                        Content="❌"
+                                        Width="20" Height="20"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="0" Margin="0"
+                                        IsVisible="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
+                                        IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
+                                        Click="OnTabCloseButtonClicked"/>
+                            </Grid>
+                        </Border>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TabItem.LocalTabItem:selected">
+        <Setter Property="ZIndex" Value="100"/> 
+        <Setter Property="Background" Value="#454545"/> 
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderThickness="0.5,0.5,0.5,0" 
+                            BorderBrush="Gray" 
+                            Height="20" 
+                            CornerRadius="5 5 0 0" 
+                            Background="{TemplateBinding Background}">
+                        <Border BorderThickness="0,0,0,1" BorderBrush="#454545">
+                            <Grid HorizontalAlignment="Center" ColumnDefinitions="120,20">
+                                <TextBlock FontSize="13" Grid.Column="0"
+                                           Margin="0 0 0 0"
+                                           FontWeight="Bold"
+                                           HorizontalAlignment="Left"
+                                           VerticalAlignment="Center" 
+                                           Text="{TemplateBinding Header}"/>
+                            
+                                <Button x:Name="CloseButton"
+                                        Grid.Column="1"
+                                        Content="❌"
+                                        HorizontalContentAlignment="Center"
+                                        Width="20" Height="20"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="0" Margin="0"
+                                        IsVisible="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
+                                        IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
+                                        Click="OnTabCloseButtonClicked"/>
+                            </Grid>
+                        </Border>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    
+    <Style Selector="TabItem.LocalTabItem:selected">
+        <Setter Property="ZIndex" Value="100"/>
+        <Setter Property="Background" Value="#454545"/> 
+    </Style>
+
+</UserControl.Styles>
+
+
+	<!--	<Grid ColumnDefinitions="*, 0.5, 350">
+
+
+
+
+			<SplitView IsPaneOpen="True"
+			DisplayMode="Inline"
+			OpenPaneLength="350"
+		    PanePlacement="Right"
+			PaneBackground="Transparent">
+		<SplitView.Pane> -->
+
+
+
+
+
+		
+	<Grid >
+
+
+
+		<Grid.RowDefinitions>
+			<RowDefinition Height="80" />
+			<RowDefinition Height="*" />
+
+			<!-- This defines a single column taking full width -->
+		</Grid.RowDefinitions>
+		<StackPanel>
+		<Border BoxShadow="2 2 5 2 Black" BorderBrush="Gray" BorderThickness="0.5" Margin="6 10 5 10" Height="60" Background="#454545" CornerRadius="5 5 5 5" Padding="5 5 5 5" >
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button BorderBrush="#2e2e2e" Background="#ad76ea" Width="50" Height="50" Command="{Binding EnableLive}" 
+                        x:Name="EnableLive" IsEnabled="{Binding !IsExperimentEnabled}">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+        
+                        <Viewbox Width="50" Height="50">
+                            <Canvas Width="45" Height="45">
+
+                                <PathIcon x:Name="PlayButtonDisplayIcon" Canvas.Top="3" Canvas.Left="11.5" Height="22" Width="22" Foreground="White"             
+                                            Data="{StaticResource play_circle_regular}"/>
+
+                                <TextBlock Canvas.Top="25" Canvas.Left="4" 
+                                           Text="Live"
+                                           Foreground="White"
+                                           FontWeight="Bold"
+                                           FontSize="12"
+                                           Width="37"
+                                           TextAlignment="Center"
+                                           x:Name="LiveButtonText"/>
+                            </Canvas>
+                        </Viewbox>
+
+                    </StackPanel>
+                </Button>
+                <Button BorderBrush="#2e2e2e" Background="#ad76ea" Width="50" Height="50" 
+                           x:Name="StartExperiment"  Command="{Binding StartExperiment}" >
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+        
+                            <Viewbox Width="50" Height="50">
+                                <Canvas Width="45" Height="45">
+                                <PathIcon x:Name="RecButtonDisplayIcon" Canvas.Top="3" Canvas.Left="12" Height="22" Width="22" Foreground="White"             
+                                            Data="{StaticResource record_regular}"/>
+
+
+                                    <TextBlock Canvas.Top="25" Canvas.Left="4" 
+                                               Text="Start"
+                                               Foreground="White"
+                                               FontWeight="Bold"
+                                               FontSize="12"
+                                               Width="37"
+                                               TextAlignment="Center"
+                                               x:Name="ExperimentButtonText"/>
+                                </Canvas>
+                            </Viewbox>
+
+                        </StackPanel>
+                    </Button>
+            </StackPanel>
+		    </Border>
+        
+
+
+
+		</StackPanel>
+		
+
+
+		
+		
+		<TabControl Grid.Row="1"  DragDrop.AllowDrop="True"   Grid.Column="0"   x:Name="TabLiveFocus" TabStripPlacement="Top" Padding="0" Margin="5 0 5 0" >
+            <TabControl.Styles>
+                <Style Selector="TabItem > ContentControl">
+                    <Setter Property="BorderThickness" Value="0.5"/>
+                    <Setter Property="Margin" Value="2 -3 0 0"/>
+                    <Setter Property="BorderBrush" Value="Gray"/>
+                </Style>
+
+            </TabControl.Styles>
+			<TabControl.Items>
+
+
+				<TabItem Classes="LocalTabItem" x:Name="LiveView" Header="Live view" HorizontalAlignment="Center" VerticalAlignment="Center" IsSelected="True" Tag="False" >
+					<ContentControl  ZIndex="0" BorderBrush="Gray"  >
+
+						<views:ImageDisplayView  x:Name="ImagePanel" DragDrop.AllowDrop="True" DataContext="{Binding LiveView}"/>
+					</ContentControl>
+
+				</TabItem>
+
+				<TabItem Classes="LocalTabItem"  Header="Field view" HorizontalAlignment="Center" VerticalAlignment="Center" IsSelected="False"  Tag="False" >
+					<ContentControl ZIndex="0" BorderBrush="Gray" >
+					
+						<views:FieldViewerView x:Name="FieldViewer" DragDrop.AllowDrop="True" DataContext="{Binding FieldView}"/>
+					
+					</ContentControl>
+
+				</TabItem>
+
+				<TabItem Classes="LocalTabItem"   Header="Smart Program" IsSelected="False"  Tag="False" >
+	
+					<ContentControl ZIndex="0" BorderBrush="Gray" >
+						<views:SmartProgramView x:Name="SmartProgramViewer">
+
+						</views:SmartProgramView>
+					</ContentControl>
+				</TabItem>
+
+
+			</TabControl.Items>
+
+
+
+		</TabControl>
+
+	</Grid> 
+
+
+
+
+</UserControl>

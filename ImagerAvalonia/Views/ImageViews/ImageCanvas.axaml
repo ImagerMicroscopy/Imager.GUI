@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="ImagerAvalonia.Views.ImageCanvas"
+			  
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 x:DataType="vm:ImageCanvasViewModel">
+
+
+	<Canvas x:Name="DisplayedCanvas" Margin="0 40 0 0"  Width="820" Height="820">
+		<TextBlock Text="{Binding HeaderText}" Canvas.Top="-20" FontSize="20"/>
+		<Image x:Name="DisplayedImage" Width="800" Height="800" Stretch="Uniform" RenderOptions.BitmapInterpolationMode="None"/>	
+	</Canvas>
+	
+	
+
+</UserControl>

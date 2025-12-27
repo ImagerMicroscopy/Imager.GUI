@@ -1,0 +1,278 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+
+			 xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
+             x:Class="ImagerAvalonia.Views.ImageDisplayView"
+             x:DataType="vm:ImageDisplayViewModel"
+			 DragDrop.AllowDrop="True">
+
+
+
+	<Grid>
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+		<Canvas Grid.Row="0"  DragDrop.AllowDrop="True" x:Name="ImageCanvas" Background="#454545"  >
+
+				
+				
+				
+				<Grid x:Name="ImageContainer"  Canvas.Top="0"  Background="#454545" Width="2000" Height="2000" >
+
+					<Grid.RowDefinitions>
+						<RowDefinition Height="95*"/>
+						<RowDefinition Height="05*"/>
+					</Grid.RowDefinitions>
+
+
+					<StackPanel Grid.Row="0" VerticalAlignment="Center">
+
+						<Panel x:Name="ImagePanel" HorizontalAlignment="Center" Margin="-800 0 0 0"  VerticalAlignment="Center" Background="#454545" Width="400" Height="400">
+
+						</Panel>
+						
+					</StackPanel>
+				</Grid>
+			
+		</Canvas>
+
+
+
+		<ScrollViewer     Background="{x:Null}"  Width="265" HorizontalAlignment="Right"    VerticalScrollBarVisibility="Auto">
+
+			<StackPanel IsHitTestVisible="True" Width="265" HorizontalAlignment="Right" >
+					<Border  
+								BorderBrush="Black"
+								BorderThickness="2"
+								CornerRadius="5"
+								BoxShadow="5 5 10 5 Black"
+								Padding="0" Margin="0" Background="#80DCDCDC">
+
+						<StackPanel>
+						<Expander IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
+							<Expander.Header>
+								<Border CornerRadius="2" Height="32" Width="300"  Background="#80DCDCDC">
+									<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" >Contrast settings</TextBlock>
+								</Border>
+							</Expander.Header>
+						
+							<StackPanel x:Name="ElementsPanel">
+								<views:ContrastPanelView x:Name="ContrastPanel" Margin="0 -10 0 -10" Width="250">
+								</views:ContrastPanelView>
+							</StackPanel>
+
+						</Expander>
+						
+						<Expander IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
+							<Expander.Header>
+								<Border Height="32" Width="300"  Background="#80DCDCDC">
+									<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" > Image elements</TextBlock>
+								</Border>
+							</Expander.Header>
+
+							<StackPanel>
+								<ContentControl Width="250" x:Name="RegionContent"> </ContentControl>
+							</StackPanel>
+
+						</Expander>
+
+						<Expander IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
+							<Expander.Header>
+								<Border Height="32" Width="300"  Background="#80DCDCDC">
+									<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" > Multi channel viewer</TextBlock>
+								</Border>
+							</Expander.Header>
+
+							<StackPanel>
+								<ContentControl Width="250" x:Name="MultiChannelConfig"> </ContentControl>
+							</StackPanel>
+
+						</Expander>
+					   </StackPanel>
+					</Border>
+
+			</StackPanel>
+		</ScrollViewer>
+
+		
+		
+		
+		
+		<StackPanel Margin="0 0 0 70" VerticalAlignment="Center" HorizontalAlignment="Left"   x:Name="ImageUtilities"  Orientation="Horizontal"  Height="580" Width="10"   >
+				<Border Background="Gainsboro"
+						BorderBrush="Black"
+						BorderThickness="2"
+						CornerRadius="5"
+						BoxShadow="5 5 10 5 Black"
+						Padding="2" Margin="40" Opacity="0.5">
+					<StackPanel x:Name="imageControls" Orientation="Vertical">
+
+
+						
+						<Button x:Name="selectDotButton"  Background="LightGray" Click="OnDotToggled" ToolTip.Tip="Select ROI's. Press once on top of image to add ROI. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection."  VerticalAlignment="Top" Width="30" Height="30">
+							<Button.Content>
+								<Image Width="30" Height="30" Source="/Assets/icons/circle.png"> </Image>
+							</Button.Content>
+						</Button>
+						<Button x:Name="selectLineButton"  Background="LightGray" Click="OnDotToggled" ToolTip.Tip="Line element. Press on selected image to start adding a line element. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection."  VerticalAlignment="Top" Width="30" Height="30">
+							<Button.Content>
+								<Image Width="30" Height="30" Source="/Assets/icons/line.png"> </Image>
+							</Button.Content>
+						</Button>
+						<ToggleButton BorderBrush="#2e2e2e" Background="LightGray"   Width="30" Height="30" x:Name="IsMultiViewEnabled" IsChecked="{Binding MultiViewEnabled}" ToolTip.Tip="Multi channel view. Click to enable composite multi channel view. Click again to disable." 
+						VerticalAlignment="Top" Click="OnChangeToMultiChannel">
+							<ToggleButton.Content>
+								<Image Width="30" Height="30" Source="/Assets/icons/multichannel.png"> </Image>
+							</ToggleButton.Content>
+						</ToggleButton>
+
+
+					</StackPanel>
+				</Border>
+
+			
+			
+		</StackPanel>
+
+
+
+
+		<DockPanel Height="25" VerticalAlignment="Bottom"  Background="Gray"> 
+			<Grid DockPanel.Dock="Left" ColumnDefinitions="180, *, 180" HorizontalAlignment="Stretch">
+			<Button Grid.Column="0" Height="26" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="100" BorderBrush="#2e2e2e" VerticalAlignment="Bottom" Click="OnResetView" > Reset view </Button>
+			<StackPanel ZIndex="0" Margin="70 0 0 0" x:Name="ImageProgress" Grid.Column="1"   HorizontalAlignment="Center" Orientation="Horizontal">
+				<Slider Padding="5 0 5 0" ClipToBounds="False" ZIndex="1" Height="40" Margin="0 0 0 0"  VerticalAlignment="Center" IsEnabled="{Binding !ShowLiveView}"  x:Name="imageSlider" Minimum="1" TickFrequency="1" IsSnapToTickEnabled="True"  Maximum="{Binding MaxFrameCount}" Value="{Binding RequestedFrame, Mode=TwoWay}"   Width="390">
+					<Slider.Styles>
+						
+						<Style Selector="Slider:horizontal">
+							<Setter Property="MinWidth" Value="40" />
+							<Setter Property="MinHeight" Value="20" />
+							
+
+							<Style Selector="^ Track">
+								<Style Selector="^ #PART_DecreaseButton Border">
+									<Setter Property="CornerRadius" Value="10 0 0 10 "/>
+									<Setter Property="Height" Value="14"/>
+									<Setter Property="Background" Value="#ad76ea"/>
+									<Setter Property="ZIndex" Value="0"/>
+
+
+								</Style>
+
+								<Style Selector="^ #PART_IncreaseButton Border">
+									<Setter Property="CornerRadius" Value="0 10 10 0"/>
+									<Setter Property="Height" Value="14"/>
+									<Setter Property="Background" Value="#e0e0e0"/>									
+									<Setter Property="ZIndex" Value="0"/>
+
+								</Style>
+
+								<Style Selector="^ Thumb">
+									<Setter Property="Height" Value="10"/>
+									<Setter Property="Width" Value="10"/>
+									<Setter Property="BorderBrush" Value="#2e2e2e"/>
+									<Setter Property="BorderThickness" Value="1"/>
+									<Setter Property="ZIndex" Value="1"/>
+									<Setter Property="ClipToBounds" Value="False"/>
+									<Setter Property="Template">
+										<Setter.Value>
+											<ControlTemplate>
+												<Canvas ZIndex="1" ClipToBounds="False"  Width="5" Height="5">
+													<Ellipse ZIndex="1" ClipToBounds="False" Stroke="Black" StrokeThickness="1" Fill="LightGray" Width="15" Height="15" Canvas.Top="-5" Canvas.Left="-6">
+														
+													</Ellipse>
+												</Canvas>
+											</ControlTemplate>
+										</Setter.Value>
+									</Setter>
+								</Style>
+                        
+						<!--		<Style Selector="^ Thumb">
+									<Setter Property="Height" Value="20"/>
+									<Setter Property="Width" Value="20"/>
+									<Setter Property="BorderBrush" Value="#2e2e2e"/>
+									<Setter Property="Background" Value="LightGray"/>
+									<Setter Property="BorderThickness" Value="1"/>
+								</Style> -->
+
+								<Style Selector="^ Thumb:pointerover">
+									<Setter Property="Height" Value="10"/>
+									<Setter Property="Width" Value="10"/>
+									<Setter Property="BorderBrush" Value="LightGray"/>
+									<Setter Property="Background" Value="White"/>
+									<Setter Property="BorderThickness" Value="1"/>
+								</Style>
+							</Style>
+							<Style Selector="^ Track:disabled">
+								<Style Selector="^ #PART_DecreaseButton Border">
+									<Setter Property="CornerRadius" Value="10 0 0 10 "/>
+									<Setter Property="Height" Value="14"/>
+									<Setter Property="Background" Value="DarkGray"/>
+									<Setter Property="ZIndex" Value="0"/>
+
+								</Style>
+
+								<Style Selector="^ #PART_IncreaseButton Border">
+									<Setter Property="CornerRadius" Value="0 10 10 0 "/>
+									<Setter Property="Height" Value="14"/>
+									<Setter Property="Background" Value="DarkGray"/>
+									<Setter Property="ZIndex" Value="0"/>
+								</Style>
+                        
+								<Style Selector="^ Thumb">
+									<Setter Property="Height" Value="10"/>
+									<Setter Property="Width" Value="10"/>
+									<Setter Property="ZIndex" Value="1"/>
+									<Setter Property="ClipToBounds" Value="False"/>
+									<Setter Property="BorderBrush" Value="#2e2e2e"/>
+									<Setter Property="BorderThickness" Value="1"/>
+									<Setter Property="Template">
+										<Setter.Value>
+											<ControlTemplate>
+												<Canvas ZIndex="1" ClipToBounds="False"  Width="5" Height="5">
+													<Ellipse ZIndex="1" ClipToBounds="False" Stroke="Black" StrokeThickness="1" Fill="DarkGray" Width="15" Height="15" Canvas.Top="-5" Canvas.Left="-6">
+														
+													</Ellipse>
+												</Canvas>
+											</ControlTemplate>
+										</Setter.Value>
+									</Setter>
+								</Style>
+							</Style>
+						</Style>
+					</Slider.Styles>
+				</Slider>
+				<TextBlock Background="Transparent" ZIndex="0" Margin="2 0 0 0" Width="90" VerticalAlignment="Center" Text="{Binding AcquisitionProgress}"  FontSize="10"  > </TextBlock>
+				<CheckBox Margin="0 0 0 0" VerticalAlignment="Center" IsChecked="{Binding ShowLiveView}"  FontSize="10" Command="{Binding DisableLiveView}"   >
+					Show last
+				</CheckBox>
+
+			</StackPanel>
+
+
+			<StackPanel Grid.Column="2"  VerticalAlignment="Bottom" HorizontalAlignment="Right" Orientation="Horizontal">
+				<TextBlock VerticalAlignment="Center"> Pin position: </TextBlock>
+				<ComboBox Padding="3 0 3 0" MinHeight="15" Margin="2 0 0 0" FontSize="10" Height="25" SelectedItem="{Binding PinnedPosition}" BorderBrush="#2e2e2e" ItemsSource="{Binding AvailableStagePositions}" DisplayMemberBinding="{Binding Name}" Width="80"></ComboBox>
+			</StackPanel>
+			</Grid>
+		</DockPanel>
+
+	</Grid>
+
+
+
+
+
+
+
+
+
+
+
+</UserControl>

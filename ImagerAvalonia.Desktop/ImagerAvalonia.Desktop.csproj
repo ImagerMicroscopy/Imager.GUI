@@ -1,0 +1,106 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!--If you are willing to use Windows/MacOS native APIs you will need to create 3 projects.
+    One for Windows with net8.0-windows TFM, one for MacOS with net8.0-macos and one with net8.0 TFM for Linux.-->
+
+	<TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+	<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	<Platforms>AnyCPU;x64</Platforms>
+
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <WarningLevel>0</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <WarningLevel>0</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <WarningLevel>0</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <WarningLevel>0</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="AvaloniaEdit.TextMate" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ImagerAvalonia\ImagerAvalonia.csproj" />
+  </ItemGroup>
+
+
+
+
+
+<!--<Target Name="CopyMIS" AfterTargets="Build">
+		<Message Importance="high" Text="🔄 Copying Measurement Image Storage DLL's (Build)..." />
+		<Copy SourceFiles="..\ImagerAvalonia.Desktop\bin\Debug\net8.0\MeasurementImageStorageDLL.dll" DestinationFolder="$(OutputPath)" />
+		<Copy SourceFiles="..\ImagerAvalonia.Desktop\bin\Debug\net8.0\MeasurementImageStorageDLL.lib" DestinationFolder="$(OutputPath)" />
+	</Target>
+
+
+	<Target Name="CopyMISPublish" AfterTargets="Publish">
+		<Message Importance="high" Text="🔄 Copying Measurement Image Storage DLL's (Build)..." />
+		<Copy SourceFiles="..\ImagerAvalonia.Desktop\bin\Debug\net8.0\MeasurementImageStorageDLL.dll" DestinationFolder="$(PublishDir)" />
+		<Copy SourceFiles="..\ImagerAvalonia.Desktop\bin\Debug\net8.0\MeasurementImageStorageDLL.lib" DestinationFolder="$(PublishDir)" />
+	</Target> -->
+
+
+
+<!--<Target Name="CopyPythonBuild" AfterTargets="Build">
+		<ItemGroup>
+			<SmartProgramFiles Include="..\Python\**\*" />
+		</ItemGroup>
+
+		<Message Importance="high" Text="🔄 Copying Smart Program files..." />
+		<Message Importance="high" Text="OutputPath = '$(OutputPath)'" />
+
+		<Copy SourceFiles="@(SmartProgramFiles)" DestinationFolder="$(OutputPath)SmartProgramPython\%(RecursiveDir)" SkipUnchangedFiles="true" />
+	</Target>
+
+	<Target Name="CopyPython" AfterTargets="Publish">
+		<ItemGroup>
+			<SmartProgramFiles Include="..\Python\**\*" />
+		</ItemGroup>
+
+		<Message Importance="high" Text="🔄 Copying Smart Program files..." />
+		<Message Importance="high" Text="OutputPath = '$(PublishDir)'" />
+
+		<Copy SourceFiles="@(SmartProgramFiles)" DestinationFolder="$(PublishDir)SmartProgramPython\%(RecursiveDir)" SkipUnchangedFiles="true" />
+	</Target> -->
+
+
+	<Target Name="CopyLogs" AfterTargets="Publish">
+		<ItemGroup>
+			<LogBookConfigEnd Include="..\ImagerAvalonia\LogBookConfigEnd.json" />
+			<LogBookConfigStart Include="..\ImagerAvalonia\LogBookConfigStart.json" />
+
+		</ItemGroup>
+
+		<Message Importance="high" Text="🔄 Copying log book configs..." />
+		<Message Importance="high" Text="OutputPath = '$(PublishDir)'" />
+
+		<Copy SourceFiles="@(LogBookConfigEnd)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(LogBookConfigStart)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+
+	</Target>
+</Project>

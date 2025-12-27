@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="using:ImagerAvalonia"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="ImagerAvalonia.Views.MultiChannelConfigView"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			 x:DataType="vm:MultiChannelViewModel">
+
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:MultiChannelConfigChannelViewModel}">
+            <views:MultiChannelConfigChannelView />
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+
+
+
+
+    <StackPanel Orientation="Vertical">
+
+
+	    <ItemsControl Background="Transparent" ItemsSource="{Binding AvailableChannels}">
+            <ItemsControl.ItemTemplate>
+				<DataTemplate>
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Foreground="Black" Text="{Binding ChannelName}" FontSize="14"> </TextBlock>
+                        <StackPanel Margin="-50 0 0 0" Width="200" Orientation="Horizontal" Spacing="140">
+			                <Button Foreground="Black" Command="{Binding OnChannelAdded}" Width="40" Height="25"  HorizontalAlignment="Left"  FontSize="12"  >
+				                Add
+			                </Button>
+			                <Button  Foreground="Black" Command="{Binding OnChannelRemoved}" Width="65" Height="25"   HorizontalAlignment="Right"  FontSize="12"  >
+				                Remove
+			                </Button>
+		                </StackPanel>
+                         <ContentControl Margin="0 4 0 0" IsVisible="{Binding IsEnabled}" Content="{Binding ConfigChannelViewModel}" />
+
+                    </StackPanel>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+
+    </StackPanel>
+</UserControl>

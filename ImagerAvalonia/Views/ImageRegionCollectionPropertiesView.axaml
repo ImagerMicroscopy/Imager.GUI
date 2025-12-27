@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="360" d:DesignHeight="200"
+			 Width="250"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.ImageRegionCollectionPropertiesView"
+			 x:DataType="vm:ImageRegionDisplayViewModel">
+
+	
+
+	<StackPanel >
+		<TextBlock Margin="2 0 0 0" FontSize="12" Foreground="Black"> Region Collections</TextBlock>
+		<Border BorderBrush="Black"  BorderThickness="1" Padding="0" Margin="2">
+			<ListBox 
+					 Background="#80DCDCDC"
+					 FontSize="12"
+					 x:Name="RegionCollections"
+					 ItemsSource="{Binding CollectionNames}"
+					 SelectedItem="{Binding SelectedRegion}"
+					 Height="100">
+			</ListBox>
+
+		</Border>
+		<Grid ColumnDefinitions="30,50,75,90">
+			<Button Margin="2 0 0 0" Height="20" Width="30" Padding="2" FontSize="10" Command="{Binding SetPlotParams}" Grid.Column="0">
+				<Button.Styles>
+					<Style Selector="Button /template/ ContentPresenter">
+						<Setter Property="FontSize" Value="10"/>
+						<Setter Property="Foreground" Value="Black"/>
+						<Setter Property="VerticalAlignment" Value="Stretch"/>
+						<Setter Property="HorizontalAlignment" Value="Stretch"/>
+					</Style>
+				</Button.Styles>
+				Plot</Button>
+			<Button Height="20"  Width="75" Padding="2" FontSize="10"  Command="{Binding HideAllCollections}" Grid.Column="2">
+				<Button.Styles>
+					<Style Selector="Button /template/ ContentPresenter">
+						<Setter Property="Foreground" Value="Black"/>
+						<Setter Property="FontSize" Value="10"/>
+						<Setter Property="VerticalAlignment" Value="Stretch"/>
+						<Setter Property="HorizontalAlignment" Value="Stretch"/>
+					</Style>
+				</Button.Styles>
+				Hide/Show all</Button>
+			<Button Margin="0 0 2 0" Height="20" Width="40" Padding="2" FontSize="10" Command="{Binding DeleteCollection}" HorizontalAlignment="Right" Grid.Column="3"> 
+				<Button.Styles>
+					<Style Selector="Button /template/ ContentPresenter">						
+						<Setter Property="Foreground" Value="Black"/>
+						<Setter Property="FontSize" Value="10"/>
+						<Setter Property="VerticalAlignment" Value="Stretch"/>
+						<Setter Property="HorizontalAlignment" Value="Stretch"/>
+					</Style>
+				</Button.Styles>
+			Delete</Button>
+
+		</Grid >
+
+	
+	</StackPanel>
+
+
+</UserControl>
+

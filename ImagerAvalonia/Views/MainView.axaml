@@ -1,0 +1,611 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:model="using:ImagerAvalonia.Services.MeasurementControl"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="1800"
+             d:DesignHeight="1050"
+             x:Class="ImagerAvalonia.Views.MainView"
+             x:DataType="vm:MainViewModel">
+
+	<Design.DataContext>
+		<vm:MainViewModel />
+	</Design.DataContext>
+
+
+
+	<UserControl.Styles>
+
+
+
+
+		<Style Selector="NumericUpDown.custom-numeric-style">
+
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate>
+						<Border Height="20" Padding="0" BorderThickness="0" Margin="0 0 0 0">
+							<Grid>
+								<TextBox BorderThickness="0.5" Padding="5 0 0 0" VerticalContentAlignment="Center" Name="PART_TextBox" FontSize="10" MinHeight="10" HorizontalAlignment="Stretch" />
+								<Grid HorizontalAlignment="Right">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Button BorderThickness="0.5 0 0.5 0" BorderBrush="Gray" CornerRadius="3 0 0 3"  Padding="0" Name="PART_IncreaseButton" HorizontalContentAlignment="Center"  VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="6" Grid.Column="0" Width="17" Height="19" Content="▲" Click="IncreaseValue"> 
+										<Button.Styles>
+											<Style Selector="Button /template/ ContentPresenter">
+												<Setter Property="FontSize" Value="8"/>
+												<Setter Property="VerticalAlignment" Value="Stretch"/>
+												<Setter Property="HorizontalAlignment" Value="Stretch"/>
+								
+
+											</Style>
+										</Button.Styles>
+									</Button>
+									<Button  CornerRadius="0 3 3 0" BorderThickness="0 0 0.5 0" BorderBrush="Gray" Padding="0" Name="PART_DecreaseButton" HorizontalContentAlignment="Center"  VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="6" Grid.Column="1" Width="17" Height="19" Content="▼" Click="DecreaseValue">
+									     <Button.Styles>
+
+											<Style Selector="Button /template/ ContentPresenter">
+												<Setter Property="FontSize" Value="8"/>
+												<Setter Property="VerticalAlignment" Value="Stretch"/>
+												<Setter Property="HorizontalAlignment" Value="Stretch"/>
+
+											</Style>
+										</Button.Styles>
+									</Button>
+								</Grid>
+							</Grid>
+						</Border>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+		
+		<Style Selector="TabControl WrapPanel">
+			<Setter Property="MaxHeight" Value="200" />
+			<Setter Property="Margin" Value="2,0,0,0" />
+		</Style>
+
+
+
+		<Style Selector="TabItem">
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="MinHeight" Value="12" />
+			<Setter Property="VerticalAlignment" Value="Center" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="Padding" Value="10 0" />
+			<Setter Property="BorderThickness" Value="0.5 1 1 1" />
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+		</Style>
+
+		<Style Selector="TabItem:selected">
+			<Setter Property="Background" Value="#454545" />
+			<Setter Property="Margin" Value="0" />
+			<Setter Property="Padding" Value="10 0" />
+		</Style>
+
+		<Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#454545" />
+		</Style>
+	</UserControl.Styles>
+	
+	<UserControl.DataTemplates>
+		    <dataTemplates:DetectorPropertyTemplateSelector>
+				<DataTemplate x:Key="Numeric" DataType="vm:NumericDetectorPropertyViewModel">
+
+				</DataTemplate>
+				<DataTemplate x:Key="Discrete" DataType="vm:CategoricDetectorPropertyViewModel">
+				
+				</DataTemplate>
+
+		</dataTemplates:DetectorPropertyTemplateSelector>
+	
+		<dataTemplates:MovablePropertyTemplateSelector>
+				<DataTemplate x:Key="Continuous" DataType="vm:ContinuousMovableEquipmentViewModel">
+					
+				</DataTemplate>
+				<DataTemplate x:Key="Discrete" DataType="vm:DiscreteMovableEquipmentViewModel">
+				
+				</DataTemplate>
+
+		</dataTemplates:MovablePropertyTemplateSelector>
+	</UserControl.DataTemplates>
+	
+	
+
+
+	<SplitView IsPaneOpen="True"
+			   DisplayMode="Inline"
+			   OpenPaneLength="300"
+			   PanePlacement="Left"
+			   PaneBackground="Transparent">
+
+		<SplitView.Pane>
+			<ScrollViewer>
+				<Border BorderBrush="Gray" BorderThickness="0,0,0,0" Padding="0" Margin="0">
+
+					<StackPanel Margin="10">
+
+						<!-- Experiments -->
+						<Border  Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
+							<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
+								<Expander.Resources>
+									<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
+											<GradientStop Color="#ba96e3" Offset="0.0"/>
+											<GradientStop Color="#ad76ea" Offset="1.0"/>
+									</LinearGradientBrush>
+
+									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
+										<GradientStop Color="#bd86fa" Offset="0.0"/>
+										<GradientStop Color="#6173a5" Offset="1.0"/>
+									</LinearGradientBrush>
+
+									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
+										<GradientStop Color="#8d56ca" Offset="0.0"/>
+										<GradientStop Color="#415385" Offset="1.0"/>
+									</LinearGradientBrush>
+
+								</Expander.Resources>
+								<Expander.Header>
+									<Grid Margin="0">
+										<TextBlock Padding="0"
+													Margin="0 5 16 0"
+													VerticalAlignment="Center"
+													Height="27"
+													FontSize="17"
+													Width="200"
+													Background="Transparent"
+													Text="Experiments"/>
+									</Grid>								
+								</Expander.Header>
+								<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}" Width="270">
+								<Border
+									CornerRadius="5"
+									BorderBrush="Transparent"
+									BorderThickness="0.5"
+									ClipToBounds="True">
+								<ListBox 
+									        CornerRadius="5 5 5 5" 
+											BorderBrush="Black" BorderThickness="1"
+											Background="Gray"
+											x:Name="AvailableExperiments"
+											ItemsSource="{Binding Experiments}"
+											SelectedItem="{Binding SelectedExperiment}"
+											Height="100"
+											Width="266"
+											ClipToBounds="True">
+									<ListBox.ItemTemplate>
+										<DataTemplate>
+											<TextBlock Margin="5 0 0 0" VerticalAlignment="Center"  Text="{Binding ExperimentName}" />
+										</DataTemplate>
+									</ListBox.ItemTemplate>
+									<ListBox.Styles>
+										<Style Selector="ListBoxItem">
+											<Setter Property="Background" Value="Transparent"/>
+											<Setter Property="Height" Value="25"/>
+											<Setter Property="FontSize" Value="12"/>
+											<Setter Property="Padding" Value="0"/>
+											<Setter Property="Foreground" Value="White"/>
+										</Style>
+										<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+											<Setter Property="Background">
+												<Setter.Value>
+													<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+														<GradientStop Color="#ba96e3" Offset="0.0"/>
+														<GradientStop Color="#ad76ea" Offset="1.0"/>
+													</LinearGradientBrush>
+												</Setter.Value>
+											</Setter>
+											<Setter Property="Height" Value="25"/>
+											<Setter Property="FontSize" Value="12"/>
+											<Setter Property="Padding" Value="0"/>
+											<Setter Property="CornerRadius" Value="5"/>
+										</Style>
+										
+									</ListBox.Styles>
+
+								</ListBox>
+								</Border>
+								<StackPanel Width="297" Orientation="Horizontal" HorizontalAlignment="Left" Spacing="14.8" Margin="2 0 0 0">
+										<Button Height="25" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="55" BorderBrush="#2e2e2e" Command="{Binding AddExperiment}">
+											Add
+										</Button>					
+										<Button  Height="25"  Padding="0 3 0 3"  VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="55" BorderBrush="#2e2e2e" Command="{Binding SaveExperiment}">
+											Save
+										</Button>
+										<Button  Height="25"  Padding="0 3 0 3"  VerticalContentAlignment="Center"  HorizontalContentAlignment="Center" Width="55" BorderBrush="#2e2e2e" Command="{Binding LoadExperiment}">
+											Load
+										</Button>
+										<Button  Height="25"  Padding="0 3 0 3"  VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="55" BorderBrush="#2e2e2e" Command="{Binding RemoveExperiment}">
+											Remove
+										</Button>
+								</StackPanel>
+								<Border  Margin="0 5 2 0" BorderThickness="0 1 0 0" Width="250" BorderBrush="Gray">
+									
+								</Border>
+								<views:ExperimentalPanelViewControl Margin="0 5 0 0"  Padding="0" HorizontalAlignment="Left" Width="270"  x:Name="ExperimentalPanelViewControl"
+											 DataContext="{Binding SelectedExperiment}"/>
+							</StackPanel>
+							</Expander>
+
+
+						</Border>
+						<StackPanel   Margin="0 0 0 0">
+	
+						<Border  Margin="0 10 0 0" Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
+								<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
+									<Expander.Resources>
+										<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
+												<GradientStop Color="#ba96e3" Offset="0.0"/>
+												<GradientStop Color="#ad76ea" Offset="1.0"/>
+										</LinearGradientBrush>
+
+										<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
+											<GradientStop Color="#bd86fa" Offset="0.0"/>
+											<GradientStop Color="#6173a5" Offset="1.0"/>
+										</LinearGradientBrush>
+
+										<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
+											<GradientStop Color="#8d56ca" Offset="0.0"/>
+											<GradientStop Color="#415385" Offset="1.0"/>
+										</LinearGradientBrush>
+
+									</Expander.Resources>
+									<Expander.Header>
+										<Grid Margin="0">
+												<TextBlock Padding="0"
+															Margin="0 5 16 0"
+															VerticalAlignment="Center"
+															Height="27"
+															FontSize="17"
+															Width="200"
+															Background="Transparent"
+															Text="Stage control"/>
+										</Grid>										
+									</Expander.Header>
+									<StackPanel Width="250">
+
+
+										<views:StageControlPanelView x:Name="StageControlPanelViewControl" Height="200"/>
+
+									</StackPanel>
+								</Expander>
+
+
+							</Border>
+
+
+
+
+
+						<Border  Margin="0 10 0 0" Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
+							<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
+								<Expander.Resources>
+									<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
+											<GradientStop Color="#ba96e3" Offset="0.0"/>
+											<GradientStop Color="#ad76ea" Offset="1.0"/>
+									</LinearGradientBrush>
+
+									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
+										<GradientStop Color="#bd86fa" Offset="0.0"/>
+										<GradientStop Color="#6173a5" Offset="1.0"/>
+									</LinearGradientBrush>
+
+									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
+										<GradientStop Color="#8d56ca" Offset="0.0"/>
+										<GradientStop Color="#415385" Offset="1.0"/>
+									</LinearGradientBrush>
+
+								</Expander.Resources>
+								<Expander.Header>
+										<Grid Margin="0">
+												<TextBlock Padding="0"
+															Margin="0 5 16 0"
+															VerticalAlignment="Center"
+															Height="27"
+															FontSize="17"
+															Width="200"
+															Background="Transparent"
+															Text="Status messages"/>
+										</Grid>							
+								</Expander.Header>
+								<StackPanel Width="250">
+
+
+									<views:StatusWindowView  x:Name="StatusViewControl" Height="100"/>
+
+								</StackPanel>
+
+							</Expander>
+
+
+						</Border>
+
+						</StackPanel>
+
+					</StackPanel>
+					
+				</Border>
+
+
+
+			</ScrollViewer>
+		</SplitView.Pane>
+
+		<SplitView.Content>
+
+			<SplitView IsPaneOpen="True"
+			   DisplayMode="Inline"
+			   OpenPaneLength="297"
+			   PanePlacement="Right"
+		   PaneBackground="Transparent">
+
+				<SplitView.Content>
+					
+			
+					<Grid>
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="*"/>
+						</Grid.RowDefinitions>
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="*"/>
+							<ColumnDefinition Width="0"/>
+						</Grid.ColumnDefinitions>
+
+						<views:ImageControlPanelView x:Name="ImageControlView"
+													 DataContext="{Binding ImageControlPanel}"
+													 Grid.RowSpan="2"
+													 Grid.Column="0"/>
+					</Grid>
+			
+			
+				</SplitView.Content>
+				<SplitView.Pane>
+					<ScrollViewer>
+						<Border BorderBrush="Gray" BorderThickness="0,0,0,0" Padding="0" Margin="0">
+							<StackPanel Width="280"  Margin="0 10 0 0">
+
+									<Border Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
+										<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
+											<Expander.Resources>
+												<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
+														<GradientStop Color="#ba96e3" Offset="0.0"/>
+														<GradientStop Color="#ad76ea" Offset="1.0"/>
+												</LinearGradientBrush>
+
+												<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
+													<GradientStop Color="#bd86fa" Offset="0.0"/>
+													<GradientStop Color="#6173a5" Offset="1.0"/>
+												</LinearGradientBrush>
+
+												<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
+													<GradientStop Color="#8d56ca" Offset="0.0"/>
+													<GradientStop Color="#415385" Offset="1.0"/>
+												</LinearGradientBrush>
+
+											</Expander.Resources>
+											<Expander.Header>
+												<Grid Margin="0">
+
+													<TextBlock 	Margin="0 5 16 0" VerticalAlignment="Center" Height="25"  FontSize="17" Width="200" Background="Transparent">Acquisitions</TextBlock>
+												</Grid>
+											</Expander.Header>
+											<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}"  Width="270" Background="#454545">
+
+
+												<ListBox CornerRadius="5 5 5 5" 
+															BorderBrush="Black" BorderThickness="1"
+															Width="266"
+															Background="Gray"
+															HorizontalAlignment="Center"
+															x:Name="AvailableAcquisitions"
+															ItemsSource="{Binding UserDefinedAcquisitionSettings.Acquisitions}"
+															SelectedItem="{Binding SelectedAcquisition}"
+															Margin="0 0 0 0"
+															Height="100">
+													<ListBox.ItemTemplate>
+														<DataTemplate>
+															<TextBox    HorizontalAlignment="Left" Margin="0 0 0 0"  Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+																			Background="Transparent"
+																			VerticalContentAlignment="Center"
+																			BorderThickness="0"
+																			Height="22"
+																			Width="90"
+																			MinHeight="12"
+																			Padding="2"
+																			FontSize="12"
+																			CaretBrush="Black"
+																			Focusable="True"
+																			IsTabStop="True"/>
+
+														</DataTemplate>
+													</ListBox.ItemTemplate>
+													<ListBox.Styles>
+														<Style Selector="ListBoxItem">
+															<Setter Property="Background" Value="Transparent"/>
+															<Setter Property="Height" Value="25"/>
+															<Setter Property="FontSize" Value="12"/>
+															<Setter Property="Padding" Value="0"/>
+															<Setter Property="Foreground" Value="White"/>
+														</Style>
+														<Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+															<Setter Property="Background">
+																<Setter.Value>
+																	<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+																		<GradientStop Color="#ba96e3" Offset="0.0"/>
+																		<GradientStop Color="#ad76ea" Offset="1.0"/>
+																	</LinearGradientBrush>
+																</Setter.Value>
+															</Setter>
+															<Setter Property="Height" Value="25"/>
+															<Setter Property="FontSize" Value="12"/>
+															<Setter Property="Padding" Value="0"/>
+															<Setter Property="CornerRadius" Value="5"/>
+														</Style>
+										
+													</ListBox.Styles>
+												</ListBox>
+
+												<StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="146" Margin="2 0 0 0">
+														<Button Height="25" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="60" BorderBrush="#2e2e2e" Command="{Binding	CopyAcquisition}">
+															Copy
+														</Button>	
+														<Button Height="25" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="60" BorderBrush="#2e2e2e" Command="{Binding RemoveAcquisition}">
+															Remove
+														</Button>			
+												</StackPanel>
+												
+												<!-- Sources -->
+												<TextBlock Margin="5" FontSize="15">Available Sources</TextBlock>
+
+												<!-- Channels -->
+											<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding SelectedAcquisition.Sources}">
+												<ItemsControl.ItemTemplate>
+													
+												<DataTemplate x:DataType="vm:SourcesViewModel">
+													<ScrollViewer VerticalScrollBarVisibility="Auto">
+
+														<Expander Width="265" IsExpanded="True" Padding="0" MinHeight="13" CornerRadius="5">
+															<Expander.Resources>
+																<SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Gray" ></SolidColorBrush>
+																<x:Double  x:Key="ExpanderChevronButtonSize" >17</x:Double>
+
+															</Expander.Resources>
+															<Expander.Header>
+																<Grid Margin="0">
+
+																	<TextBlock Text="{Binding DisplayedName}" 	Margin="0 0 16 0" VerticalAlignment="Center" Height="10"  FontSize="11" Width="200" Background="Transparent"></TextBlock>
+																</Grid>
+														</Expander.Header>
+
+
+
+														<ItemsControl Margin="0 2 0 0" Background="Transparent"  ItemsSource="{Binding Channels}">
+															<ItemsControl.ItemTemplate>
+																<DataTemplate>
+
+																	<Grid Margin="2 2 0 2" ColumnDefinitions="100,0.5*,0.5*"  Height="20">
+																		<TextBlock Foreground="White" ToolTip.Tip="{Binding Name}" FontSize="12" Text="{Binding Name}" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+																		<CheckBox BorderThickness="0.5"  Margin="0 0 10 0" Padding="0"  HorizontalAlignment="Right"  IsChecked="{Binding IsEnabled}" Grid.Row="0" Grid.Column="1"/>
+																		<NumericUpDown Classes="custom-numeric-style" HorizontalAlignment="Right" Value="{Binding PowerLevel}" Minimum="0" Maximum="100" Increment="1" Grid.Row="0" Grid.Column="2"/>
+
+
+
+																	</Grid>
+																</DataTemplate>
+															</ItemsControl.ItemTemplate>
+														</ItemsControl>
+														</Expander>
+													</ScrollViewer>
+													</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+
+												<!-- Filter settings -->
+												<TextBlock Margin="4" FontSize="15">Movable components</TextBlock>
+
+
+
+												<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding SelectedAcquisition.FilterWheels}">
+												<ItemsControl.ItemTemplate>
+													
+												<DataTemplate x:DataType="vm:MovableEquipmentViewModel">
+													<ScrollViewer VerticalScrollBarVisibility="Auto">
+
+														<Expander Width="265" IsExpanded="True" Padding="0" MinHeight="13" CornerRadius="5">
+															<Expander.Resources>
+																<SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Gray" ></SolidColorBrush>
+																<x:Double  x:Key="ExpanderChevronButtonSize" >17</x:Double>
+
+															</Expander.Resources>
+															<Expander.Header>
+																<Grid Margin="0">
+
+																	<TextBlock Text="{Binding Name}" 	Margin="0 0 16 0" VerticalAlignment="Center" Height="10"  FontSize="11" Width="200" Background="Transparent"></TextBlock>
+																</Grid>
+														</Expander.Header>
+
+														<ItemsControl Margin="0 2 0 0" Width="260"  ItemsSource="{Binding Properties}"></ItemsControl>
+
+													</Expander>
+													</ScrollViewer>
+													</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+
+
+
+	
+												<!-- Detectors -->
+												<TextBlock Margin="4" FontSize="15">Available Detectors</TextBlock>
+												<Grid ColumnDefinitions="400,1.5*" Margin="2 2 0 2">
+													<ItemsControl ItemsSource="{Binding SelectedAcquisition.Detector}">
+														<ItemsControl.ItemTemplate>
+															<DataTemplate>
+																<Grid ColumnDefinitions="150,1.5*" Margin="2 -4 0 2">
+																	<TextBlock FontSize="10" Text="{Binding Name}" Margin="0" VerticalAlignment="Center" Grid.Row="0" Grid.Column="0"/>
+																	<ToggleSwitch IsChecked="{Binding IsEnabled}" Margin="30 0 0 0" Grid.Row="0" Grid.Column="1">																	
+																	</ToggleSwitch>
+																</Grid>
+															</DataTemplate>
+														</ItemsControl.ItemTemplate>
+													</ItemsControl>
+												</Grid>
+
+												<TextBlock Margin="4,4,0,0" FontSize="15">Detector properties</TextBlock>
+
+												<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding  SelectedAcquisition.Detector}">
+												<ItemsControl.ItemTemplate>
+													
+												<DataTemplate x:DataType="vm:DetectorEquipmentViewModel">
+													<ScrollViewer VerticalScrollBarVisibility="Auto">
+
+														<Expander Width="265" IsExpanded="True" Padding="0" MinHeight="13" CornerRadius="5">
+															<Expander.Resources>
+																<SolidColorBrush x:Key="ExpanderHeaderBackground" Color="Gray" ></SolidColorBrush>
+																<x:Double  x:Key="ExpanderChevronButtonSize" >17</x:Double>
+
+															</Expander.Resources>
+															<Expander.Header>
+																<Grid Margin="0">
+
+																	<TextBlock Text="{Binding Name}" 	Margin="0 0 16 0" VerticalAlignment="Center" Height="10"  FontSize="11" Width="200" Background="Transparent"></TextBlock>
+																</Grid>
+														</Expander.Header>
+
+
+
+														<ItemsControl Margin="0 2 0 0" Background="Transparent"  ItemsSource="{Binding Properties}">
+															
+														</ItemsControl>
+														</Expander>
+													</ScrollViewer>
+													</DataTemplate>
+													</ItemsControl.ItemTemplate>
+												</ItemsControl>
+
+
+
+	
+												
+											</StackPanel>
+										</Expander>
+
+									</Border >
+							</StackPanel>
+							
+						</Border>
+					</ScrollViewer>
+				</SplitView.Pane>
+			</SplitView>
+		</SplitView.Content>
+
+	</SplitView>
+</UserControl>

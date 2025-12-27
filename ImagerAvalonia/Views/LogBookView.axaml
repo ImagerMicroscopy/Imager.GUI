@@ -1,0 +1,142 @@
+<Window xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             CanResize="False"
+             RequestedThemeVariant="Dark"
+			 Background="Gray"
+             Width="800"
+             Height="650"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.LogBookView"
+			 x:DataType="vm:LogBookViewModel"
+             Title="Log book"
+             Icon="/Assets/icons/IconImager.ico">
+
+<Window.Styles>
+	
+    <Styles>
+        <Style Selector="DataValidationErrors">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Content="{TemplateBinding Content}" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+
+        <Style Selector="TextBox:error /template/ Border#PART_BorderElement">
+            <Style.Animations>
+                <Animation Duration="0:0:1" IterationCount="3">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="BorderBrush" Value="Red"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="50%">
+                        <Setter Property="BorderBrush" Value="Transparent"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="BorderBrush" Value="Red"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
+    </Styles>
+</Window.Styles>
+
+
+
+  <StackPanel Background="Gray"  Margin="0 20 0 0" Orientation="Vertical">
+    <Grid Margin="20 0 0 0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Column="0" FontSize="16" VerticalAlignment="Center" Text="User:"/>
+        <TextBox Grid.Column="1" VerticalAlignment="Center" Text="{Binding UserName}" IsEnabled="{Binding !IsEnd}">
+
+        </TextBox>
+        <TextBlock Grid.Column="2" Margin="20 0 0 0" VerticalAlignment="Center" Text="Start usage:"/>
+        <TextBlock Grid.Column="3" Margin="20 0 0 0" VerticalAlignment="Center" Text="{Binding StartDate}"/>
+        <TextBlock Grid.Column="4" Margin="20 0 0 0" VerticalAlignment="Center" IsVisible="{Binding IsEnd}" Text="End usage:"/>
+        <TextBlock Grid.Column="5" Margin="20 0 0 0" VerticalAlignment="Center" IsVisible="{Binding IsEnd}" Text="{Binding EndDate}"/>
+    </Grid>
+   <Border Background="#454545" Margin="0 20 0 0" BorderBrush="Black" BorderThickness="0.5">
+
+   <ScrollViewer Height="500" VerticalScrollBarVisibility="Auto">
+   <Grid  Background="#454545"   HorizontalAlignment="Left" Margin="20 20 0 0" ColumnDefinitions="350,350" Width="700">
+        <ItemsControl IsEnabled="{Binding !IsEnd}" Grid.Column="0"   Width="300" ItemsSource="{Binding SettingsStart}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <TextBlock Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" Text="{Binding Logbooksettingkey}" />
+                        <ItemsControl Margin="40 0 0 0" ItemsSource="{Binding Logbooksettingvalues}" >
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Grid.Column="0"  ColumnDefinitions="200,100">
+                                        <TextBlock Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left" Grid.Column="0" Text="{Binding Logbookvalue}" />
+                                        <CheckBox VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" IsChecked="{Binding Isvalueenabled}">
+                                            <CheckBox.Styles>
+                                                <Style Selector="CheckBox:unchecked /template/ Border#NormalRectangle">
+                                                    <Setter Property="BorderBrush" Value="White"/>
+                                                </Style>
+                                                <Style Selector="CheckBox:pointerover /template/ Border#NormalRectangle">
+                                                    <Setter Property="BorderBrush" Value="White" />
+                                                </Style>
+                                            </CheckBox.Styles>
+                                        </CheckBox>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl IsVisible="{Binding IsEnd}" Grid.Column="1"  Width="300" ItemsSource="{Binding SettingsEnd}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel>
+                        <TextBlock Foreground="White" FontWeight="Bold" HorizontalAlignment="Left" Text="{Binding Logbooksettingkey}" />
+                        <ItemsControl Margin="40 0 0 0" ItemsSource="{Binding Logbooksettingvalues}" >
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid   ColumnDefinitions="200,100">
+                                        <TextBlock Foreground="White" VerticalAlignment="Center" HorizontalAlignment="Left" Grid.Column="0" Text="{Binding Logbookvalue}" />
+                                        <CheckBox VerticalAlignment="Center" HorizontalAlignment="Center" Grid.Column="1" IsChecked="{Binding Isvalueenabled}">
+                                            <CheckBox.Styles>
+                                                <Style Selector="CheckBox:unchecked /template/ Border#NormalRectangle">
+                                                    <Setter Property="BorderBrush" Value="White"/>
+                                                </Style>
+                                                <Style Selector="CheckBox:pointerover /template/ Border#NormalRectangle">
+                                                    <Setter Property="BorderBrush" Value="White" />
+                                                </Style>
+                                            </CheckBox.Styles>
+                                        </CheckBox>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+    </ScrollViewer>
+    </Border>
+
+    <Button Height="25" Padding="3 2 3 2" Command="{Binding SubmitEntry}" HorizontalAlignment="Right" BorderBrush="#2e2e2e"> Submit </Button>
+    </StackPanel>
+
+
+
+</Window>
+

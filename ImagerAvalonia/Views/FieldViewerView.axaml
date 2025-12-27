@@ -1,0 +1,116 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d" d:DesignWidth="2000" d:DesignHeight="2000"
+             x:Class="ImagerAvalonia.Views.FieldViewerView"
+             x:DataType="vm:FieldViewerViewModel"
+			 
+			 Background="#454545">
+
+	<Grid x:Name="ParentGrid">
+
+
+
+
+		<Grid x:Name="ParentCanvasGrid">
+
+			<Canvas VerticalAlignment="Top" Margin="0 0 0 0" HorizontalAlignment="Left"  x:Name="CNVS" Background="#454545" Height="2000" Width="2000"  >
+			<Canvas.RenderTransform>
+				<TransformGroup>
+					<ScaleTransform ScaleX="1" ScaleY="1"/>
+					<TranslateTransform X="0" Y="0"/>
+				</TransformGroup>
+			</Canvas.RenderTransform>
+			<Rectangle Canvas.Top="0" Canvas.Left="0" Height="2000" Width="2000" Fill="#454545" />
+
+
+
+			</Canvas>
+		</Grid>
+
+		<StackPanel Margin="10 10 0 0" VerticalAlignment="Top" HorizontalAlignment="Left" Orientation="Horizontal"  Width="210" Height="200" >
+			<Border Background="Gainsboro"
+				  BorderBrush="Black"
+				  BorderThickness="2"
+				  CornerRadius="5"
+					BoxShadow="5 5 10 5 Black"
+				  Padding="0"  Opacity="0.2">
+
+				<Rectangle Height="150" Width="212" Fill="Transparent" />
+
+			</Border>
+
+			<TextBlock Margin="-204 5 0 0"  FontSize="14"> Field view settings</TextBlock>
+
+			<Grid Height="20" Margin="-204 -81 0 0"   ColumnDefinitions="100,100">
+				<TextBlock FontSize="12" Grid.Column="0" > Pixel size (nm)</TextBlock>
+								
+				<NumericUpDown HorizontalAlignment="Left" Classes="custom-numeric-style" Grid.Column="1" Minimum="0"  Value="{Binding PixelSize}" Width="100" Height="20"  > </NumericUpDown>
+
+
+			</Grid>
+
+			<Grid Height="20" Margin="-204 -38 0 0"   ColumnDefinitions="100,100">
+				<TextBlock FontSize="12" VerticalAlignment="Center" Grid.Column="0" > Acquisition</TextBlock>
+
+				<ComboBox Padding="2" FontSize="10" BorderThickness="0.5" MinHeight="20" Height="20"  VerticalAlignment="Center" Grid.Column="1" SelectedItem="{Binding SelectedAcquisition}"  ItemsSource="{Binding Acquisitions}"   Width="100"   > </ComboBox>
+
+
+			</Grid>
+
+			<Grid Height="20" Margin="-204 5 0 0"   ColumnDefinitions="100,100">
+				<TextBlock FontSize="12" VerticalAlignment="Center" Grid.Column="0" > Detector</TextBlock>
+
+				<ComboBox Padding="2" FontSize="10" BorderThickness="0.5"  MinHeight="20" Height="20" VerticalAlignment="Center" Grid.Column="1" SelectedItem="{Binding SelectedDetector}" ItemsSource="{Binding Detectors}"   Width="100"  > </ComboBox>
+
+
+			</Grid>
+			
+			
+
+			<Grid Height="30" Margin="-204 118 0 0"   ColumnDefinitions="100,100">
+				<TextBlock VerticalAlignment="Center" Grid.Column="0"  > Engage</TextBlock>
+				<ToggleSwitch Height="40" Grid.Column="1" Margin="0 10 0 0" VerticalAlignment="Center" Command="{Binding EngageFieldViewer}"  > </ToggleSwitch>
+
+
+			</Grid>
+
+			
+			
+
+		</StackPanel>
+
+
+
+		<StackPanel Width="310" HorizontalAlignment="Right">
+			<Border Background="Gainsboro"
+					BorderBrush="Black"
+					BorderThickness="2"
+					CornerRadius="5"
+					BoxShadow="5 5 10 5 Black"
+					Padding="10" Margin="0 10 10 0" Opacity="0.5">
+
+				<Rectangle Height="25" Width="230" Fill="" />
+			</Border>
+			<views:ContrastPanelView Height="100" x:Name="ContrastPanelFieldView" Margin="-20 -40 0 0" Width="250">
+
+			</views:ContrastPanelView>
+		</StackPanel>
+
+
+
+
+
+		<DockPanel Height="25" VerticalAlignment="Bottom"  Background="Gray"> 
+		<Grid RowDefinitions="25"  ColumnDefinitions="100,100,100">
+			<Button  Padding="3 4 3 4" Grid.Row="0" Grid.Column="0" FontSize="10" Width="90" Margin="2 0 0 0" Click="ClearSelected" BorderBrush="#2e2e2e"> Clear view</Button>
+			<Button  Padding="3 4 3 4" Grid.Row="0" Grid.Column="1" FontSize="10"  Width="90" Margin="2 0 0 0" Click="OnResetView" BorderBrush="#2e2e2e"> Reset view </Button>
+			<Button  Padding="3 4 3 4" Grid.Row="0" Grid.Column="2" FontSize="10"  Width="90" Margin="2 0 0 0" Click="GoToCurrent" BorderBrush="#2e2e2e"> Go to current</Button>
+		</Grid>
+
+		</DockPanel>
+	</Grid>
+</UserControl>

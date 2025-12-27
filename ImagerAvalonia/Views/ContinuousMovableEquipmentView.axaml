@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:model="using:ImagerAvalonia.Services.MeasurementControl"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="400"
+             d:DesignHeight="40"
+             x:Class="ImagerAvalonia.Views.ContinuousMovableEquipmentView"
+             x:DataType="vm:ContinuousMovableEquipmentViewModel">
+
+			<StackPanel  Margin="4 0 0 0" Spacing="43" HorizontalAlignment="Stretch" Orientation="Horizontal">
+				<TextBlock ToolTip.Tip="{Binding ComponentName}" FontSize="12" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ComponentName}" Width="105"/>
+				<!--	<TextBlock FontSize="10" HorizontalAlignment="Right" VerticalAlignment = "Center" Text="{Binding MinValue}" Width="9"/> -->
+
+				<NumericUpDown  HorizontalAlignment="Right" ToolTip.Tip="{Binding MinmaxVal}" Classes="custom-numeric-style" x:Name="UpDownSelector" Value="{Binding SelectedValue, Mode=TwoWay}" Increment="{Binding IncrementValue}" Minimum="{Binding MinValue}" Maximum="{Binding MaxValue}" Width="107" ></NumericUpDown>
+
+				<!--    <TextBlock FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding MaxValue}" Width="20"/> -->
+
+
+			</StackPanel>
+
+</UserControl>

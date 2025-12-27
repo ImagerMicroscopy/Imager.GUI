@@ -1,0 +1,96 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="260"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.TimeLapseView"
+			 x:DataType="vm:TimeLapseViewModel">
+
+
+
+
+
+	<UserControl.Styles >
+
+		<Style Selector="Border.header-border">
+			<Setter Property="Background">
+				<Setter.Value>
+					<SolidColorBrush Color="#454545"  />
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="MaxWidth" Value="750" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="Border.thin">
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="CornerRadius" Value="0,0,5,5" />
+			<Setter Property="Margin" Value="0,0,0,15" />
+		</Style>
+
+	</UserControl.Styles>
+
+
+
+	<StackPanel Orientation="Vertical"
+				Width="600"
+			    HorizontalAlignment="Left"
+				Background="#454545">
+			<StackPanel Orientation="Vertical"
+						Spacing="4">
+				<TextBlock Text="Time lapse" Classes="header" />
+			</StackPanel>
+
+
+
+
+			<Grid ColumnDefinitions="140,40" RowDefinitions="Auto,Auto"  >
+				<TextBlock FontSize="10" Text="Number of times in total" VerticalAlignment="Center"  Grid.Row="0" Grid.Column="0"/>
+				<NumericUpDown Classes="custom-numeric-style" Value="{Binding NTimes, Mode=TwoWay}" Minimum="0" Increment="1"  IsTabStop="True"
+				 Width="110"  ShowButtonSpinner="True" FormatString="N0" ParsingNumberStyle="Integer"
+								   HorizontalAlignment="Left" Grid.Row="0" Grid.Column="1"  />
+				<TextBlock FontSize="10" Text="Time delta (s)"  VerticalAlignment="Center"  Grid.Row="1" Grid.Column="0" />
+				<NumericUpDown Classes="custom-numeric-style" Value="{Binding TimeDelta , Mode=TwoWay }" Minimum="0.001" Increment="0.001" IsTabStop="True"
+				 Width="110"   ShowButtonSpinner="True"
+								   HorizontalAlignment="Left" Grid.Row="1" Grid.Column="1"   />
+
+			</Grid>
+
+
+		<StackPanel  Width="110" HorizontalAlignment="Left" Orientation="Horizontal">
+			<TextBlock Foreground="White"  FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Parameters from program" Width="130"/>
+			<CheckBox IsChecked="{Binding FromProgramId}" Margin="20 0 0 0">
+
+			</CheckBox>
+
+		</StackPanel>
+
+		<StackPanel IsEnabled="{Binding FromProgramId}"  Width="110" HorizontalAlignment="Left" Orientation="Horizontal">
+			<TextBlock Foreground="White"  FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Program ID" Width="40"/>
+
+			<ComboBox BorderThickness="0.5" HorizontalAlignment="Center" FontSize="10" Padding="0" MinHeight="20" Height="20" 
+			 DisplayMemberBinding="{Binding SmartProgramID}"  VerticalAlignment = "Center"  Margin="20 0 0 0" 
+			 SelectedItem="{Binding SelectedProgramId}" ItemsSource="{Binding SmartPrograms}" Width="110">
+				<ComboBox.Styles>
+					<Style Selector="ComboBox ContentPresenter">
+						<Setter Property="Margin" Value="5 0 0 0"/>
+					</Style>
+				</ComboBox.Styles>
+			</ComboBox> 
+		</StackPanel>
+		
+		
+	</StackPanel>
+
+</UserControl>
+

@@ -1,0 +1,174 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="650"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.RelStageView"
+			 x:DataType="vm:RelStageViewModel">
+
+
+
+
+
+	<UserControl.Styles >
+
+		<Style Selector="Border.header-border">
+			<Setter Property="Background">
+				<Setter.Value>
+					<SolidColorBrush Color="#454545"  />
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="MaxWidth" Value="750" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="Border.thin">
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="CornerRadius" Value="0,0,5,5" />
+			<Setter Property="Margin" Value="0,0,0,15" />
+		</Style>
+
+	</UserControl.Styles>
+
+
+
+	<StackPanel Orientation="Vertical"
+				Width="600"
+			    HorizontalAlignment="Left"
+				Background="#454545">
+			<StackPanel Orientation="Vertical"
+						Spacing="4">
+				<TextBlock Text="Relative stage loop"  Classes="header" />
+			</StackPanel>
+
+		
+	
+			
+			<StackPanel Margin="0 0 0 0" Orientation="Vertical"
+						HorizontalAlignment="Left"
+						Spacing="-4">
+				
+					<Grid ColumnDefinitions="162,100">
+
+					<TextBlock FontSize="10"  VerticalAlignment="Center" Grid.Column="0"  Margin="0,2,0,0"
+										 Text="Step size in X (μm)"
+										 TextTrimming="CharacterEllipsis" />
+					<NumericUpDown Grid.Column="1" Classes="custom-numeric-style" Minimum="0" Watermark="0" Value="{Binding StepSizeX, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, FallbackValue=0}"
+					 Width="100"  ShowButtonSpinner="False"
+									   VerticalAlignment="Center" />
+					</Grid>
+
+					<Grid ColumnDefinitions="162,100">
+
+					<TextBlock FontSize="10" VerticalAlignment="Center"  Grid.Column="0"  Margin="0,2,0,0"
+										 Text="Step size in Y (μm)"
+										 TextTrimming="CharacterEllipsis" />
+					<NumericUpDown  Grid.Column="1"  Classes="custom-numeric-style"  Minimum="0" Watermark="0" Value="{Binding StepSizeY, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, FallbackValue=0}"
+					 Width="100"  ShowButtonSpinner="False"
+									   VerticalAlignment="Center" />
+					</Grid>
+
+					<Grid ColumnDefinitions="162,100">
+
+					<TextBlock FontSize="10" VerticalAlignment="Center"  Grid.Column="0"  Margin="0,2,0,0"
+										 Text="Step size in Z (μm)"
+										 TextTrimming="CharacterEllipsis" />
+
+					<NumericUpDown  Grid.Column="1" Classes="custom-numeric-style"  Minimum="0" Watermark="0" Value="{Binding StepSizeZ, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, FallbackValue=0}"
+					Width="100"  ShowButtonSpinner="False"
+									   VerticalAlignment="Center" />
+					</Grid>
+
+			</StackPanel>
+
+
+
+
+
+
+			<StackPanel  Orientation="Vertical"
+				        Margin="10 0 0 0"
+						HorizontalAlignment="Left"
+						Spacing="-4">
+				
+					<Canvas Width="300" Height="230">
+						    <Image Source="avares://ImagerAvalonia/Assets/stage.png"
+						   Width="230" Height="230"
+						   Canvas.Left="15"
+						   Canvas.Top="20" ZIndex="0"/>
+
+							<NumericUpDown Canvas.Left="40" Canvas.Top="40" Grid.Column="1"  Classes="custom-numeric-style"  Width="10" Name="upDown1"  Value="{Binding TilePositiveY, FallbackValue=0}"
+											   ShowButtonSpinner="False"
+											  Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0" ZIndex="1"/>
+
+							<NumericUpDown Canvas.Left="-5" Canvas.Top="80" Grid.Column="1"   Classes="custom-numeric-style"  Width="10" Name="upDown2" Value="{Binding TileNegativeY, FallbackValue=0}"
+										ShowButtonSpinner="False"
+										 Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0"/>
+
+							<NumericUpDown Canvas.Left="-5" Canvas.Top="170"  Grid.Column="1"   Classes="custom-numeric-style"  Width="10" Name="upDown3" Value="{Binding TileNegativeX, FallbackValue=0}"
+										ShowButtonSpinner="False"
+										 Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0" ZIndex="1"/>
+
+							<NumericUpDown Canvas.Left="40" Canvas.Top="200"  Grid.Column="1"   Classes="custom-numeric-style"  Width="10" Name="upDown4" Value="{Binding TilePositiveX, FallbackValue=0}"
+										ShowButtonSpinner="False"
+										 Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0" ZIndex="1"/>
+
+							<NumericUpDown Canvas.Left="140" Canvas.Top="30"  Grid.Column="1"  Classes="custom-numeric-style"  Width="10" Name="upDown5" Value="{Binding TileNegativeZ, FallbackValue=0}"
+												ShowButtonSpinner="False"
+												 Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0" ZIndex="1"/>
+						
+							<NumericUpDown Canvas.Left="140" Canvas.Top="60"  Grid.Column="1"  Classes="custom-numeric-style"  Width="10" Name="upDown6" Value="{Binding TilePositiveZ, FallbackValue=0}"
+												ShowButtonSpinner="False"
+												 Watermark="0" Increment="1" FormatString="N0" ParsingNumberStyle="Integer" Minimum="0" ZIndex="1"/>
+
+
+					</Canvas>
+					
+
+				</StackPanel>
+
+
+
+		<StackPanel Margin="0 0 0 0" Orientation="Horizontal">
+			<TextBlock  Width="130" FontSize="10" VerticalAlignment="Center">Return to original position </TextBlock>
+			<CheckBox IsChecked="{Binding ReturnToStartingPosition}"  VerticalAlignment="Center" Margin="20 0 0 0"></CheckBox>
+		</StackPanel>
+			
+
+		<StackPanel Margin="0 0 0 0" Width="110" HorizontalAlignment="Left" Orientation="Horizontal">
+			<TextBlock Foreground="White"  FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Parameters from program" Width="130"/>
+			<CheckBox IsChecked="{Binding FromProgramId}" Margin="20 0 0 0">
+				<CheckBox.Resources>
+					<SolidColorBrush x:Key="CheckBoxCheckBackgroundFillChecked">#ad76ea</SolidColorBrush>
+					<SolidColorBrush x:Key="CheckBoxCheckBackgroundFillPressed">#ad76ea</SolidColorBrush>
+
+				</CheckBox.Resources>
+			</CheckBox>
+
+		</StackPanel>
+
+		<StackPanel IsEnabled="{Binding FromProgramId}" Margin="0 0 0 0" Width="110" HorizontalAlignment="Left" Orientation="Horizontal">
+			<TextBlock Foreground="White"  FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Program ID" Width="40"/>
+
+		    <ComboBox BorderThickness="0.5" HorizontalAlignment="Center" FontSize="10" Padding="0" MinHeight="20" Height="20" ItemsSource="{Binding SmartPrograms}" DisplayMemberBinding="{Binding SmartProgramID}"  VerticalAlignment = "Center"  Margin="20 0 0 0" SelectedItem="{Binding SelectedProgramId}"  Width="110">
+				<ComboBox.Styles>
+					<Style Selector="ComboBox ContentPresenter">
+						<Setter Property="Margin" Value="5 0 0 0"/>
+					</Style>
+				</ComboBox.Styles>
+			</ComboBox> 
+		</StackPanel>
+	</StackPanel>
+
+</UserControl>
+

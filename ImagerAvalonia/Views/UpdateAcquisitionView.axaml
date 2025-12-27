@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+			 xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.UpdateAcquisitionView"
+			 x:DataType="vm:UpdateAcquisitionViewModel">
+
+	<UserControl.Styles>
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+	</UserControl.Styles>
+
+	<StackPanel Orientation="Vertical"
+				Width="600"
+			    HorizontalAlignment="Left"
+				Background="#454545">
+		<Border Classes="header-border">
+			<StackPanel Orientation="Vertical"
+						Spacing="4">
+				<TextBlock Text="Update Acquisition" Classes="header" />
+
+				<ItemsControl ItemsSource="{Binding ToUpdateAcquisitions}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+						<StackPanel Orientation="Horizontal">
+							<RadioButton IsChecked="{Binding Enabledupdate}" Content="{Binding Name}"   GroupName="AcqUpdate" />
+								
+						</StackPanel>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</StackPanel>
+		</Border>
+	</StackPanel>
+</UserControl>

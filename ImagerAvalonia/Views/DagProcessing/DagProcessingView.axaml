@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			
+             mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
+             x:Class="ImagerAvalonia.Views.DagProcessingView"
+			 x:DataType="vm:DagProcessingViewModel"
+			 Background="#454545">
+
+
+	<SplitView 
+		   IsPaneOpen="True"
+           DisplayMode="Inline"
+           OpenPaneLength="260"
+		   PaneBackground="Gray">
+		<SplitView.Pane>
+			<StackPanel Margin="10 10 0 0">
+				<Border  BorderThickness="0 0 2 0" BorderBrush="Black">
+					<StackPanel Orientation="Vertical">
+						<TextBlock FontSize="20"> External API functions </TextBlock>
+
+						<ItemsControl Background="Gray"  ItemsSource="{Binding ApiNodes}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Grid Margin="3 0 0 0" ColumnDefinitions="200 20">
+									<TextBlock Grid.Column="0" Text="{Binding }"> </TextBlock>
+									<Button Command="{Binding  $parent[SplitView].((vm:DagProcessingViewModel)DataContext).AddNode}" CommandParameter="{Binding}"    FontSize="20"  BorderBrush="{DynamicResource SystemAccentColor}"   Grid.Column="1"  Margin="20 0 0 0" Width="20" Height="20">
+
+										<Button.Content>
+											<TextBlock Width="20" Height="20"  Margin="4 -5 0 0 ">+</TextBlock>
+										</Button.Content>
+
+									</Button>
+
+								</Grid>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+						</ItemsControl>
+
+						<TextBlock FontSize="20">Inputs</TextBlock>
+						<Grid Margin="3 0 0 0" ColumnDefinitions="200 20">
+							<TextBlock Grid.Column="0" Text="Image input"> </TextBlock>
+							<Button Command="{Binding  $parent[SplitView].((vm:DagProcessingViewModel)DataContext).AddImageInputNode}"     FontSize="20"  BorderBrush="{DynamicResource SystemAccentColor}"   Grid.Column="1"  Margin="20 0 0 0" Width="20" Height="20">
+
+								<Button.Content>
+									<TextBlock Width="20" Height="20"  Margin="4 -5 0 0 ">+</TextBlock>
+								</Button.Content>
+
+							</Button>
+
+						</Grid>
+
+						<StackPanel>
+							<Button Margin="0 10 0 5" Command="{Binding  $parent[SplitView].((vm:DagProcessingViewModel)DataContext).SubmitDag}"   BorderBrush="{DynamicResource SystemAccentColor}"  HorizontalAlignment="Right"  Width="100" Height="20">
+								<Button.Content>
+									<TextBlock FontSize="12"   Margin="4 -5 0 0 ">Submit DAG</TextBlock>
+								</Button.Content>
+
+							</Button>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+			</StackPanel>
+			
+		</SplitView.Pane>
+
+		<SplitView.Content>
+			<Canvas x:Name="ProcessingCanvas" Background="#454545">
+
+
+	
+			</Canvas>
+
+		</SplitView.Content>
+	</SplitView>
+
+
+
+
+
+
+
+
+
+
+
+
+</UserControl>

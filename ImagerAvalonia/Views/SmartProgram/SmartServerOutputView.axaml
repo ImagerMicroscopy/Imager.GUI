@@ -1,0 +1,27 @@
+<UserControl  xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:reactiveui="using:ReactiveUI"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			
+             mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
+             x:Class="ImagerAvalonia.Views.SmartServerOutputView"
+             x:DataType="vm:SmartProgramOutputViewModel">
+    <ScrollViewer x:Name="ScrollViewer" VerticalScrollBarVisibility="Visible" 
+                  HorizontalScrollBarVisibility="Disabled">
+	<!--	<TextBlock FontSize="12" Text="{Binding SmartProgramOutput}" Background="#000a21">
+		
+        </TextBlock> -->
+
+        <ItemsControl ItemsSource="{Binding RunList}" >
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <TextBlock Text="{Binding Text}" Foreground="{Binding Color}"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+    
+</UserControl>

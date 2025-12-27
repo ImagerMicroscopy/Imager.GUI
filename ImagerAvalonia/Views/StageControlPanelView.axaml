@@ -1,0 +1,205 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+
+			 xmlns:ScottPlot="clr-namespace:ScottPlot.Avalonia;assembly=ScottPlot.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="300"
+             x:Class="ImagerAvalonia.Views.StageControlPanelView"
+             x:DataType="vm:StageControlPanelViewModel"
+			 DragDrop.AllowDrop="True">
+
+
+
+	<!--	<Grid ColumnDefinitions="*, 0.5, 350">
+
+
+
+
+			<SplitView IsPaneOpen="True"
+			DisplayMode="Inline"
+			OpenPaneLength="350"
+		    PanePlacement="Right"
+			PaneBackground="Transparent">
+		<SplitView.Pane> -->
+
+
+
+
+
+		
+	<Grid >
+
+
+
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*" />
+			<!-- This defines a single column taking full width -->
+		</Grid.ColumnDefinitions>
+		
+		
+		
+			<StackPanel Margin="30 0 0 0"  Orientation="Horizontal"  Width="300" Height="160" >
+				<StackPanel Margin="0 0 0 0" Orientation="Horizontal"  Width="60" Height="160" >
+					<Border
+							Margin="0 -45 -40 0"
+							 BorderBrush="Black"
+							  BorderThickness="0" Height="30" Width="30"
+							  CornerRadius="5"
+							 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+						<Button
+							Command="{Binding MoveWest}"
+							Background="Gainsboro"
+							  CornerRadius="5"
+							Width="30" Height="40" Padding="0 5 0 5"  BorderBrush="#2e2e2e"  TextBlock.TextAlignment="Center" FontSize="12"> ◀ </Button>
+					</Border>
+
+
+
+					<StackPanel Margin="40 0 0 0" Orientation="Vertical"  Width="40" Height="120" 	 >
+						<TextBlock Margin="0 -37 0 0" FontSize="16" HorizontalAlignment="Center"> XY </TextBlock>
+						<Border
+						Margin="0 -4 0 0"
+						 BorderBrush="Black"
+						  BorderThickness="0" Height="30" Width="30"
+						  CornerRadius="5"
+						 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+							<Button
+								Command="{Binding MoveNorth}"
+								Background="Gainsboro"
+								  CornerRadius="5"
+									Width="30" Height="40" Padding="0 5 0 5"  BorderBrush="#2e2e2e"  TextBlock.TextAlignment="Center" FontSize="12"> ▲ </Button>
+						</Border>
+						<Border
+						Margin="0 20 0 0"
+					 BorderBrush="Black"
+					  BorderThickness="0" Height="30" Width="30"
+					  CornerRadius="5"
+					 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+							<Button
+								Command="{Binding MoveSouth}"
+								Background="Gainsboro"
+								CornerRadius="5"
+							    Width="30" Height="40" Padding="0 5 0 5"  BorderBrush="#2e2e2e" TextBlock.TextAlignment="Center" FontSize="12"> ▼ </Button>
+						</Border>
+
+						<TextBlock Margin="20 20 0 0" Width="120" FontSize="16" HorizontalAlignment="Center"> XY step (μm) </TextBlock>
+						<NumericUpDown  Classes="custom-numeric-style"  Minimum="0"  Value="{Binding XYStep,TargetNullValue=0.0, FallbackValue=0.0}" Width="120" Margin="0 0 0 0" HorizontalAlignment="Center">  </NumericUpDown>
+
+					</StackPanel>
+
+					<Border
+					Margin="0 -45 -40 0"
+					 BorderBrush="Black"
+					  BorderThickness="0" Height="30" Width="30"
+					  CornerRadius="5"
+					 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+						<Button
+							Command="{Binding MoveEast}"
+							Background="Gainsboro"
+							CornerRadius="5"
+							Width="30" Height="40" Padding="0 5 0 5"   BorderBrush="#2e2e2e" TextBlock.TextAlignment="Center" FontSize="12">  ▶ </Button>
+					</Border>
+
+
+
+				</StackPanel>
+
+
+
+				<StackPanel Margin="110 0 0 0" Orientation="Vertical"  Width="40" Height="120" 	 >
+					<TextBlock Margin="0 -37 0 0" FontSize="16" HorizontalAlignment="Center"> Z </TextBlock>
+					<Border
+					Margin="0 -4 0 0"
+				 BorderBrush="Black"
+				  BorderThickness="0" Height="30" Width="30"
+				  CornerRadius="5"
+				 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+						<Button
+							Command="{Binding MoveUp}"
+							Background="Gainsboro"
+							CornerRadius="5"
+							Width="30" Height="40" Padding="0 5 0 5" BorderBrush="#2e2e2e" TextBlock.TextAlignment="Center" FontSize="12"> ▲ </Button>
+					</Border>
+					<Border
+					Margin="0 20 0 0"
+				 BorderBrush="Black"
+				  BorderThickness="0" Height="30" Width="30"
+				  CornerRadius="5"
+				 BoxShadow="5 5 10 5 Black" Opacity="0.5">
+						<Button
+							Command="{Binding MoveDown}"
+							Background="Gainsboro"
+							CornerRadius="5"
+							Width="30" Height="40" Padding="0 5 0 5"   BorderBrush="#2e2e2e" TextBlock.TextAlignment="Center" FontSize="12"> ▼ </Button>
+					</Border>
+
+					<TextBlock Margin="20 20 0 0" Width="120" FontSize="16" HorizontalAlignment="Center"> Z step (μm) </TextBlock>
+					<NumericUpDown  Classes="custom-numeric-style"   Minimum="0"  Value="{Binding ZStep,TargetNullValue=0.0, FallbackValue=0.0}" Width="110" Margin="0 0 0 0" HorizontalAlignment="Center">  </NumericUpDown>
+
+				</StackPanel>
+
+
+			</StackPanel>
+
+		
+		
+		
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	</Grid>
+
+	<!--	<StackPanel Canvas.Top="500" Margin="0 0 0 0" Orientation="Horizontal"  Width="280" Height="120" >
+			<Border Background="Gainsboro"
+					BorderBrush="Black"
+					BorderThickness="2"
+					CornerRadius="5"
+					BoxShadow="5 5 10 5 Black"
+					Padding="10" Margin="40" Opacity="0.5">
+
+				<Rectangle Height="100" Width="232" Fill="" />
+
+
+			</Border>
+
+			<StackPanel  Margin="-100 0 0 0" Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Width="100" Height="120" >
+					<Button Background="{Binding BackgroundExperimentColor}"  x:Name="StartExperiment" Content="{Binding ExperimentText}" Command="{Binding StartExperiment}" BorderBrush="{DynamicResource SystemAccentColor}"></Button> 
+			</StackPanel>
+
+
+
+			<StackPanel Margin="-290 0 0 0" Orientation="Horizontal"  Width="300" Height="120"  	 >
+
+					<Button IsEnabled="{Binding !IsExperimentEnabled}" Background="LightGreen" Command="{Binding EnableLive}" x:Name="EnableOrStopLive" Margin="0 0 0 0" BorderBrush="{DynamicResource SystemAccentColor}" > Live </Button> 
+
+			</StackPanel>
+		</StackPanel> -->
+
+
+
+
+
+
+
+
+	<!-- 	</Grid> -->
+
+
+
+
+</UserControl>

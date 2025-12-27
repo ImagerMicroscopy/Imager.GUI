@@ -1,0 +1,138 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="ImagerAvalonia.Views.ImageElementCollectionsView"	  
+        xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+		xmlns:circleviews="clr-namespace:ImagerAvalonia.Views.CircleElementPlotviews"
+		xmlns:lineviews="clr-namespace:ImagerAvalonia.Views.LineElementPlotviews"
+		Background="#454545"
+		x:DataType="vm:ImageElementCollectionsViewModel">
+
+	<Window.DataTemplates>
+		<DataTemplate DataType="{x:Type vm:CircleElementViewModel}">
+			<Border BorderBrush="Gray" BorderThickness="1" Padding="4" Margin="4">
+				<DockPanel>
+					
+					<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="#EEE">
+						<TextBlock Text="" Width="0" HorizontalAlignment="Stretch" />
+
+						<Button Content="✕"
+								Width="20"
+								Height="22"
+								Margin="2,0,0,0"
+								Padding="0 0 0 0"
+								HorizontalContentAlignment="Center"
+								VerticalContentAlignment="Center"
+								Foreground="Red"
+								HorizontalAlignment="Right"
+								Command="{Binding $parent[ItemsControl].((vm:ImageElementCollectionsViewModel)DataContext).RemovePlotElementCommand}"
+								CommandParameter="{Binding}"/>
+					</StackPanel>
+
+					<circleviews:CircleElementPlotView DataContext="{Binding}" />
+				</DockPanel>
+			</Border>
+		</DataTemplate>
+		<DataTemplate DataType="{x:Type vm:LineElementViewModel}">
+			<Border BorderBrush="Gray" BorderThickness="1" Padding="4" Margin="4">
+				<DockPanel>
+
+					<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="#EEE">
+						<TextBlock Text="" Width="0" HorizontalAlignment="Stretch" />
+
+						<Button Content="✕"
+								Width="20"
+								Height="22"
+								Margin="2,0,0,0"
+								Padding="0 0 0 0"
+								HorizontalContentAlignment="Center"
+								VerticalContentAlignment="Center"
+								Foreground="Red"
+								HorizontalAlignment="Right"
+								Command="{Binding $parent[ItemsControl].((vm:ImageElementCollectionsViewModel)DataContext).RemovePlotElementCommand}"
+								CommandParameter="{Binding}"/>
+					</StackPanel>
+
+					<lineviews:LineElementPlotView DataContext="{Binding}" />
+				</DockPanel>
+			</Border>
+		</DataTemplate>
+	</Window.DataTemplates>
+
+	<Window.Styles>
+		<Style Selector="NumericUpDown.custom-numeric-style">
+			<Setter Property="Template">
+				<Setter.Value>
+					<ControlTemplate>
+						<Border Height="20" Padding="0" BorderThickness="0" Margin="0 0 0 0">
+							<Grid>
+								<TextBox BorderThickness="0.5" Padding="5 0 0 0" VerticalContentAlignment="Center" Name="PART_TextBox" FontSize="10" MinHeight="10" HorizontalAlignment="Stretch" />
+								<Grid HorizontalAlignment="Right">
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*" />
+										<ColumnDefinition Width="*" />
+									</Grid.ColumnDefinitions>
+									<Button Padding="0" Name="PART_IncreaseButton" HorizontalContentAlignment="Center"  VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="6" Grid.Column="0" Width="17" Height="17" Content="▲" Click="IncreaseValue" />
+									<Button Padding="0" Name="PART_DecreaseButton" HorizontalContentAlignment="Center"  VerticalAlignment="Center" VerticalContentAlignment="Center" FontSize="6" Grid.Column="1" Width="17" Height="17" Content="▼" Click="DecreaseValue" />
+								</Grid>
+							</Grid>
+						</Border>
+					</ControlTemplate>
+				</Setter.Value>
+			</Setter>
+		</Style>
+
+	</Window.Styles>
+	<ScrollViewer VerticalScrollBarVisibility="Visible" VerticalAlignment="Stretch">
+
+		
+	<!--	<ItemsControl ItemsSource="{Binding PlotElements}">
+
+			<ItemsControl.ItemsPanel>
+				<ItemsPanelTemplate>
+					<UniformGrid/>
+				</ItemsPanelTemplate>
+			</ItemsControl.ItemsPanel>
+		</ItemsControl> -->
+
+
+		<ItemsControl ItemsSource="{Binding PlotElements}">
+			<ItemsControl.ItemsPanel>
+				<ItemsPanelTemplate>
+					<UniformGrid Rows="{Binding NumberOfCollections, Mode=TwoWay}" />
+				</ItemsPanelTemplate>
+			</ItemsControl.ItemsPanel>
+
+			<ItemsControl.ItemTemplate>
+				<DataTemplate DataType="{x:Type vm:CircleElementViewModel}">
+					<Border BorderBrush="Gray" BorderThickness="1" Padding="4" Margin="4">
+						<DockPanel>
+
+							<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="#EEE">
+								<TextBlock Text="" Width="0" HorizontalAlignment="Stretch" />
+
+								<Button Content="✕"
+										Width="20"
+										Height="22"
+										Margin="2,0,0,0"
+										Padding="0 0 0 0"
+										HorizontalContentAlignment="Center"
+										VerticalContentAlignment="Center"
+										Foreground="Red"
+										HorizontalAlignment="Right"
+										Command="{Binding $parent[ItemsControl].((vm:ImageElementCollectionsViewModel)DataContext).RemovePlotElementCommand}"
+										CommandParameter="{Binding}"/>
+							</StackPanel>
+
+							<circleviews:CircleElementPlotView DataContext="{Binding}" />
+						</DockPanel>
+					</Border>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+			
+	</ScrollViewer>
+
+</Window>

@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+			
+             mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
+             x:Class="ImagerAvalonia.Views.SmartProgramEditorView"
+			 x:DataType="vm:SmartProgramViewModel"
+			 Background="#454545">
+
+
+	
+    <UserControl.DataTemplates>
+		<DataTemplate DataType="{x:Type vm:ScalarVM}">
+			<Grid ColumnDefinitions="100, 100">
+				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="0.001" Value="{Binding Value, Mode=TwoWay}" />
+            </Grid>
+        </DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:BooleanVM}">
+			<Grid ColumnDefinitions="100, 100">
+				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+				<CheckBox Grid.Column="1" IsChecked="{Binding Value, Mode=TwoWay}" />
+			</Grid>
+		</DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:IntegerVM}">
+			<Grid ColumnDefinitions="100, 100">
+				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="1" Value="{Binding Value, Mode=TwoWay}" />
+			</Grid>
+		</DataTemplate>
+
+		<DataTemplate DataType="{x:Type vm:TextVM}">
+			<Grid ColumnDefinitions="100, 100">
+				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+				<TextBox  BorderThickness="1" Grid.Column="1" Padding="0" Margin="0" Width="100" MinHeight="20" Height="20" FontSize="12" Text="{Binding Value, Mode=TwoWay}" />
+			</Grid>
+		</DataTemplate>
+    </UserControl.DataTemplates>
+
+	<DockPanel>
+	
+
+		<SplitView DockPanel.Dock="Bottom" 
+			
+			IsPaneOpen="True"
+			DisplayMode="Inline"
+			OpenPaneLength="260"
+			PaneBackground="Gray">
+			<SplitView.Pane>
+				<StackPanel Margin="10 2 0 0">
+					<StackPanel  Spacing="80" Orientation="Horizontal" >
+						<Button Height="25" Width="85" HorizontalAlignment="Left" Command="{Binding LoadFolder}" >Load Folder</Button>
+						<Button Height="25" Width="85" HorizontalAlignment="Right" Click="saveFile" >Save File</Button>
+					</StackPanel>
+					<Border Margin="0 10 0 0" BorderThickness="0 0 0 0" BorderBrush="Black">
+						<StackPanel Orientation="Vertical">
+							<StackPanel Orientation="Horizontal">
+								<TextBlock VerticalAlignment="Center" Foreground="Black" FontSize="14"> Selected Program </TextBlock>
+								<ComboBox BorderThickness="0.5" SelectedItem="{Binding SelectedProgram}" HorizontalAlignment="Center" FontSize="10" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="20 0 0 0"  ItemsSource="{Binding ProgramNames}" Width="110">
+									<ComboBox.Styles>
+										<Style Selector="ComboBox ContentPresenter">
+											<Setter Property="Margin" Value="5 0 0 0"/>
+										</Style>
+									</ComboBox.Styles>
+								</ComboBox>
+							</StackPanel>
+						<TextBlock Margin="0 20 0 0" Foreground="Black" FontSize="14"> Program parameters </TextBlock>
+								
+						<ItemsControl ItemsSource="{Binding AvailableParameters}" >
+						</ItemsControl>
+
+						<TextBlock Foreground="Black"  Margin="0 20 0 0" FontSize="14"> Program methods </TextBlock>
+
+						<ItemsControl Background="Gray"  ItemsSource="{Binding AvailableMethods}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<StackPanel>
+									<TextBlock Text="{Binding MethodName}"></TextBlock>
+									<views:InputFunctionView/>
+								</StackPanel>
+
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+						</ItemsControl> 
+
+						<TextBlock Foreground="Black"  Margin="0 20 0 0" FontSize="14"> Acquisition Updates </TextBlock>
+
+						<ItemsControl Background="Gray"  ItemsSource="{Binding AvailableAcquisitionUpdates}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<StackPanel>
+									<TextBlock Text="{Binding AcquisitionUpdate}"></TextBlock>
+									<views:SmartUpdateAcquisitionView/>
+								</StackPanel>
+
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+						</ItemsControl> 
+
+						</StackPanel>
+					</Border>
+				</StackPanel>
+
+			</SplitView.Pane>
+
+			<SplitView.Content>
+				<ContentControl  BorderThickness="0" >
+					<views:EditorView x:Name="EditorView">
+
+					</views:EditorView>
+				</ContentControl>
+			</SplitView.Content>
+		</SplitView>
+	</DockPanel>
+</UserControl>

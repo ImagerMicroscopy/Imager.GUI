@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ImagerAvalonia.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+			 x:DataType="vm:SmartUpdateAcquisitionFunctionViewModel"
+             x:Class="ImagerAvalonia.Views.SmartUpdateAcquisitionView">
+
+	<UserControl.DataTemplates>
+		<DataTemplate x:DataType="vm:UpdateAcquisitionFunctionParameterViewModel">
+			<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+				<TextBlock Grid.Column="0" Text="{Binding ParameterName}"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Width="80"/>
+				<ComboBox HorizontalAlignment="Right" Grid.Column="1" SelectedIndex="{Binding SelectedPathIndex}"  ItemsSource="{Binding EquipmentPaths}"   BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding SelectedPath}" Width="90">
+					<ComboBox.Styles>
+						<Style Selector="ComboBox ContentPresenter">
+							<Setter Property="Margin" Value="5 0 0 0"/>
+						</Style>
+					</ComboBox.Styles>
+				</ComboBox>
+			</Grid>
+		</DataTemplate>
+
+	</UserControl.DataTemplates>
+
+	<StackPanel Orientation="Vertical">
+    <Grid Margin="3 0 0 0" ColumnDefinitions="180 20 20">
+
+		<TextBlock FontSize="12" Foreground="Black" Grid.Column="0" Text="Selected Acquisition Update"> </TextBlock>
+
+		<Rectangle  Width="8" Height="8" Fill="{Binding SmartProgramBinding.SmartProgramColor}"  Grid.Column="1" IsHitTestVisible="True"  />
+
+		<Button   Click="OnSelectButtonClick"  FontSize="20"   Grid.Column="2"  Margin="20 0 0 0" Width="20" Height="20">
+			<Button.Styles>
+				<Style Selector="Button /template/ ContentPresenter">
+					<Setter Property="FontSize" Value="20"/>
+					<Setter Property="VerticalAlignment" Value="Stretch"/>
+					<Setter Property="HorizontalAlignment" Value="Stretch"/>
+				</Style>
+			</Button.Styles>
+			<Button.Content>
+				<TextBlock Width="20" Height="20"  Margin="4 -5 0 0 ">+</TextBlock>
+			</Button.Content>
+
+		</Button>
+	</Grid> 
+
+	<ItemsControl ItemsSource="{Binding AcquisitionUpdateParameters}">
+		
+	</ItemsControl>
+	</StackPanel>
+</UserControl>

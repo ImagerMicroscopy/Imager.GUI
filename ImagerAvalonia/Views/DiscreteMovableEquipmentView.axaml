@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:model="using:ImagerAvalonia.Services.MeasurementControl"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="120"
+             d:DesignHeight="40"
+             x:Class="ImagerAvalonia.Views.DiscreteMovableEquipmentView"
+             x:DataType="vm:DiscreteMovableEquipmentViewModel">
+
+	<StackPanel Margin="4 0 0 0" Spacing="43" HorizontalAlignment="Stretch" Orientation="Horizontal">
+		<TextBlock ToolTip.Tip="{Binding ComponentName}" FontSize="12" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding ComponentName}" Width="80"/>
+		<ComboBox   BorderThickness="0.5" HorizontalAlignment="Right" FontSize="10" Padding="0" MinHeight="20" Height="20" VerticalAlignment = "Center"  SelectedIndex="0"  Margin="20 0 0 0" SelectedItem="{Binding SelectedMovableComponent}" ItemsSource="{Binding PossibleSettings}" Width="113">
+			<ComboBox.Styles>
+				<Style Selector="ComboBox ContentPresenter">
+					<Setter Property="Margin" Value="5 0 0 0"/>
+				</Style>
+	
+			</ComboBox.Styles>
+		</ComboBox>
+	</StackPanel>
+
+</UserControl>

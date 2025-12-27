@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="120"
+             d:DesignHeight="40"
+             x:Class="ImagerAvalonia.Views.InputFunctionView"
+             x:DataType="vm:InputFunctionViewModel">
+
+
+
+	<StackPanel Orientation="Vertical">
+	<ItemsControl ItemsSource="{Binding MethodParams}" >
+			<ItemsControl.ItemTemplate>
+				<DataTemplate>
+					<StackPanel>
+						<Grid Margin="3 0 0 0" ColumnDefinitions="180 20 20">
+
+						<TextBlock FontSize="12" Foreground="Black" Grid.Column="0" Text="Selected Detection"> </TextBlock>
+
+						<Rectangle  Width="8" Height="8" Fill="{Binding SmartProgramBinding.SmartProgramColor}"  Grid.Column="1" IsHitTestVisible="True"  />
+
+						<Button   Click="OnSelectButtonClick"  FontSize="20"     Grid.Column="2"  Margin="20 0 0 0" Width="20" Height="20">
+							<Button.Styles>
+								<Style Selector="Button /template/ ContentPresenter">
+									<Setter Property="FontSize" Value="20"/>
+									<Setter Property="VerticalAlignment" Value="Stretch"/>
+									<Setter Property="HorizontalAlignment" Value="Stretch"/>
+								</Style>
+							</Button.Styles>
+							<Button.Content>
+								<TextBlock HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Width="20" Height="20"  Margin="4 -5 0 0 ">+</TextBlock>
+							</Button.Content>
+
+						</Button>
+						</Grid>
+
+
+
+						<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+							<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Acquisition" Width="80"/>
+							<ComboBox HorizontalAlignment="Right" Grid.Column="1"  ItemsSource="{Binding FilteredAcquisitions}" DisplayMemberBinding="{Binding Name}"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding AcquisitionInput}" Width="90">
+								<ComboBox.Styles>
+									<Style Selector="ComboBox ContentPresenter">
+										<Setter Property="Margin" Value="5 0 0 0"/>
+									</Style>
+								</ComboBox.Styles>
+							</ComboBox>
+						</Grid>
+
+						<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
+							<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Detector" Width="80"/>
+							<ComboBox HorizontalAlignment="Right" Grid.Column="1" ItemsSource="{Binding DefinedDetectors}" DisplayMemberBinding="{Binding Name}"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" SelectedItem="{Binding DetectorInput}"  Width="90">
+								<ComboBox.Styles>
+									<Style Selector="ComboBox ContentPresenter">
+										<Setter Property="Margin" Value="5 0 0 0"/>
+									</Style>
+								</ComboBox.Styles>
+							</ComboBox>
+						</Grid>
+					</StackPanel>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+
+		</StackPanel>
+
+</UserControl>

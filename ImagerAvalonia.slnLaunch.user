@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "New Profile",
+    "Projects": [
+      {
+        "Path": "ImagerAvalonia.Desktop\\ImagerAvalonia.Desktop.csproj",
+        "Action": "Start",
+        "DebugTarget": "ImagerAvalonia.Desktop"
+      },
+      {
+        "Path": "DagOrchestrator\\DagOrchestrator.csproj",
+        "Action": "Start",
+        "DebugTarget": "http"
+      }
+    ]
+  }
+]

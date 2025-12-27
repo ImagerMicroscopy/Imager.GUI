@@ -1,0 +1,7 @@
+{
+  "Clean?": [ "40x Objective", "100x Objective", "Stage", "Microscope Area" ],
+  "Used Objectives": [ "40x Objective (AIR)", "100x Objective (OIL)" ],
+  "Stage Inserts": [ "Ti2-S-HU" ],
+  "Manual optics": [ "1.5x", "1.0x" ],
+  "Detection": [ "Left port", "Right port", "PCO-Edge4.0", "Hamamatsu", "Photometrix 1", "Photometrix 2" ]
+}

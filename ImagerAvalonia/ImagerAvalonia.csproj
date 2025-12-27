@@ -1,0 +1,193 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+
+	  <LangVersion>latest</LangVersion>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+	  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	  <Platforms>AnyCPU;x64</Platforms>
+
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Autofac" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" />
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" />
+    <PackageReference Include="Avalonia.Diagnostics" />
+    <PackageReference Include="Avalonia.ReactiveUI" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Xaml.Behaviors" />
+    <PackageReference Include="AvaloniaEdit.TextMate" />
+    <PackageReference Include="BitMiracle.LibTiff.NET" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="MessagePack" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+	<PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+	<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+	<PackageReference Include="Newtonsoft.Json" />
+	<PackageReference Include="RangeSlider.Avalonia" />
+    <PackageReference Include="ScottPlot" />
+    <PackageReference Include="ScottPlot.Avalonia" />
+    <PackageReference Include="System.Drawing.Common" />
+
+
+
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BitMiracle.LibTiff.NET">
+      <HintPath>..\..\libtiff.net-master\Result\net7.0\BitMiracle.LibTiff.NET.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaXaml Update="Views\FieldViewerView.axaml">
+      <SubType>Designer</SubType>
+    </AvaloniaXaml>
+    <AvaloniaXaml Update="Views\ContrastPanelView.axaml">
+      <SubType>Designer</SubType>
+    </AvaloniaXaml>
+  </ItemGroup>
+
+
+	
+	
+  <ItemGroup>
+    <Compile Update="Views\DagProcessing\DagNodeBase.axaml.cs">
+      <DependentUpon>DagNodeBase.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\DagProcessing\DagNodeImageOutputView.axaml.cs">
+      <DependentUpon>DagNodeImageOutputView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\DagProcessing\DagNodeImageInputView.axaml.cs">
+      <DependentUpon>DagNodeImageInputView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\LogBookView.axaml.cs">
+      <DependentUpon>LogBookView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageViews\ImageElementViews\LineElementPlotView.axaml.cs">
+      <DependentUpon>LineElementPlotView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageViews\ImageElementViews\CircleElementPlotView.axaml.cs">
+      <DependentUpon>CircleElementPlotView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\DiscreteMovableEquipmentView.axaml.cs">
+      <DependentUpon>DiscreteMovableEquipmentView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ContrastPanelView.axaml.cs">
+      <SubType>Code</SubType>
+      <DependentUpon>ContrastPanelView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\CategoricDetectorPropertyView.axaml.cs">
+      <DependentUpon>CategoricDetectorPropertyView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ContinuousMovableEquipmentView.axaml.cs">
+      <DependentUpon>ContinuousMovableEquipmentView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageRegionCollectionPropertiesView.axaml.cs">
+      <DependentUpon>ImageRegionCollectionPropertiesView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageViews\ImageRegionDisplayView.axaml.cs">
+      <DependentUpon>ImageRegionDisplayView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\MultiChannelView\MultiImageCanvas.axaml.cs">
+      <DependentUpon>MultiImageCanvas.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\SmartProgram\InputFunctionView.axaml.cs">
+      <DependentUpon>InputFunctionView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\SmartProgram\EditorView.axaml.cs">
+      <DependentUpon>PythonEditorView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\SmartProgram\SmartProgramEditorView.axaml.cs">
+      <DependentUpon>SmartProgramEditorView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\SmartProgram\SmartProgramView.axaml.cs">
+      <DependentUpon>SmartProgramView.axaml</DependentUpon>
+    </Compile>
+	 <Compile Update="Views\SmartProgram\EditorView.axaml.cs">
+	  <DependentUpon>EditorView.axaml</DependentUpon>
+	</Compile>
+    <Compile Update="Views\StatusWindowView.axaml.cs">
+      <DependentUpon>StatusWindowView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\StageControlPanelView.axaml.cs">
+      <DependentUpon>StageControlPanelView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageDisplayView.axaml.cs">
+      <DependentUpon>ImageDisplayView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\ImageControlPanelView.axaml.cs">
+      <DependentUpon>ImageControlPanelView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\IrradiationPanelView.axaml.cs">
+      <DependentUpon>IrradiationPanelView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\AcquisitionPanelView.axaml.cs">
+      <DependentUpon>AcquisitionPanelView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\FieldViewerView.axaml.cs">
+      <SubType>Code</SubType>
+      <DependentUpon>FieldViewerView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\StageLoopView.axaml.cs">
+      <DependentUpon>StageLoopView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\DoTimesView.axaml.cs">
+      <DependentUpon>DoTimesView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\TimeLapseView.axaml.cs">
+      <DependentUpon>TimeLapseView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\NumericDetectorPropertyView.axaml.cs">
+      <DependentUpon>NumericDetectorPropertyView.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\WaitView.axaml.cs">
+      <DependentUpon>WaitView.axaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+
+   <ItemGroup>
+     <Folder Include="ViewModels\ViewUtils\" />
+   </ItemGroup>
+
+   <ItemGroup>
+     <None Update="Config.json">
+       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+     </None>
+     <None Update="LogBookConfigEnd.json">
+       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+     </None>
+	<None Update="LogBookConfigStart.json">
+	   <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	</None>
+   </ItemGroup>
+<!--	<Target Name="BuildAspNetProject" BeforeTargets="Build">
+		<MSBuild Projects="..\DagOrchestrator\DagOrchestrator.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
+	</Target> -->
+</Project>

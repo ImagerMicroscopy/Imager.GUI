@@ -1,0 +1,89 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="450"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.AcquisitionPanelView"
+			 x:DataType="vm:AcquisitionPanelViewModel">
+
+
+
+
+
+	<UserControl.Styles >
+
+		<Style Selector="Border.header-border">
+			<Setter Property="Background">
+				<Setter.Value>
+					<SolidColorBrush Color="#454545"  />
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="MaxWidth" Value="900" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="Border.thin">
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="CornerRadius" Value="0,0,5,5" />
+			<Setter Property="Margin" Value="0,0,0,15" />
+		</Style>
+
+	</UserControl.Styles>
+	
+
+	
+	<StackPanel Orientation="Vertical"
+				Width="300"
+			    HorizontalAlignment="Left"
+				Background="#454545"
+				Margin="0 0 0 0">
+			<StackPanel Orientation="Vertical"
+						Spacing="4">
+				<TextBlock Margin="0 0 0 0" Text="Detection" Classes="header" />
+			</StackPanel>
+		
+
+	<!--			<ItemsControl ItemsSource="{Binding AvailableAcquisitions}"   >
+
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid ColumnDefinitions="100,1.5*" RowDefinitions="Auto,Auto"  Margin="4">
+								<TextBlock Text="{Binding Name}" Margin="10" VerticalAlignment="Center" Grid.Row="0" Grid.Column="0"/>
+
+
+							</Grid>
+
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl> -->
+
+				<ItemsControl Margin="-20 0 0 0" Width="280" ItemsSource="{Binding IsAquisitionEnabled}"   >
+
+					<ItemsControl.ItemTemplate>
+						<DataTemplate>
+							<Grid ColumnDefinitions="190,100" Margin="0 0 0 0">
+								<TextBlock Width="190" FontSize="12" Text="{Binding Name}" VerticalAlignment="Center" Grid.Column="0" TextTrimming="CharacterEllipsis"/>
+								<ToggleSwitch   IsChecked="{Binding IsEnabled}" Grid.Column="1" VerticalAlignment="Center" 
+															Command="{Binding $parent[StackPanel].((vm:AcquisitionPanelViewModel)DataContext).OnToggle, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+															CommandParameter="{Binding}" />							
+							</Grid>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+
+
+		
+	</StackPanel>
+	
+</UserControl>

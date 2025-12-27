@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ImagerAvalonia": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:model="using:ImagerAvalonia.Services.MeasurementControl"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="120"
+             d:DesignHeight="40"
+             x:Class="ImagerAvalonia.Views.NumericDetectorPropertyView"
+             x:DataType="vm:NumericDetectorPropertyViewModel">
+
+			<StackPanel Height="20" Margin="-3 2 0 0" Width="250" Orientation="Horizontal">
+				<TextBlock Foreground="White" FontSize="12" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding Label}" Width="110"/>
+				<NumericUpDown   Height="17" Classes="custom-numeric-style" VerticalAlignment = "Center"  Margin="42 0 0 0" Increment="0.0001" Value="{Binding Value}" Width="105"/> 
+			</StackPanel>
+
+</UserControl>

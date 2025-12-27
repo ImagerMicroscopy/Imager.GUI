@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:model="using:ImagerAvalonia.Services.MeasurementControl"
+			 xmlns:dataTemplates="using:ImagerAvalonia.DataTemplates" 
+             xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             mc:Ignorable="d"
+             d:DesignWidth="120"
+             d:DesignHeight="40"
+             x:Class="ImagerAvalonia.Views.DagNodeImageOutputView"
+			 x:DataType="vm:DagNodeOutputViewModel">
+
+
+	<StackPanel Orientation="Horizontal">
+		<TextBlock Text="{Binding DisplayedOutputType}" FontSize="10" Margin="0 0 0 0" HorizontalAlignment="Right"></TextBlock>
+		
+		<Ellipse PointerPressed="OnPointerPressed"  x:Name="ConnectorPoint"  StrokeThickness="2" Stroke="Black" Margin="0 0 0 0" HorizontalAlignment="Right"  Fill="White" Width="10" Height="10"> </Ellipse>
+
+	</StackPanel>
+
+
+
+</UserControl>

@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
+             x:Class="ImagerAvalonia.Views.StageLoopTemplateView"
+			 x:DataType="vm:StageLoopTemplateViewModel">
+
+
+
+	<Window.DataTemplates>
+		<DataTemplate DataType="{x:Type vm:WellPlateViewModel}">
+			<views:WellPlateView />
+		</DataTemplate>
+	</Window.DataTemplates>
+
+	<SplitView IsPaneOpen="True"
+			   DisplayMode="Inline"
+			   OpenPaneLength="150"
+			   Background="#454545">
+		<SplitView.Pane >
+			<Border Background="#3b3b3b">
+				<ListBox Background="#3b3b3b" SelectedItem="{Binding SelectedTemplate}"  ItemsSource="{Binding StageLoopTemplates}">
+					<ListBox.ItemTemplate>
+						<DataTemplate>
+							<TextBlock Text ="{Binding TemplateName}"></TextBlock>
+						</DataTemplate>
+					</ListBox.ItemTemplate>
+
+					
+				</ListBox>
+				
+			</Border>
+			
+		</SplitView.Pane>
+
+		<SplitView.Content>
+			<ContentControl Content="{Binding SelectedTemplate}" />
+				
+		</SplitView.Content>
+		
+		
+	</SplitView>
+
+
+
+
+</Window>
+

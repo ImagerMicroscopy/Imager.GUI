@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="280" d:DesignHeight="450"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.IrradiationPanelView"
+			 x:DataType="vm:IrradiationPanelViewModel">
+
+
+
+
+
+	<UserControl.Styles >
+
+		<Style Selector="Border.header-border">
+			<Setter Property="Background">
+				<Setter.Value>
+					<SolidColorBrush Color="#454545"  />
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="MaxWidth" Value="900" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="Border.thin">
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="CornerRadius" Value="0,0,5,5" />
+			<Setter Property="Margin" Value="0,0,0,15" />
+		</Style>
+
+	</UserControl.Styles>
+	
+
+	
+	<StackPanel Orientation="Vertical"
+				Width="320"
+			    HorizontalAlignment="Left"
+				Background="#454545">
+			<StackPanel Orientation="Vertical"
+						Spacing="4">
+				<TextBlock Text="Irradiation" Classes="header" />
+			</StackPanel>
+		
+
+		<StackPanel Orientation="Vertical">
+
+
+			<Grid Margin="0 0 0 0" ColumnDefinitions="70,100,90" RowDefinitions="Auto,Auto"  >
+				<TextBlock VerticalAlignment="Center" FontSize="11" Text="Irradiate for "  Grid.Row="0" Grid.Column="0" Margin="0 0 0 0"/>
+				<NumericUpDown Classes="custom-numeric-style"  Value="{Binding IrradiationTimes, UpdateSourceTrigger=PropertyChanged}" IsTabStop="True"
+				 Width="100" MinHeight="10" Height="20" Padding="0 0 0 0" Minimum="0" ShowButtonSpinner="False"
+								   HorizontalAlignment="Left" Grid.Row="0" Grid.Column="1" Margin="0"  />
+				<TextBlock FontSize="11" Text=" seconds with:"  Grid.Row="0" Grid.Column="2"  VerticalAlignment="Center" HorizontalAlignment="Center"/>
+			</Grid>
+
+
+		</StackPanel>
+
+		<ItemsControl Margin="-48 0 0 0" Width="260" ItemsSource="{Binding SourcesViewModels}"   >
+
+			<ItemsControl.ItemTemplate>
+				<DataTemplate>
+					<StackPanel Orientation="Vertical">
+						<TextBlock ClipToBounds="False" FontSize="11" Margin="0 0 0 0" Text="{Binding Name}" VerticalAlignment="Center" Grid.Column="0" TextTrimming="CharacterEllipsis"/>
+						<ItemsControl ItemsSource="{Binding Channels}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<Grid Margin="20 0 0 2" ColumnDefinitions="100,0.5*,0.5*"  Height="20">
+										<TextBlock ToolTip.Tip="{Binding Name}" FontSize="11" Text="{Binding Name}" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+										<CheckBox BorderThickness="0.5"  Margin="0 0 10 0" Padding="0"  HorizontalAlignment="Right"  IsChecked="{Binding IsEnabled}" Grid.Row="0" Grid.Column="1"/>
+										<NumericUpDown Classes="custom-numeric-style" HorizontalAlignment="Left" Value="{Binding PowerLevel}" Minimum="0" Maximum="100" Increment="1" Grid.Row="0" Grid.Column="2"/>
+									</Grid>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+
+
+	
+			<!--		<Grid ColumnDefinitions="*,Auto" Margin="0 0 0 0">
+						<TextBlock Text="{Binding Name}" VerticalAlignment="Center" Grid.Column="0" TextTrimming="CharacterEllipsis"/>
+						<ToggleSwitch IsChecked="{Binding IsEnabled}" Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0"
+													Command="{Binding $parent[StackPanel].((vm:IrradiationPanelViewModel)DataContext).OnToggle, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+													CommandParameter="{Binding}" />
+					</Grid> -->
+
+
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
+	</StackPanel>
+	
+</UserControl>
