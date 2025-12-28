@@ -8,6 +8,7 @@
 
 This is the main repository containing the implementation of the graphical user interface for Imager. 
 
+
 ## Table of Contents
 
 - [Overview](#overview)
@@ -21,6 +22,9 @@ This is the main repository containing the implementation of the graphical user 
 
 This repository contains the Avalonia-based GUI for **Imager**, including UI components and communication utilities. It is designed to be cross-platform and developer-friendly. 
 Our UI implementation includes various features such as an interactive experiment designer, live image viewer, acquisition tabs, and many other useful utilities! 
+
+<img src="docs/images/screenshot.png" align="center" width="700">
+
 
 ---
 

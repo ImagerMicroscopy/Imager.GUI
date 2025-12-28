@@ -6,7 +6,7 @@
         xmlns:views="clr-namespace:ImagerAvalonia.Views"
         mc:Ignorable="d" d:DesignWidth="1900" d:DesignHeight="800"
         x:Class="ImagerAvalonia.Views.MainWindow"
-        Title="ImagerAvalonia"
+        Title="Imager"
 		RequestedThemeVariant="Dark"
 		Background="#333333"
         Icon="/Assets/icons/IconImager.ico">

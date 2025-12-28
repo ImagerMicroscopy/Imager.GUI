@@ -284,48 +284,7 @@
 
 
 
-						<Border  Margin="0 10 0 0" Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
-							<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
-								<Expander.Resources>
-									<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
-											<GradientStop Color="#ba96e3" Offset="0.0"/>
-											<GradientStop Color="#ad76ea" Offset="1.0"/>
-									</LinearGradientBrush>
 
-									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
-										<GradientStop Color="#bd86fa" Offset="0.0"/>
-										<GradientStop Color="#6173a5" Offset="1.0"/>
-									</LinearGradientBrush>
-
-									<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
-										<GradientStop Color="#8d56ca" Offset="0.0"/>
-										<GradientStop Color="#415385" Offset="1.0"/>
-									</LinearGradientBrush>
-
-								</Expander.Resources>
-								<Expander.Header>
-										<Grid Margin="0">
-												<TextBlock Padding="0"
-															Margin="0 5 16 0"
-															VerticalAlignment="Center"
-															Height="27"
-															FontSize="17"
-															Width="200"
-															Background="Transparent"
-															Text="Status messages"/>
-										</Grid>							
-								</Expander.Header>
-								<StackPanel Width="250">
-
-
-									<views:StatusWindowView  x:Name="StatusViewControl" Height="100"/>
-
-								</StackPanel>
-
-							</Expander>
-
-
-						</Border>
 
 						</StackPanel>
 
@@ -599,6 +558,51 @@
 										</Expander>
 
 									</Border >
+
+								
+
+									<Border  Margin="0 10 0 0" Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
+										<Expander IsExpanded="True" MinHeight="15" VerticalAlignment="Top" Background="#454545"  >
+											<Expander.Resources>
+												<LinearGradientBrush x:Key="ExpanderHeaderBackground" StartPoint="0%,0%" EndPoint="100%,0%">
+														<GradientStop Color="#ba96e3" Offset="0.0"/>
+														<GradientStop Color="#ad76ea" Offset="1.0"/>
+												</LinearGradientBrush>
+
+												<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPointerOver" StartPoint="0%,0%" EndPoint="100%,0%">
+													<GradientStop Color="#bd86fa" Offset="0.0"/>
+													<GradientStop Color="#6173a5" Offset="1.0"/>
+												</LinearGradientBrush>
+
+												<LinearGradientBrush x:Key="ExpanderHeaderBackgroundPressed" StartPoint="0%,0%" EndPoint="100%,0%">
+													<GradientStop Color="#8d56ca" Offset="0.0"/>
+													<GradientStop Color="#415385" Offset="1.0"/>
+												</LinearGradientBrush>
+
+											</Expander.Resources>
+											<Expander.Header>
+													<Grid Margin="0">
+															<TextBlock Padding="0"
+																		Margin="0 5 16 0"
+																		VerticalAlignment="Center"
+																		Height="27"
+																		FontSize="17"
+																		Width="200"
+																		Background="Transparent"
+																		Text="Status messages"/>
+													</Grid>							
+											</Expander.Header>
+											<StackPanel Width="250">
+
+
+												<views:StatusWindowView  x:Name="StatusViewControl" Height="100"/>
+
+											</StackPanel>
+
+										</Expander>
+
+
+									</Border>
 							</StackPanel>
 							
 						</Border>
