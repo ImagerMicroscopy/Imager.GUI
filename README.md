@@ -64,13 +64,13 @@ Follow these steps to install and run the project:
    **For windows:**
 
    ```bash
-    dotnet publish ImagerAvalonia.Dekstop -r win-x64 -p:PublishSingleFile=true --self-contained true  -o Release
+    dotnet publish ImagerAvalonia.Desktop -r win-x64 -p:PublishSingleFile=true --self-contained true  -o Release
    ``` 
 
    **For linux:**
 
    ```bash
-    dotnet publish ImagerAvalonia.Dekstop -r linux-x64 -p:PublishSingleFile=true --self-contained true  -o Release
+    dotnet publish ImagerAvalonia.Desktop -r linux-x64 -p:PublishSingleFile=true --self-contained true  -o Release
    ``` 
 
    This will create compiled binaries in the folder 'Release'
