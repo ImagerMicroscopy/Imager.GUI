@@ -68,7 +68,7 @@ jobs:
 
     # Publish Binaries
     - name: Publish .NET Project
-      run:  dotnet publish $PROJECT_PATH -r win-x64 -p:PublishSingleFile=true --self-contained true  -o Release
+      run:  dotnet publish $PROJECT_PATH -r win-x64 -c Release --self-contained true  -o Release
       
     # Upload Binaries
     - name: Upload artifacts

@@ -157,17 +157,21 @@ namespace Imager.Tests.ViewModels
             out ImageControlPanelViewModel imagePanel,
             out UserDefinedAcquisitions userDefinedAcquisitions,
             out Mock<SmartProcessingRegisterViewModel> processViewModel,
-            out Mock<AcquisitionStateService> acquisitionState)
+            out Mock<AcquisitionStateService> acquisitionState,
+            out Mock<EquipmentState> equipmentState)
         {
 
-           
 
             stageControl = new Mock<IStageControl>();
+            var stageControlVM = new Mock<StageControlPanelViewModel>(stageControl.Object);
             messages = new Mock<ComUtils>();
             userDefinedAcquisitions =  new UserDefinedAcquisitions();
             processViewModel = new Mock<SmartProcessingRegisterViewModel>();
-            acquisitionState = new Mock<AcquisitionStateService>(stageControl.Object, processViewModel.Object, messages.Object);
+            equipmentState = new Mock<EquipmentState>();
+            acquisitionState = new Mock<AcquisitionStateService>(stageControl.Object, processViewModel.Object, messages.Object, equipmentState.Object);
 
+
+            var imageRegionDisplayViewModel = new ImageRegionDisplayViewModel();
             var loggerFactoryMock = new Mock<ILoggerFactory>();
             var loggerMock = new Mock<ILogger>();
             loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>())).Returns(loggerMock.Object);
@@ -191,11 +195,13 @@ namespace Imager.Tests.ViewModels
             var comUtilsMock = new Mock<ComUtils>();
             var processVmMock = new Mock<SmartProcessingRegisterViewModel>();
 
+
+            builder.RegisterInstance(imageRegionDisplayViewModel).As<ImageRegionDisplayViewModel>();
             builder.RegisterInstance(stageMock.Object).As<IStageControl>();
             builder.RegisterInstance(comUtilsMock.Object).As<ComUtils>();
             builder.RegisterInstance(processVmMock.Object).As<SmartProcessingRegisterViewModel>();
             builder.RegisterInstance(acquisitionState.Object).SingleInstance().As<AcquisitionStateService>();
-
+            builder.RegisterInstance(stageControlVM.Object).SingleInstance();
             var statusVM = new Mock<StatusWindowViewModel>();
             var storageMock = new Mock<IStorageProvider>();
             var serializerMock = new Mock<IExperimentSerialization>();
@@ -214,7 +220,8 @@ namespace Imager.Tests.ViewModels
                imagePanel,
                userDefinedAcquisitions,
                processViewModel.Object,
-               acquisitionState.Object);
+               acquisitionState.Object,
+               equipmentState.Object);
 
             SetupEquipmentMocks(messages);
 
@@ -226,7 +233,8 @@ namespace Imager.Tests.ViewModels
                 imagePanel,
                 userDefinedAcquisitions,
                 processViewModel.Object,
-                acquisitionState.Object
+                acquisitionState.Object,
+                equipmentState.Object
                 
             );
         }
@@ -236,7 +244,7 @@ namespace Imager.Tests.ViewModels
         public void Get_Parameters()
         {
             // Tests the getting of the parameters and their assignment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -256,7 +264,7 @@ namespace Imager.Tests.ViewModels
         public void Add_and_RemoveAcquisition()
         {
             // Tests if single acquisition can be removed (at least one acquisition must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -272,7 +280,7 @@ namespace Imager.Tests.ViewModels
         {
 
             // Tests if an experiment can be added (at least one experiment must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
 
             vm.AddExperiment();
             Assert.Single(vm.Experiments);
@@ -284,10 +292,11 @@ namespace Imager.Tests.ViewModels
         public void Select_Experiment()
         {
             // Tests if selection changes properly when user selects an experiment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+
 
             var mockVM = new Mock<MainViewModel>(MockBehavior.Strict, null!); // if ctor needs deps
-            var view = new MainView(vm);
+            var view = new MainView();
             vm.AddExperiment();
             var control = view.FindControl<ListBox>("AvailableExperiments");
             control.SelectedItem = vm.Experiments[0];
