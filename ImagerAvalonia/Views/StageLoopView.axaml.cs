@@ -40,10 +40,7 @@ public partial class StageLoopView : UserControl
         }
     }
 
-    private void Border_PointerEnter(object? sender, PointerEventArgs e)
-    {
-        (sender as Border)?.Focus();
-    }
+
 
     private void OnRowPasteClipboardContent(object? sender, KeyEventArgs e)
     {

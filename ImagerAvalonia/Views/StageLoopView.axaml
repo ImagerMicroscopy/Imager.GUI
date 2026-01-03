@@ -51,17 +51,19 @@
 		</StackPanel>
 		
 
-		<ScrollViewer Height="250">
-		<Border    PointerEntered="Border_PointerEnter" Focusable="True" KeyDown="OnKeyDown" Background="#454545" Classes="thin">
+		<ScrollViewer   Height="250">
 
 
 			<DataGrid HorizontalAlignment="Left" Width="262"  ItemsSource="{Binding XYPositions}" 
 					  AutoGenerateColumns="False" IsReadOnly="False"
 					  GridLinesVisibility="All"
+					  Focusable="True"
 					  BorderThickness="1" BorderBrush="Gray" ColumnWidth="Auto"
 					  SelectedIndex="{Binding CurrentSelectedIndex}"
 					  CanUserSortColumns="False"
-					  KeyDown="OnRowPasteClipboardContent">
+					  Background="Transparent"
+					  KeyDown="OnRowPasteClipboardContent"
+					  >
 				<DataGrid.Styles>
 					<Style Selector="DataGridCell">
 						<Setter Property="FontSize" Value="10" />
@@ -150,7 +152,6 @@
 				</DataGrid.Columns>
 			</DataGrid>
 
-		</Border>
 		</ScrollViewer>
 
 
