@@ -673,6 +673,11 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
                     JObject coords_data = new JObject();
                     coords_data["coordinates"] = coords;
+
+                    if(string.IsNullOrEmpty(xyz.Name) || string.IsNullOrWhiteSpace(xyz.Name))
+                    {
+                        throw new Exception("One or more stage positions have an empty name");
+                    }
                     coords_data["name"] = xyz.Name;
 
                     pos_data.Add(coords_data);

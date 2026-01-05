@@ -99,6 +99,9 @@ namespace ImagerAvalonia.Services
 
                 var firstElement = imagerSavedProgram.Program.Program.Elements[0];
                 firstElement.DetectionNames.Clear();
+                if (string.IsNullOrEmpty(SelectedAcquisition.Name)) {
+                    throw new Exception("Acquisition name can not be empty");
+                }
                 firstElement.DetectionNames.Add(SelectedAcquisition.Name);
 
                 imagerSavedProgram.Program.DefinedDetections.Clear();

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 
 namespace ImagerAvalonia.ViewModels;
@@ -111,10 +112,12 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
 
     private void Filter_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        AcquisitionSettings.FilterWheels = _filterWheels.Select(x => x.MovableEquipmentProperties).ToList();
+        AcquisitionSettings.FilterWheels =
+            _filterWheels.Select(x => x.MovableEquipmentProperties).ToList();
     }
 
     public event EventHandler<string>? AcqNameChanged;
+
 
     [ObservableProperty]
     private string _name;
@@ -123,7 +126,7 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
 
     partial void OnNameChanged(string? oldValue, string newValue)
     {
-        AcquisitionSettings.Name = newValue;
+        AcquisitionSettings.Name = newValue;    
         AcqNameChanged?.Invoke(this, newValue);
     }
 
