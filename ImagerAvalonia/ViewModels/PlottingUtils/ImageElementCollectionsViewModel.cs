@@ -10,7 +10,6 @@ namespace ImagerAvalonia.ViewModels
     {
         [ObservableProperty] ObservableCollection<ElementPlotViewModel> _plotElements = new();
         [ObservableProperty] private int _NumberOfCollections = 1;
-
         public ImageElementCollectionsViewModel() 
         { 
             

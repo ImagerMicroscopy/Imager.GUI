@@ -257,11 +257,13 @@ namespace ImagerAvalonia.Views.ImageViews
 
         private void ResizeLine(double delta)
         {
-
-            double newSize = AddedLine.StrokeThickness + delta;
-            if (newSize is >= MinDotSize and <= MaxDotSize)
+            if (AddedLine is not null)
             {
-                AddedLine.StrokeThickness = newSize;             
+                double newSize = AddedLine.StrokeThickness + delta;
+                if (newSize is >= MinDotSize and <= MaxDotSize)
+                {
+                    AddedLine.StrokeThickness = newSize;
+                }
             }
             
         }

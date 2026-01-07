@@ -14,29 +14,29 @@
 	
     <UserControl.DataTemplates>
 		<DataTemplate DataType="{x:Type vm:ScalarVM}">
-			<Grid ColumnDefinitions="100, 100">
-				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+			<Grid ColumnDefinitions="120, 100">
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
 				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="0.001" Value="{Binding Value, Mode=TwoWay}" />
             </Grid>
         </DataTemplate>
 
 		<DataTemplate DataType="{x:Type vm:BooleanVM}">
-			<Grid ColumnDefinitions="100, 100">
-				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+			<Grid ColumnDefinitions="120, 100">
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
 				<CheckBox Grid.Column="1" IsChecked="{Binding Value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>
 
 		<DataTemplate DataType="{x:Type vm:IntegerVM}">
-			<Grid ColumnDefinitions="100, 100">
-				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+			<Grid ColumnDefinitions="120, 100">
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
 				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="1" Value="{Binding Value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>
 
 		<DataTemplate DataType="{x:Type vm:TextVM}">
-			<Grid ColumnDefinitions="100, 100">
-				<TextBlock Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
+			<Grid ColumnDefinitions="120, 100">
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
 				<TextBox  BorderThickness="1" Grid.Column="1" Padding="0" Margin="0" Width="100" MinHeight="20" Height="20" FontSize="12" Text="{Binding Value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>

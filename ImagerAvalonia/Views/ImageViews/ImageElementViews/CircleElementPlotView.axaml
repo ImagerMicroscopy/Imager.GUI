@@ -13,7 +13,7 @@
     <StackPanel Margin="20" Spacing="10">
 
         <!-- Info -->
-
+		<StackPanel Orientation="Vertical">
 		<StackPanel Orientation="Horizontal">
 			<TextBlock Text="{Binding AcqDetDisplay}" Foreground="Black" />
 			<ComboBox   BorderThickness="0.5" Foreground="Black" HorizontalAlignment="Center" FontSize="10" Padding="0" MinHeight="20" Height="20" VerticalAlignment = "Center"  SelectedItem="{Binding SelectedPlotType}" SelectedIndex="2"  Margin="20 0 0 0" ItemsSource="{Binding Plots}" Width="100">
@@ -24,6 +24,8 @@
 
 				</ComboBox.Styles>
 			</ComboBox>
+		</StackPanel>
+		<TextBlock Text="{Binding CollectionName}" Foreground="Black"/>
 		</StackPanel>
 
 		<Border Height="400" Background="#80DCDCDC" x:Name="HistogramPlotPanel">

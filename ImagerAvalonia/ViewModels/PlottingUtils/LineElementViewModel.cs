@@ -26,7 +26,6 @@ namespace ImagerAvalonia.ViewModels
 
         public override string AcquisitionName { get ; set ; }
         public override string DetectorName { get; set; }
-        public override string CollectionName { get; set; }
 
 
 

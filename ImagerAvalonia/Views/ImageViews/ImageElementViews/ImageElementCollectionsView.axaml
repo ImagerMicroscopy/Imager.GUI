@@ -12,27 +12,28 @@
 
 	<Window.DataTemplates>
 		<DataTemplate DataType="{x:Type vm:CircleElementViewModel}">
-			<Border BorderBrush="Gray" BorderThickness="1" Padding="4" Margin="4">
-				<DockPanel>
-					
-					<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="#EEE">
-						<TextBlock Text="" Width="0" HorizontalAlignment="Stretch" />
+			<Border BorderBrush="Red" BorderThickness="1" Padding="4" Margin="4">
+				<StackPanel Orientation="Vertical">
 
-						<Button Content="✕"
-								Width="20"
+					<Grid  Background="#EEE" ColumnDefinitions="*, Auto">
+                
+					
+						<Button Grid.Column="1"
+								Content="✕"
+								Width="20" 
 								Height="22"
 								Margin="2,0,0,0"
-								Padding="0 0 0 0"
+								Padding="0"
 								HorizontalContentAlignment="Center"
 								VerticalContentAlignment="Center"
 								Foreground="Red"
-								HorizontalAlignment="Right"
 								Command="{Binding $parent[ItemsControl].((vm:ImageElementCollectionsViewModel)DataContext).RemovePlotElementCommand}"
 								CommandParameter="{Binding}"/>
-					</StackPanel>
+					</Grid>
 
 					<circleviews:CircleElementPlotView DataContext="{Binding}" />
-				</DockPanel>
+            
+				</StackPanel>
 			</Border>
 		</DataTemplate>
 		<DataTemplate DataType="{x:Type vm:LineElementViewModel}">
@@ -40,8 +41,6 @@
 				<DockPanel>
 
 					<StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Background="#EEE">
-						<TextBlock Text="" Width="0" HorizontalAlignment="Stretch" />
-
 						<Button Content="✕"
 								Width="20"
 								Height="22"
@@ -53,6 +52,8 @@
 								HorizontalAlignment="Right"
 								Command="{Binding $parent[ItemsControl].((vm:ImageElementCollectionsViewModel)DataContext).RemovePlotElementCommand}"
 								CommandParameter="{Binding}"/>
+
+					
 					</StackPanel>
 
 					<lineviews:LineElementPlotView DataContext="{Binding}" />

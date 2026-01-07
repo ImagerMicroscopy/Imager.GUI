@@ -14,6 +14,13 @@
 
         <!-- Info -->
 
+		<StackPanel Orientation="Vertical">
+		<StackPanel Orientation="Horizontal">
+			<TextBlock Text="{Binding AcqDetDisplay}" Foreground="Black" />
+			
+		</StackPanel>
+		<TextBlock Text="{Binding CollectionName}" Foreground="Black"/>
+		</StackPanel>
 
 
 		<Border Height="400" Background="#80DCDCDC" x:Name="LineProfilePlotPanel">

@@ -17,7 +17,7 @@ namespace ImagerAvalonia.ViewModels
     {
         public abstract string AcquisitionName { get; set; }
         public abstract string DetectorName { get; set; }
-        public abstract string CollectionName { get; set; }
+        [ObservableProperty] string _collectionName;
         public abstract Task UpdateImageElements(byte[] imagedata, int imwidth, int imheight, XYStagePosition xy, double time);
     }
 
@@ -43,8 +43,6 @@ namespace ImagerAvalonia.ViewModels
 
         public override string AcquisitionName { get ; set ; }
         public override string DetectorName { get; set; }
-        public override string CollectionName { get; set; }
-
 
 
 
