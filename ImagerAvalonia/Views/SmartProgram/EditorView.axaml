@@ -10,6 +10,13 @@
              x:Class="ImagerAvalonia.Views.EditorView"
 			 x:DataType="vm:PythonEditorWindowViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="ToolTip">
+            <Setter Property="MaxWidth" Value="600"/>
+            <Setter Property="MaxHeight" Value="400"/>
+        </Style>
+    </UserControl.Styles>
+
 
 
 <DockPanel>
@@ -44,6 +51,9 @@
                 <MenuItem Header="Paste" InputGesture="ctrl+V" Command="{Binding PasteMouseCommand}"  CommandParameter="{Binding #Editor.TextArea}"></MenuItem>
                 <MenuItem Header="-"/>
                 <MenuItem Header="Select All" InputGesture="ctrl+A" Command="{Binding SelectAllMouseCommand}" CommandParameter="{Binding #Editor.TextArea}"></MenuItem>
+                <MenuItem Header="-"/>
+                <MenuItem Header="Go to Definition" Click="GoToDefinition_Click" InputGesture="F12"/>
+                <MenuItem Header="Format Document" Click="FormatDocument_Click" InputGesture="Alt+Shift+F"/>
             </MenuFlyout>
         </AvalonEdit:TextEditor.ContextFlyout>
 
