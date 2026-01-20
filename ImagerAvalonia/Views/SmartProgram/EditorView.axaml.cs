@@ -7,24 +7,27 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
-using ImagerAvalonia.PythonEditor.Resources;
-using ImagerAvalonia.ViewModels;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
 using AvaloniaEdit.Folding;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.Snippets;
 using AvaloniaEdit.TextMate;
+using ImagerAvalonia.Exceptions;
+using ImagerAvalonia.PythonEditor.Resources;
+using ImagerAvalonia.Utils;
+using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 using TextMateSharp.Grammars;
 using Snippet = AvaloniaEdit.Snippets.Snippet;
-using AvaloniaEdit;
-using System.IO;
 namespace ImagerAvalonia.Views
 {
     using Pair = KeyValuePair<int, Control>;
@@ -140,15 +143,26 @@ namespace ImagerAvalonia.Views
                 ResourceLoader.LoadSampleFile(documentPath));
         }
 
-        public void SaveDocument(object? sender, RoutedEventArgs e)
+
+        public async Task SaveDocument(object? sender, RoutedEventArgs e)
         {
-            if (_savePath is not null)
+            if (_savePath is null)
+                return;
+
+            try
             {
-                using (FileStream fs = new FileStream(_savePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    _textEditor.Save(fs);
-                }
+                using FileStream fs = new FileStream(
+                    _savePath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None);
+
+                _textEditor.Save(fs);
                 OnReloadRequested?.Invoke(this, _savePath);
+            }
+            catch (Exception ex)
+            {
+                await ExceptionWindowHandler.ShowExceptionAsync(ex);
             }
         }
 
