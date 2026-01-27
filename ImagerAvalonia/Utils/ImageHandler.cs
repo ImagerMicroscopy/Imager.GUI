@@ -99,7 +99,7 @@ namespace ImagerAvalonia.Utils
                     {
                         num_datasets += 1;
                         imageData.Images.Add(image_data);
-                        var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                        var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, e.RequestedTime);
                         imageData.Metadata.Add(plane_metadata);
                         imageData.Sizes.Add(_storageProvider.GetPlaneSize());
                         imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
