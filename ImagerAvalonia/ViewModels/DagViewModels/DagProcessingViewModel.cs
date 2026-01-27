@@ -16,7 +16,7 @@ namespace ImagerAvalonia.ViewModels;
 
 public partial class DagProcessingViewModel : ViewModelBase
 {
-    private readonly IPythonComService _nodeComService;
+    private readonly IPythonCom _nodeComService;
     [ObservableProperty] Guid _dagId = Guid.NewGuid();
     private Dictionary<string, NodeInfo> _apiParameters = new();
     public List<DagNodeViewModel> AddedNodes = new();
@@ -26,7 +26,7 @@ public partial class DagProcessingViewModel : ViewModelBase
     
 
 
-    public DagProcessingViewModel(IPythonComService nodeCom)
+    public DagProcessingViewModel(IPythonCom nodeCom)
     {
         _nodeComService = nodeCom;
         try

@@ -1,3 +1,4 @@
+using Autofac;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Diagnostics;
@@ -7,37 +8,40 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.ReactiveUI;
+using Avalonia.Threading;
+using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
-using ImagerAvalonia.PythonEditor.Resources;
-using ImagerAvalonia.ViewModels;
 using AvaloniaEdit.Document;
 using AvaloniaEdit.Editing;
 using AvaloniaEdit.Folding;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.Snippets;
 using AvaloniaEdit.TextMate;
+using ImagerAvalonia.PythonEditor.Resources;
+using ImagerAvalonia.Services;
+using ImagerAvalonia.ViewModels;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.ComponentModel.Design;
+using System.IO;
 using System.Linq;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading.Tasks;
 using TextMateSharp.Grammars;
 using Snippet = AvaloniaEdit.Snippets.Snippet;
-using AvaloniaEdit;
-using System.IO;
-using Autofac;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using ImagerAvalonia.Services;
-using System.Threading.Tasks;
-using Avalonia.Threading;
-using System.Text;
-using System.ComponentModel.Design;
 namespace ImagerAvalonia.Views
 {
     using Pair = KeyValuePair<int, Control>;
 
-    public partial class EditorView : UserControl
+    public partial class EditorView : ReactiveUserControl<PythonEditorWindowViewModel>
     {
         private readonly AvaloniaEdit.TextEditor _textEditor;
         private FoldingManager _foldingManager;
@@ -53,13 +57,13 @@ namespace ImagerAvalonia.Views
         private RegistryOptions _registryOptions;
         private int _currentTheme = (int)ThemeName.DarkPlus;
         private string? _savePath;
-
+        private readonly IPythonCom _pythonService;
+        private readonly IPythonLinting _pythonLintingService;
         public event EventHandler<string> OnReloadRequested;
 
         public EditorView()
         {
             InitializeComponent();
-
 
             _textEditor = this.FindControl<TextEditor>("Editor");
             _textEditor.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Visible;
@@ -78,20 +82,15 @@ namespace ImagerAvalonia.Views
             _textEditor.TextArea.RightClickMovesCaret = true;
             _textEditor.Options.HighlightCurrentLine = true;
             _textEditor.Options.CompletionAcceptAction = CompletionAcceptAction.DoubleTapped;
-
+            _textEditor.TextChanged += _textEditor_TextChanged;
             _addControlButton = this.FindControl<Button>("addControlBtn");
-
             _clearControlButton = this.FindControl<Button>("clearControlBtn");
-
             _insertSnippetButton = this.FindControl<Button>("insertSnippetBtn");
-
             _textEditor.TextArea.TextView.ElementGenerators.Add(_generator);
-
             _registryOptions = new RegistryOptions(
                 (ThemeName)_currentTheme);
 
             _textMateInstallation = _textEditor.InstallTextMate(_registryOptions);
-
             _textMateInstallation.AppliedTheme += TextMateInstallationOnAppliedTheme;
 
             Language pythonLanguage = _registryOptions.GetLanguageByExtension(".py");
@@ -114,26 +113,53 @@ namespace ImagerAvalonia.Views
                 else _textEditor.FontSize = _textEditor.FontSize > 1 ? _textEditor.FontSize - 1 : 1;
             }, RoutingStrategies.Bubble, true);
 
-            var PythonEditorVM = new PythonEditorWindowViewModel(_textMateInstallation, _registryOptions);
+
+            var PythonEditorVM = App.Container.Resolve<PythonEditorWindowViewModel>();
             foreach (ThemeName themeName in Enum.GetValues<ThemeName>())
             {
                 var themeViewModel = new ThemeViewModel(themeName);
-                PythonEditorVM.AllThemes.Add(themeViewModel);
                 if (themeName == ThemeName.DarkPlus)
                 {
-                    PythonEditorVM.SelectedTheme = themeViewModel;
+                    _textMateInstallation.SetTheme(_registryOptions.LoadTheme(themeViewModel.ThemeName));
                 }
             }
             DataContext = PythonEditorVM;
-            
+
+
+            this.WhenActivated(disposables =>
+            {
+                Observable.FromEventPattern(
+                        h => _textEditor.TextArea.Caret.PositionChanged += h,
+                        h => _textEditor.TextArea.Caret.PositionChanged -= h)
+                    .Select(_ => new LineInfo(_textEditor.TextArea.Caret.Position.Line, _textEditor.TextArea.Caret.Position.Column) )
+                    .Throttle(TimeSpan.FromMilliseconds(250), RxApp.MainThreadScheduler)
+                    .BindTo(ViewModel!, vm => vm.CaretPosition)
+                    .DisposeWith(disposables);
+            });
             InitializeSmartFeatures();
         }
 
+        private void _textEditor_TextChanged(object? sender, EventArgs e)
+        {
+            if(DataContext is PythonEditorWindowViewModel vm)
+            {
+                vm.Code = _textEditor.Text;
+            }
+        }
+
+        private void InitializeComponent()
+        {
+            AvaloniaXamlLoader.Load(this);
+        }
         public void SetDocument(string documentPath)
         {
             _savePath = documentPath;
             _textEditor.Document = new TextDocument(
                 ResourceLoader.LoadSampleFile(documentPath));
+            if(DataContext is PythonEditorWindowViewModel vm)
+            {
+                vm.SavePath = _savePath;
+            }
         }
 
         public void SaveDocument(object? sender, RoutedEventArgs e)
@@ -230,8 +256,6 @@ namespace ImagerAvalonia.Views
                 _textEditor.TextArea.Caret.Column);
         }
 
-
-
         private void SyntaxModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             RemoveUnderlineAndStrikethroughTransformer();
@@ -281,9 +305,9 @@ namespace ImagerAvalonia.Views
         private void InitializeSmartFeatures()
         {
             _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            _hoverTimer.Tick += HoverTimer_Tick;
+            //_hoverTimer.Tick += HoverTimer_Tick;
             
-            _textEditor.PointerMoved += TextEditor_PointerMoved;
+            //_textEditor.PointerMoved += TextEditor_PointerMoved;
             _textEditor.PointerExited += (s, e) => {
                  _hoverTimer.Stop();
                  ToolTip.SetIsOpen(_textEditor, false);
@@ -294,218 +318,222 @@ namespace ImagerAvalonia.Views
             _textEditor.TextArea.TextView.BackgroundRenderers.Add(_textMarkerService);
             _textEditor.TextArea.TextView.LineTransformers.Add(_textMarkerService);
 
-            _diagnosticsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
-            _diagnosticsTimer.Tick += DiagnosticsTimer_Tick;
-            _textEditor.TextChanged += (s, e) => {
-                _diagnosticsTimer.Stop();
-                _diagnosticsTimer.Start();
-            };
+            //_diagnosticsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+            //_diagnosticsTimer.Tick += DiagnosticsTimer_Tick;
+            //_textEditor.TextChanged += (s, e) => {
+            //    _diagnosticsTimer.Stop();
+            //    _diagnosticsTimer.Start();
+            //};
         }
 
-        private void DiagnosticsTimer_Tick(object sender, EventArgs e)
-        {
-             _diagnosticsTimer.Stop();
-             var service = App.Container.Resolve<IPythonComService>();
-             var code = _textEditor.Text;
-             
-             Task.Run(async () => {
-                 var json = await service.GetDiagnostics(code, _savePath);
-                 if (string.IsNullOrEmpty(json)) return;
-                 
-                  Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                      try {
-                          _textMarkerService.RemoveAll(m => true);
-                          
-                          var errors = JArray.Parse(json);
-                          foreach(var err in errors)
-                          {
-                              var l = err["line"]?.ToObject<int>();
-                              var c = err["column"]?.ToObject<int>();
-                              var msg = err["message"]?.ToString();
-                              
-                              if (l.HasValue && c.HasValue)
-                              {
-                                   
-                                   var lineObj = _textEditor.Document.GetLineByNumber(l.Value);
-                                   int offset = lineObj.Offset + c.Value;
-                                   int length = Math.Max(1, lineObj.Length - c.Value);
-                                   
-                                   
-                                   if (offset < 0) offset=0;
-                                   if (offset + length > _textEditor.Document.TextLength) length = _textEditor.Document.TextLength - offset;
+        //private async void DiagnosticsTimer_Tick(object sender, EventArgs e)
+        //{
+        //    _diagnosticsTimer.Stop();
 
-                                   if (length > 0)
-                                   {
-                                      var m = _textMarkerService.Create(offset, length);
-                                      m.MarkerType = TextMarkerType.SquigglyUnderline;
-                                      m.MarkerColor = Colors.Red;
-                                      m.ToolTip = msg;
-                                   }
-                              }
-                          }
-                      } catch {}
-                  });
-             });
-        }
 
-        private void TextEditor_PointerMoved(object sender, PointerEventArgs e)
-        {
-             _lastHoverPos = e.GetPosition(_textEditor);
-             _hoverTimer.Stop();
-             _hoverTimer.Start();
-        }
+        //    var code = _textEditor.Text;
+        //    try
+        //    {
+        //        var json = await _pythonService.GetDiagnostics(code, _savePath);
+        //        if (string.IsNullOrEmpty(json)) return;
 
-        private void HoverTimer_Tick(object sender, EventArgs e)
-        {
-            _hoverTimer.Stop();
-            
-            var pos = _textEditor.GetPositionFromPoint(_lastHoverPos);
-            if (pos.HasValue)
-            {
-                var line = pos.Value.Line;
-                var col = pos.Value.Column;
-                var code = _textEditor.Text; 
-                
-                var service = App.Container.Resolve<IPythonComService>();
-                Task.Run(async () => {
-                    var json = await service.GetHover(code, line, col - 1, _savePath);
-                    if (string.IsNullOrEmpty(json)) return;
-                    
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                         try {
-                             var stats = JArray.Parse(json);
-                             if (stats.Count > 0)
-                             {
-                                 var item = stats[0];
-                                 var name = item["full_name"]?.ToString() ?? item["name"]?.ToString();
-                                 var type = item["type"]?.ToString();
-                                 var doc = item["docstring"]?.ToString();
-                                 var desc = item["description"]?.ToString();
-                                 
-                                 var sb = new StringBuilder();
-                                 if (!string.IsNullOrEmpty(name)) sb.AppendLine(name);
-                                 if (!string.IsNullOrEmpty(type)) sb.AppendLine($"Type: {type}");
-                                 if (!string.IsNullOrEmpty(desc)) sb.AppendLine(desc);
-                                 if (!string.IsNullOrEmpty(doc) && type != "keyword") {
-                                     sb.AppendLine();
-                                     sb.AppendLine(doc);
-                                 }
-                                 
-                                 var txt = sb.ToString().Trim();
-                                 if (!string.IsNullOrEmpty(txt))
-                                 {
-                                      ToolTip.SetTip(_textEditor, txt);
-                                      ToolTip.SetIsOpen(_textEditor, true);
-                                 }
-                                 else
-                                 {
-                                     ToolTip.SetIsOpen(_textEditor, false);
-                                 }
-                             }
-                             else
-                             {
-                                  ToolTip.SetIsOpen(_textEditor, false);
-                             }
-                         } catch 
-                         {
-                              ToolTip.SetIsOpen(_textEditor, false);
-                         }
-                    });
-                });
-            }
-        }
+        //        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        //        {
 
-        protected override void OnKeyDown(KeyEventArgs e)
-        {
-             base.OnKeyDown(e);
-             var keymap = Avalonia.Application.Current.PlatformSettings.HotkeyConfiguration;
-             bool isCtrlSpace = (e.Key == Key.Space && (e.KeyModifiers & KeyModifiers.Control) != 0);
-             
-             if (isCtrlSpace)
-             {
-                 ShowCompletion(true);
-                 e.Handled = true;
-             }
-             
-             if (e.Key == Key.F12)
-             {
-                 GoToDefinition();
-                 e.Handled = true;
-             }
-             
-             if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Alt) && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
-             {
-                 FormatDocument();
-                 e.Handled = true;
-             }
-        }
+        //            _textMarkerService.RemoveAll(m => true);
 
-        private void GoToDefinition()
-        {
-            var service = App.Container.Resolve<IPythonComService>();
-            var code = _textEditor.Text;
-            var line = _textEditor.TextArea.Caret.Line;
-            var col = _textEditor.TextArea.Caret.Column;
-            
-            Task.Run(async () =>
-            {
-               var json = await service.GetGoto(code, line, col - 1, _savePath);
-               if (string.IsNullOrEmpty(json)) return;
-               
-               Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                   try {
-                       var results = JArray.Parse(json);
-                       if (results.Count > 0)
-                       {
-                           var match = results[0];
-                           var path = match["module_path"]?.ToString();
-                           var l = match["line"]?.ToObject<int>();
-                           var c = match["column"]?.ToObject<int>();
-                           
-                           if (l.HasValue && c.HasValue) 
-                           {
-                               if (path != null && _savePath != null && path != _savePath)
-                               {
-                                   // Different file. TODO: Trigger open file event?
-                               }
-                               else
-                               {
-                                   _textEditor.TextArea.Caret.Line = l.Value;
-                                   _textEditor.TextArea.Caret.Column = c.Value + 1;
-                                   _textEditor.ScrollTo(l.Value, c.Value + 1);
-                               }
-                           }
-                       }
-                   } catch {}
-               });
-            });
-        }
+        //            var errors = JArray.Parse(json);
+        //            foreach (var err in errors)
+        //            {
+        //                var l = err["line"]?.ToObject<int>();
+        //                var c = err["column"]?.ToObject<int>();
+        //                var msg = err["message"]?.ToString();
 
-        private void FormatDocument()
-        {
-             var service = App.Container.Resolve<IPythonComService>();
-             var code = _textEditor.Text;
-             
-             Task.Run(async () => {
-                 var result = await service.FormatCode(code);
-                 if (result != null)
-                 {
-                     Avalonia.Threading.Dispatcher.UIThread.Post(() => {
-                         try {
-                             var obj = JObject.Parse(result);
-                             if (obj["code"] != null)
-                             {
-                                 var newCode = obj["code"].ToString();
-                                 if (newCode != _textEditor.Text)
-                                 {
-                                     _textEditor.Document.Text = newCode;
-                                 }
-                             }
-                         } catch {}
-                     });
-                 }
-             });
-        }
+        //                if (l.HasValue && c.HasValue)
+        //                {
+
+        //                    var lineObj = _textEditor.Document.GetLineByNumber(l.Value);
+        //                    int offset = lineObj.Offset + c.Value;
+        //                    int length = Math.Max(1, lineObj.Length - c.Value);
+
+
+        //                    if (offset < 0) offset = 0;
+        //                    if (offset + length > _textEditor.Document.TextLength) length = _textEditor.Document.TextLength - offset;
+
+        //                    if (length > 0)
+        //                    {
+        //                        var m = _textMarkerService.Create(offset, length);
+        //                        m.MarkerType = TextMarkerType.SquigglyUnderline;
+        //                        m.MarkerColor = Colors.Red;
+        //                        m.ToolTip = msg;
+        //                    }
+        //                }
+        //            }
+
+        //        });
+        //    }
+        //    catch { }
+
+        //}
+
+        //private void TextEditor_PointerMoved(object sender, PointerEventArgs e)
+        //{
+        //     _lastHoverPos = e.GetPosition(_textEditor);
+        //     _hoverTimer.Stop();
+        //     _hoverTimer.Start();
+        //}
+
+        //private void HoverTimer_Tick(object sender, EventArgs e)
+        //{
+        //    _hoverTimer.Stop();
+
+        //    var pos = _textEditor.GetPositionFromPoint(_lastHoverPos);
+        //    if (pos.HasValue)
+        //    {
+        //        var line = pos.Value.Line;
+        //        var col = pos.Value.Column;
+        //        var code = _textEditor.Text; 
+
+        //        var service = App.Container.Resolve<IPythonCom>();
+        //        Task.Run(async () => {
+        //            var json = await service.GetHover(code, line, col - 1, _savePath);
+        //            if (string.IsNullOrEmpty(json)) return;
+
+        //            Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+        //                 try {
+        //                     var stats = JArray.Parse(json);
+        //                     if (stats.Count > 0)
+        //                     {
+        //                         var item = stats[0];
+        //                         var name = item["full_name"]?.ToString() ?? item["name"]?.ToString();
+        //                         var type = item["type"]?.ToString();
+        //                         var doc = item["docstring"]?.ToString();
+        //                         var desc = item["description"]?.ToString();
+
+        //                         var sb = new StringBuilder();
+        //                         if (!string.IsNullOrEmpty(name)) sb.AppendLine(name);
+        //                         if (!string.IsNullOrEmpty(type)) sb.AppendLine($"Type: {type}");
+        //                         if (!string.IsNullOrEmpty(desc)) sb.AppendLine(desc);
+        //                         if (!string.IsNullOrEmpty(doc) && type != "keyword") {
+        //                             sb.AppendLine();
+        //                             sb.AppendLine(doc);
+        //                         }
+
+        //                         var txt = sb.ToString().Trim();
+        //                         if (!string.IsNullOrEmpty(txt))
+        //                         {
+        //                              ToolTip.SetTip(_textEditor, txt);
+        //                              ToolTip.SetIsOpen(_textEditor, true);
+        //                         }
+        //                         else
+        //                         {
+        //                             ToolTip.SetIsOpen(_textEditor, false);
+        //                         }
+        //                     }
+        //                     else
+        //                     {
+        //                          ToolTip.SetIsOpen(_textEditor, false);
+        //                     }
+        //                 } catch 
+        //                 {
+        //                      ToolTip.SetIsOpen(_textEditor, false);
+        //                 }
+        //            });
+        //        });
+        //    }
+        //}
+
+        //protected override void OnKeyDown(KeyEventArgs e)
+        //{
+        //     base.OnKeyDown(e);
+        //     var keymap = Avalonia.Application.Current.PlatformSettings.HotkeyConfiguration;
+        //     bool isCtrlSpace = (e.Key == Key.Space && (e.KeyModifiers & KeyModifiers.Control) != 0);
+
+        //     if (isCtrlSpace)
+        //     {
+        //         ShowCompletion(true);
+        //         e.Handled = true;
+        //     }
+
+        //     if (e.Key == Key.F12)
+        //     {
+        //         GoToDefinition();
+        //         e.Handled = true;
+        //     }
+
+        //     if (e.Key == Key.F && e.KeyModifiers.HasFlag(KeyModifiers.Alt) && e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        //     {
+        //         FormatDocument();
+        //         e.Handled = true;
+        //     }
+        //}
+
+        //private void GoToDefinition()
+        //{
+        //    var service = App.Container.Resolve<IPythonCom>();
+        //    var code = _textEditor.Text;
+        //    var line = _textEditor.TextArea.Caret.Line;
+        //    var col = _textEditor.TextArea.Caret.Column;
+
+        //    Task.Run(async () =>
+        //    {
+        //       var json = await service.GetGoto(code, line, col - 1, _savePath);
+        //       if (string.IsNullOrEmpty(json)) return;
+
+        //       Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+        //           try {
+        //               var results = JArray.Parse(json);
+        //               if (results.Count > 0)
+        //               {
+        //                   var match = results[0];
+        //                   var path = match["module_path"]?.ToString();
+        //                   var l = match["line"]?.ToObject<int>();
+        //                   var c = match["column"]?.ToObject<int>();
+
+        //                   if (l.HasValue && c.HasValue) 
+        //                   {
+        //                       if (path != null && _savePath != null && path != _savePath)
+        //                       {
+        //                           // Different file. TODO: Trigger open file event?
+        //                       }
+        //                       else
+        //                       {
+        //                           _textEditor.TextArea.Caret.Line = l.Value;
+        //                           _textEditor.TextArea.Caret.Column = c.Value + 1;
+        //                           _textEditor.ScrollTo(l.Value, c.Value + 1);
+        //                       }
+        //                   }
+        //               }
+        //           } catch {}
+        //       });
+        //    });
+        //}
+
+        //private void FormatDocument()
+        //{
+        //     var service = App.Container.Resolve<IPythonCom>();
+        //     var code = _textEditor.Text;
+
+        //     Task.Run(async () => {
+        //         var result = await service.FormatCode(code);
+        //         if (result != null)
+        //         {
+        //             Avalonia.Threading.Dispatcher.UIThread.Post(() => {
+        //                 try {
+        //                     var obj = JObject.Parse(result);
+        //                     if (obj["code"] != null)
+        //                     {
+        //                         var newCode = obj["code"].ToString();
+        //                         if (newCode != _textEditor.Text)
+        //                         {
+        //                             _textEditor.Document.Text = newCode;
+        //                         }
+        //                     }
+        //                 } catch {}
+        //             });
+        //         }
+        //     });
+        //}
 
         private void AddControlButton_Click(object sender, RoutedEventArgs e)
         {
@@ -546,152 +574,152 @@ namespace ImagerAvalonia.Views
                 char c = e.Text[0];
                 if (char.IsLetterOrDigit(c) || c == '_' || c == '.')
                 {
-                    
-                    
-                    ShowCompletion(false);
+
+
+                    //ShowCompletion(false);
                 }
                 else if (c == '(')
                 {
-                    ShowSignatures();
+                    //ShowSignatures();
                 }
             }
         }
 
 
 
-        private void ShowCompletion(bool force)
-        {
-            
-            try
-            {
-                var service = App.Container.Resolve<IPythonComService>();
-                var code = _textEditor.Text;
-                var line = _textEditor.TextArea.Caret.Line;
-                var col = _textEditor.TextArea.Caret.Column; 
-                
-                Task.Run(async () =>
-                {
-                    var json = await service.GetCompletions(code, line, col - 1, _savePath);
-                    if (string.IsNullOrEmpty(json)) return;
+        //private void ShowCompletion(bool force)
+        //{
 
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        try 
-                        {
-                            var updates = JArray.Parse(json);
-                            if (updates.Count > 0)
-                            {
-                                if (_completionWindow == null)
-                                {
-                                    _completionWindow = new CompletionWindow(_textEditor.TextArea);
-                                    _completionWindow.Closed += (o, args) => _completionWindow = null;
-                                }
+        //    try
+        //    {
+        //        var service = App.Container.Resolve<IPythonCom>();
+        //        var code = _textEditor.Text;
+        //        var line = _textEditor.TextArea.Caret.Line;
+        //        var col = _textEditor.TextArea.Caret.Column; 
 
-                                int offset = _textEditor.CaretOffset;
-                                int start = offset;
-                                while (start > 0)
-                                {
-                                    char c = _textEditor.Document.GetCharAt(start - 1);
-                                    if (!char.IsLetterOrDigit(c) && c != '_') break;
-                                    start--;
-                                }
-                                
-                    
-                                _completionWindow.StartOffset = start;
-                                _completionWindow.EndOffset = offset;
+        //        Task.Run(async () =>
+        //        {
+        //            var json = await service.GetCompletions(code, line, col - 1, _savePath);
+        //            if (string.IsNullOrEmpty(json)) return;
+
+        //            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        //            {
+        //                try 
+        //                {
+        //                    var updates = JArray.Parse(json);
+        //                    if (updates.Count > 0)
+        //                    {
+        //                        if (_completionWindow == null)
+        //                        {
+        //                            _completionWindow = new CompletionWindow(_textEditor.TextArea);
+        //                            _completionWindow.Closed += (o, args) => _completionWindow = null;
+        //                        }
+
+        //                        int offset = _textEditor.CaretOffset;
+        //                        int start = offset;
+        //                        while (start > 0)
+        //                        {
+        //                            char c = _textEditor.Document.GetCharAt(start - 1);
+        //                            if (!char.IsLetterOrDigit(c) && c != '_') break;
+        //                            start--;
+        //                        }
 
 
-                                var data = _completionWindow.CompletionList.CompletionData;
-                                data.Clear();
-                                
-                                var existing = new HashSet<string>();
-                                foreach(var item in updates)
-                                {
-                                    var name = item["name"]?.ToString();
-                                    var desc = item["description"]?.ToString() ?? "";
-                                    var type = item["type"]?.ToString();
-                                    var doc = item["docstring"]?.ToString() ?? "";
-                                    
-                                    if(!string.IsNullOrEmpty(doc) && type != "keyword") desc += "\n\n" + doc;
+        //                        _completionWindow.StartOffset = start;
+        //                        _completionWindow.EndOffset = offset;
 
-                                    if (name != null && !existing.Contains(name))
-                                    {
-                                        data.Add(new MyCompletionData(name, desc));
-                                        existing.Add(name);
-                                    }
-                                }
-                                
-                                if (data.Count > 0)
-                                {
-                                    _completionWindow.Show();
-                                }
-                            }
-                            else if (force)
-                            {
-                            }
-                        }
-                        catch { }
-                    });
-                });
-            }
-            catch { }
-        }
 
-        private void ShowSignatures()
-        {
-            
-            try
-            {
-                var service = App.Container.Resolve<IPythonComService>();
-                var code = _textEditor.Text;
-                var line = _textEditor.TextArea.Caret.Line;
-                var col = _textEditor.TextArea.Caret.Column; 
-                
-                Task.Run(async () =>
-                {
-                    var json = await service.GetSignatures(code, line, col - 1, _savePath);
-                    if (string.IsNullOrEmpty(json)) return;
+        //                        var data = _completionWindow.CompletionList.CompletionData;
+        //                        data.Clear();
 
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        try 
-                        {
-                            var updates = JArray.Parse(json);
-                            if (updates.Count > 0)
-                            {
-                                _insightWindow = new OverloadInsightWindow(_textEditor.TextArea);
-                                _insightWindow.Closed += (o, args) => _insightWindow = null;
+        //                        var existing = new HashSet<string>();
+        //                        foreach(var item in updates)
+        //                        {
+        //                            var name = item["name"]?.ToString();
+        //                            var desc = item["description"]?.ToString() ?? "";
+        //                            var type = item["type"]?.ToString();
+        //                            var doc = item["docstring"]?.ToString() ?? "";
 
-                                var items = new List<(string, string)>();
-                                int selectedIndex = 0;
+        //                            if(!string.IsNullOrEmpty(doc) && type != "keyword") desc += "\n\n" + doc;
 
-                                foreach(var item in updates)
-                                {
-                                    var name = item["name"]?.ToString() ?? "Unknown";
-                                    var doc = item["docstring"]?.ToString() ?? "";
-                                    var paramsList = item["params"] as JArray;
-                                    var idx = item["index"]?.ToObject<int>() ?? 0;
-                                    
-                                    var pStrs = new List<string>();
-                                    if(paramsList != null) {
-                                        foreach(var p in paramsList) {
-                                            pStrs.Add(p["name"]?.ToString() ?? "?");
-                                        }
-                                    }
-                                    var header = $"{name}({string.Join(", ", pStrs)})";
-                                    items.Add((header, doc));
-                                }
+        //                            if (name != null && !existing.Contains(name))
+        //                            {
+        //                                data.Add(new MyCompletionData(name, desc));
+        //                                existing.Add(name);
+        //                            }
+        //                        }
 
-                                _insightWindow.Provider = new MyOverloadProvider(items);
-                                _insightWindow.Show();
-                            }
-                        }
-                         catch { }
-                    });
-                });
-            }
-            catch { }
-        }
+        //                        if (data.Count > 0)
+        //                        {
+        //                            _completionWindow.Show();
+        //                        }
+        //                    }
+        //                    else if (force)
+        //                    {
+        //                    }
+        //                }
+        //                catch { }
+        //            });
+        //        });
+        //    }
+        //    catch { }
+        //}
+
+        //private void ShowSignatures()
+        //{
+
+        //    try
+        //    {
+        //        var service = App.Container.Resolve<IPythonCom>();
+        //        var code = _textEditor.Text;
+        //        var line = _textEditor.TextArea.Caret.Line;
+        //        var col = _textEditor.TextArea.Caret.Column; 
+
+        //        Task.Run(async () =>
+        //        {
+        //            var json = await service.GetSignatures(code, line, col - 1, _savePath);
+        //            if (string.IsNullOrEmpty(json)) return;
+
+        //            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        //            {
+        //                try 
+        //                {
+        //                    var updates = JArray.Parse(json);
+        //                    if (updates.Count > 0)
+        //                    {
+        //                        _insightWindow = new OverloadInsightWindow(_textEditor.TextArea);
+        //                        _insightWindow.Closed += (o, args) => _insightWindow = null;
+
+        //                        var items = new List<(string, string)>();
+        //                        int selectedIndex = 0;
+
+        //                        foreach(var item in updates)
+        //                        {
+        //                            var name = item["name"]?.ToString() ?? "Unknown";
+        //                            var doc = item["docstring"]?.ToString() ?? "";
+        //                            var paramsList = item["params"] as JArray;
+        //                            var idx = item["index"]?.ToObject<int>() ?? 0;
+
+        //                            var pStrs = new List<string>();
+        //                            if(paramsList != null) {
+        //                                foreach(var p in paramsList) {
+        //                                    pStrs.Add(p["name"]?.ToString() ?? "?");
+        //                                }
+        //                            }
+        //                            var header = $"{name}({string.Join(", ", pStrs)})";
+        //                            items.Add((header, doc));
+        //                        }
+
+        //                        _insightWindow.Provider = new MyOverloadProvider(items);
+        //                        _insightWindow.Show();
+        //                    }
+        //                }
+        //                 catch { }
+        //            });
+        //        });
+        //    }
+        //    catch { }
+        //}
 
         class UnderlineAndStrikeThroughTransformer : DocumentColorizingTransformer
         {
@@ -1035,57 +1063,57 @@ namespace ImagerAvalonia.Views
 
     public partial class EditorView
     {
-        private async void GoToDefinition_Click(object sender, RoutedEventArgs e)
-        {
-             try
-             {
-                 var service = App.Container.Resolve<IPythonComService>();
-                 var code = _textEditor.Text;
-                 var line = _textEditor.TextArea.Caret.Line;
-                 var col = _textEditor.TextArea.Caret.Column;
+        //private async void GoToDefinition_Click(object sender, RoutedEventArgs e)
+        //{
+        //     try
+        //     {
+        //         var service = App.Container.Resolve<IPythonCom>();
+        //         var code = _textEditor.Text;
+        //         var line = _textEditor.TextArea.Caret.Line;
+        //         var col = _textEditor.TextArea.Caret.Column;
 
-                 var json = await service.GetGoto(code, line, col - 1, _savePath);
-                 if (string.IsNullOrEmpty(json)) return;
+        //         var json = await service.GetGoto(code, line, col - 1, _savePath);
+        //         if (string.IsNullOrEmpty(json)) return;
 
-                 var defs = JArray.Parse(json);
-                 if (defs.Count > 0)
-                 {
-                     var def = defs[0];
-                     var dLine = def["line"]?.ToObject<int>() ?? 0;
-                     var dCol = def["column"]?.ToObject<int>() ?? 0;
+        //         var defs = JArray.Parse(json);
+        //         if (defs.Count > 0)
+        //         {
+        //             var def = defs[0];
+        //             var dLine = def["line"]?.ToObject<int>() ?? 0;
+        //             var dCol = def["column"]?.ToObject<int>() ?? 0;
                      
-                     if (dLine > 0)
-                     {
-                         _textEditor.TextArea.Caret.Line = dLine;
-                         _textEditor.TextArea.Caret.Column = dCol + 1;
-                         _textEditor.ScrollTo(dLine, dCol);
-                         _textEditor.Focus();
-                     }
-                 }
-             }
-             catch { }
-        }
+        //             if (dLine > 0)
+        //             {
+        //                 _textEditor.TextArea.Caret.Line = dLine;
+        //                 _textEditor.TextArea.Caret.Column = dCol + 1;
+        //                 _textEditor.ScrollTo(dLine, dCol);
+        //                 _textEditor.Focus();
+        //             }
+        //         }
+        //     }
+        //     catch { }
+        //}
 
-        private async void FormatDocument_Click(object sender, RoutedEventArgs e)
-        {
-             try
-             {
-                 var service = App.Container.Resolve<IPythonComService>();
-                 var code = _textEditor.Text;
+        //private async void FormatDocument_Click(object sender, RoutedEventArgs e)
+        //{
+        //     try
+        //     {
+        //         var service = App.Container.Resolve<IPythonCom>();
+        //         var code = _textEditor.Text;
 
-                 var jsonStr = await service.FormatCode(code);
-                 if (string.IsNullOrEmpty(jsonStr)) return;
+        //         var jsonStr = await service.FormatCode(code);
+        //         if (string.IsNullOrEmpty(jsonStr)) return;
 
-                 var json = JObject.Parse(jsonStr);
-                 var formatted = json["code"]?.ToString();
+        //         var json = JObject.Parse(jsonStr);
+        //         var formatted = json["code"]?.ToString();
                  
-                 if (!string.IsNullOrEmpty(formatted) && formatted != code)
-                 {
-                     _textEditor.Document.Text = formatted;
-                 }
-             }
-             catch { }
-        }
+        //         if (!string.IsNullOrEmpty(formatted) && formatted != code)
+        //         {
+        //             _textEditor.Document.Text = formatted;
+        //         }
+        //     }
+        //     catch { }
+        //}
 
 
 

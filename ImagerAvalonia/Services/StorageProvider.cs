@@ -440,6 +440,7 @@ namespace ImagerAvalonia.Utils
                     {
                         fixed (ushort* data_buf_ptr = frame_data)
                         {
+                            System.Diagnostics.Debug.WriteLine(detectionIdx);
                             MISAddNewImage(_storageId, acqTypeName, detectorName, metadata[buf_ind].TimePoint, metadata[buf_ind].PositionX, metadata[buf_ind].PositionY, metadata[buf_ind].PositionZ,
                                            detectionIdx, posName, (int)metadata[buf_ind].Width, (int)metadata[buf_ind].Height, data_buf_ptr);
                         }
