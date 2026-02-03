@@ -20,6 +20,8 @@ using AvaloniaEdit.TextMate;
 using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.PythonEditor.Resources;
 using ImagerAvalonia.Utils;
+using ReactiveUI;
+
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -32,6 +34,10 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using TextMateSharp.Grammars;
 using Snippet = AvaloniaEdit.Snippets.Snippet;
+using Avalonia.ReactiveUI;
+using ImagerAvalonia.Services;
+using Avalonia.Threading;
+using System.Text;
 namespace ImagerAvalonia.Views
 {
     using Pair = KeyValuePair<int, Control>;
