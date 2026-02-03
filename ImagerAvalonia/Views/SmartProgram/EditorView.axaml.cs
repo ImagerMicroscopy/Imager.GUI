@@ -426,12 +426,14 @@ namespace ImagerAvalonia.Views
 
                 int offset = _textEditor.CaretOffset;
                 int start = offset;
-  
-                char c = _textEditor.Document.GetCharAt(start - 1);
-                if(c=='.' && !char.IsLetterOrDigit(_textEditor.Document.GetCharAt(start)))
+                if (start > 1)
                 {
-                    List<CompletionItem> completions = await editorWindowViewModel.GetCompletion(code, line, col - 1, _savePath);
-                    ShowCompletion(true, completions);
+                    char c = _textEditor.Document.GetCharAt(start - 1);
+                    if (c == '.' && !char.IsLetterOrDigit(_textEditor.Document.GetCharAt(start)))
+                    {
+                        List<CompletionItem> completions = await editorWindowViewModel.GetCompletion(code, line, col - 1, _savePath);
+                        ShowCompletion(true, completions);
+                    }
                 }
             }
         }
