@@ -3,6 +3,7 @@ using AvaloniaEdit.Editing;
 using AvaloniaEdit.TextMate;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.Views;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
 using System;
@@ -23,6 +24,7 @@ public class PythonEditorWindowViewModel : ReactiveObject
     private readonly IPythonLinting _pythonLinting;
 
     public event EventHandler<List<DiagnosticFeedback>>? DiagnosticsReceived;
+    public event EventHandler<List<HoverFeedback>>? HoverResponseReceived;
 
     private LineInfo _caretPosition;
     public LineInfo CaretPosition
@@ -32,6 +34,17 @@ public class PythonEditorWindowViewModel : ReactiveObject
         {
             Task.Run(() => GetDiagnostics());
             this.RaiseAndSetIfChanged(ref _caretPosition, value);   
+        }
+    }
+
+    private LineInfo _hoverPosition;
+    public LineInfo HoverPosition
+    {
+        get => _hoverPosition;
+        set
+        {
+            Task.Run(() => GetHover(value.Line, value.Column));
+            this.RaiseAndSetIfChanged(ref _caretPosition, value);
         }
     }
 
@@ -50,49 +63,42 @@ public class PythonEditorWindowViewModel : ReactiveObject
             var response = await _pythonLinting.GetDiagnostics(Code, SavePath);
             if (string.IsNullOrEmpty(response)) return;
             var diagnosticfeedback = JArray.Parse(response).ToObject<List<DiagnosticFeedback>>();
-
-            DiagnosticsReceived?.Invoke(this, diagnosticfeedback);
-
-            //Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            //{
-
-            //    _textMarkerService.RemoveAll(m => true);
-
-            //    var errors = JArray.Parse(json);
-            //    foreach (var err in errors)
-            //    {
-            //        var l = err["line"]?.ToObject<int>();
-            //        var c = err["column"]?.ToObject<int>();
-            //        var msg = err["message"]?.ToString();
-
-            //        if (l.HasValue && c.HasValue)
-            //        {
-
-            //            //var lineObj = _textEditor.Document.GetLineByNumber(l.Value);
-            //            //int offset = lineObj.Offset + c.Value;
-            //            //int length = Math.Max(1, lineObj.Length - c.Value);
-
-
-            //            //if (offset < 0) offset = 0;
-            //            //if (offset + length > _textEditor.Document.TextLength) length = _textEditor.Document.TextLength - offset;
-
-            //            //if (length > 0)
-            //            //{
-            //            //    var m = _textMarkerService.Create(offset, length);
-            //            //    m.MarkerType = TextMarkerType.SquigglyUnderline;
-            //            //    m.MarkerColor = Colors.Red;
-            //            //    m.ToolTip = msg;
-            //            //}
-            //        }
-            //    }
-
-            //});
+            if (diagnosticfeedback is not null)
+                DiagnosticsReceived?.Invoke(this, diagnosticfeedback);
         }
         catch { }
-
     }
 
+    private async Task GetHover(int line, int column)
+    {
+        try
+        {
+            var response = await _pythonLinting.GetHover(Code,line, column, SavePath);
+            if (string.IsNullOrEmpty(response)) return;
+            var hoverfeedback = JArray.Parse(response).ToObject<List<HoverFeedback>>();
+            if (hoverfeedback is not null)
+                HoverResponseReceived?.Invoke(this, hoverfeedback);
+        }
+        catch { }
+    }
 
+    public async Task<List<CompletionItem>> GetCompletion(string code, int line,int col,string  _savePath)
+    {
+        try
+        {
+            var response = await _pythonLinting.GetCompletions(code, line, col, _savePath);
+            if (string.IsNullOrEmpty(response)) return null;
+            var completionfeedback = JArray.Parse(response).ToObject<List<CompletionItem>>();
+            if (completionfeedback is not null)
+                return completionfeedback;
+            else
+                return new List<CompletionItem>();
+                
+        }
+        catch {
+            return new List<CompletionItem>();
+        }
+    }
 
     public ObservableCollection<ThemeViewModel> AllThemes { get; set; } = [];
     public string SavePath { get; internal set; }
@@ -142,3 +148,19 @@ public record DiagnosticFeedback
     public int column { get; set; }
     public string? message { get; set; }
 }
+
+public record HoverFeedback(
+    string? FullName,
+    string? Name,
+    string? Type,
+    string? Docstring,
+    string? Description
+);
+
+
+public record CompletionItem(
+    string? Name,
+    string? Description,
+    string? Type,
+    string? Docstring
+);
