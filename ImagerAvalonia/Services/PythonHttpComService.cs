@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace ImagerAvalonia.Services
 {
-    public interface IPythonComService
+    public interface IPythonCom
     {
         public Task<string> SetUpAvailableNodes();
         public Task<string> GetNodeInfo(string path);
@@ -24,7 +24,7 @@ namespace ImagerAvalonia.Services
     }
 
 
-    public class PythonHttpComService : IPythonComService
+    public class PythonHttpComService : IPythonCom
     {
 
         private readonly string _pythonAdress = "http://127.0.0.1:5100/";

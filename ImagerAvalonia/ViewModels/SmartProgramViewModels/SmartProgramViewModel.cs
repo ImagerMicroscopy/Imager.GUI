@@ -27,7 +27,7 @@ namespace ImagerAvalonia.ViewModels
 
         public event EventHandler<string> OnSelectedProgramChangedEvent;
         public string LoadedFolder = string.Empty;
-        private readonly IPythonComService _nodeComService;
+        private readonly IPythonCom _nodeComService;
         private readonly EquipmentState _equipmentState;
         private Dictionary<string, string> _programNameFolderPairs = new();
 
@@ -39,7 +39,7 @@ namespace ImagerAvalonia.ViewModels
         [ObservableProperty] ObservableCollection<SmartUpdateAcquisitionFunctionViewModel> _availableAcquisitionUpdates = new();
 
 
-        public SmartProgramViewModel( IPythonComService nodeComService , SmartProcessingRegisterViewModel smartProcessingRegister, EquipmentState eqState) 
+        public SmartProgramViewModel( IPythonCom nodeComService , SmartProcessingRegisterViewModel smartProcessingRegister, EquipmentState eqState) 
         {
             _nodeComService = nodeComService;
             _equipmentState = eqState;

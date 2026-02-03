@@ -1,3 +1,5 @@
+using Autofac;
+using Autofac.Core;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Diagnostics;
@@ -18,21 +20,29 @@ using AvaloniaEdit.TextMate;
 using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.PythonEditor.Resources;
 using ImagerAvalonia.Utils;
+using ReactiveUI;
+
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Reactive.Disposables;
+using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using TextMateSharp.Grammars;
 using Snippet = AvaloniaEdit.Snippets.Snippet;
+using Avalonia.ReactiveUI;
+using ImagerAvalonia.Services;
+using Avalonia.Threading;
+using System.Text;
 namespace ImagerAvalonia.Views
 {
     using Pair = KeyValuePair<int, Control>;
 
-    public partial class EditorView : UserControl
+    public partial class EditorView : ReactiveUserControl<PythonEditorWindowViewModel>
     {
         private readonly AvaloniaEdit.TextEditor _textEditor;
         private FoldingManager _foldingManager;
@@ -48,14 +58,13 @@ namespace ImagerAvalonia.Views
         private RegistryOptions _registryOptions;
         private int _currentTheme = (int)ThemeName.DarkPlus;
         private string? _savePath;
-
+        private readonly IPythonCom _pythonService;
+        private readonly IPythonLinting _pythonLintingService;
         public event EventHandler<string> OnReloadRequested;
-        //private CustomMargin _customMargin;
 
         public EditorView()
         {
             InitializeComponent();
-
 
             _textEditor = this.FindControl<TextEditor>("Editor");
             _textEditor.HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Visible;
@@ -63,7 +72,6 @@ namespace ImagerAvalonia.Views
             _textEditor.ShowLineNumbers = true;
             _textEditor.TextArea.Background = this.Background;
             _textEditor.TextArea.Options.ConvertTabsToSpaces = true;
-            _textEditor.TextArea.TextEntered += textEditor_TextArea_TextEntered;
             _textEditor.TextArea.TextEntering += textEditor_TextArea_TextEntering;
             _textEditor.Options.AllowToggleOverstrikeMode = true;
             _textEditor.Options.EnableTextDragDrop = true;
@@ -71,26 +79,20 @@ namespace ImagerAvalonia.Views
             _textEditor.Options.ShowBoxForControlCharacters = true;
             _textEditor.Options.ColumnRulerPositions = new List<int>() { 80, 100 };
             _textEditor.TextArea.Caret.PositionChanged += Caret_PositionChanged;
+            _textEditor.TextArea.Caret.PositionChanged += OnCompletionRequested;
+
             _textEditor.TextArea.RightClickMovesCaret = true;
             _textEditor.Options.HighlightCurrentLine = true;
             _textEditor.Options.CompletionAcceptAction = CompletionAcceptAction.DoubleTapped;
-
+            _textEditor.TextChanged += _textEditor_TextChanged;
             _addControlButton = this.FindControl<Button>("addControlBtn");
-            //_addControlButton.Click += AddControlButton_Click;
-
             _clearControlButton = this.FindControl<Button>("clearControlBtn");
-            //_clearControlButton.Click += ClearControlButton_Click;
-
             _insertSnippetButton = this.FindControl<Button>("insertSnippetBtn");
-            //_insertSnippetButton.Click += InsertSnippetButton_Click;
-
             _textEditor.TextArea.TextView.ElementGenerators.Add(_generator);
-
             _registryOptions = new RegistryOptions(
                 (ThemeName)_currentTheme);
 
             _textMateInstallation = _textEditor.InstallTextMate(_registryOptions);
-
             _textMateInstallation.AppliedTheme += TextMateInstallationOnAppliedTheme;
 
             Language pythonLanguage = _registryOptions.GetLanguageByExtension(".py");
@@ -102,10 +104,6 @@ namespace ImagerAvalonia.Views
 
             string scopeName = _registryOptions.GetScopeByLanguageId(pythonLanguage.Id);
 
-            //_textEditor.Document = new TextDocument(
-            //    "// AvaloniaEdit supports displaying control chars: \a or \b or \v" + Environment.NewLine +
-            //    "// AvaloniaEdit supports displaying underline and strikethrough" + Environment.NewLine +
-            //    ResourceLoader.LoadSampleFile(scopeName));
             _textMateInstallation.SetGrammar(_registryOptions.GetScopeByLanguageId(pythonLanguage.Id));
             _textEditor.TextArea.TextView.LineTransformers.Add(new UnderlineAndStrikeThroughTransformer());
             _statusTextBlock = this.Find<TextBlock>("StatusText");
@@ -117,30 +115,147 @@ namespace ImagerAvalonia.Views
                 else _textEditor.FontSize = _textEditor.FontSize > 1 ? _textEditor.FontSize - 1 : 1;
             }, RoutingStrategies.Bubble, true);
 
-            // Add a custom margin at the left of the text area, which can be clicked.
-            //_customMargin = new CustomMargin();
-            //_textEditor.TextArea.LeftMargins.Insert(0, _customMargin);
 
-            var PythonEditorVM = new PythonEditorWindowViewModel(_textMateInstallation, _registryOptions);
+            var PythonEditorVM = App.Container.Resolve<PythonEditorWindowViewModel>();
             foreach (ThemeName themeName in Enum.GetValues<ThemeName>())
             {
                 var themeViewModel = new ThemeViewModel(themeName);
-                PythonEditorVM.AllThemes.Add(themeViewModel);
                 if (themeName == ThemeName.DarkPlus)
                 {
-                    PythonEditorVM.SelectedTheme = themeViewModel;
+                    _textMateInstallation.SetTheme(_registryOptions.LoadTheme(themeViewModel.ThemeName));
                 }
             }
             DataContext = PythonEditorVM;
+            PythonEditorVM.DiagnosticsReceived += OnDiagnosticsReceived;
+            PythonEditorVM.HoverResponseReceived += OnHoverResponseReceived;
 
+            this.WhenActivated(disposables =>
+            {
+                Observable.FromEventPattern(
+                        h => _textEditor.TextArea.Caret.PositionChanged += h,
+                        h => _textEditor.TextArea.Caret.PositionChanged -= h)
+                    .Select(_ => new LineInfo(_textEditor.TextArea.Caret.Position.Line, _textEditor.TextArea.Caret.Position.Column) )
+                    .Throttle(TimeSpan.FromMilliseconds(250), RxApp.MainThreadScheduler)
+                    .BindTo(ViewModel!, vm => vm.CaretPosition)
+                    .DisposeWith(disposables);
+            });
+            this.WhenActivated(disposables =>
+            {
+                Observable.FromEventPattern<PointerEventArgs>(
+                        h => _textEditor.TextArea.PointerMoved += h,
+                        h => _textEditor.TextArea.PointerMoved -= h)
+                    .Select(e => {
+                        var textView = _textEditor.TextArea.TextView;
+                        var posInView = e.EventArgs.GetPosition(textView);
+                        var contentPos = posInView + textView.ScrollOffset;
+                        return textView.GetPositionFloor(contentPos);
+                    })
+                    .Where(lineCol => lineCol != null)
+                    .Select(lineCol => new LineInfo(lineCol!.Value.Line, lineCol!.Value.Column))
+                    .Throttle(TimeSpan.FromMilliseconds(250), RxApp.MainThreadScheduler)
+                    .BindTo(ViewModel!, vm => vm.HoverPosition)
+                    .DisposeWith(disposables);
+            });
 
+            InitializeSmartFeatures();
         }
 
+
+
+        private void OnHoverResponseReceived(object? sender, List<HoverFeedback> e)
+        {
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                try
+                {
+                    if (e.Count > 0)
+                    {
+                        var item = e[0];
+                        var name = item.FullName ?? item.Name;
+                        var type = item.Type;
+                        var doc = item.Docstring;
+                        var desc = item.Description;
+
+                        var sb = new StringBuilder();
+                        if (!string.IsNullOrEmpty(name)) sb.AppendLine(name);
+                        if (!string.IsNullOrEmpty(type)) sb.AppendLine($"Type: {type}");
+                        if (!string.IsNullOrEmpty(desc)) sb.AppendLine(desc);
+                        if (!string.IsNullOrEmpty(doc) && type != "keyword")
+                        {
+                            sb.AppendLine();
+                            sb.AppendLine(doc);
+                        }
+                        var txt = sb.ToString().Trim();
+
+                        if (!string.IsNullOrEmpty(txt))
+                        {
+                            ToolTip.SetTip(_textEditor, txt);
+                            ToolTip.SetIsOpen(_textEditor, true);
+                        }
+                        else
+                        {
+                            ToolTip.SetIsOpen(_textEditor, false);
+                        }
+                    }
+                    else
+                    {
+
+                        ToolTip.SetIsOpen(_textEditor, false);
+                    }
+                }
+                catch
+                {
+                    ToolTip.SetIsOpen(_textEditor, false);
+                }
+            });
+        }
+
+        private void OnDiagnosticsReceived(object? sender, List<DiagnosticFeedback> diagnosticFeedbacks)
+        {
+            Dispatcher.UIThread.Invoke(() =>
+            {
+                _textMarkerService.RemoveAll(m => true);
+                foreach (var err in diagnosticFeedbacks)
+                {
+                    var lineObj = _textEditor.Document.GetLineByNumber(err.line);
+                    int offset = lineObj.Offset + err.column;
+                    int length = Math.Max(1, lineObj.Length - err.column);
+
+                    if (offset < 0) offset = 0;
+                    if (offset + length > _textEditor.Document.TextLength) length = _textEditor.Document.TextLength - offset;
+                    if (length > 0)
+                    {
+                        var m = _textMarkerService.Create(offset, length);
+                        m.MarkerType = TextMarkerType.SquigglyUnderline;
+                        m.MarkerColor = Colors.Red;
+                        if (err.message is not null)
+                            m.ToolTip = err.message;
+                    }
+                }
+            });
+        }
+
+        private void _textEditor_TextChanged(object? sender, EventArgs e)
+        {
+            if(DataContext is PythonEditorWindowViewModel vm)
+            {
+                vm.Code = _textEditor.Text;
+            }
+        }
+
+        private void InitializeComponent()
+        {
+            AvaloniaXamlLoader.Load(this);
+        }
         public void SetDocument(string documentPath)
         {
             _savePath = documentPath;
             _textEditor.Document = new TextDocument(
                 ResourceLoader.LoadSampleFile(documentPath));
+            if(DataContext is PythonEditorWindowViewModel vm)
+            {
+                vm.SavePath = _savePath;
+            }
         }
 
 
@@ -193,13 +308,13 @@ namespace ImagerAvalonia.Views
                     brush =>
                     {
                         _textEditor.TextArea.TextView.CurrentLineBackground = brush;
-                        _textEditor.TextArea.TextView.CurrentLineBorder = new Pen(brush); // Todo: VS Code didn't seem to have a border but it might be nice to have that option. For now just make it the same..
+                        _textEditor.TextArea.TextView.CurrentLineBorder = new Pen(brush);
                     }))
             {
                 _textEditor.TextArea.TextView.SetDefaultHighlightLineColors();
             }
 
-            //Todo: looks like the margin doesn't have a active line highlight, would be a nice addition
+
             if (!ApplyBrushAction(e, "editorLineNumber.foreground",
                     brush => _textEditor.LineNumbersForeground = brush))
             {
@@ -224,13 +339,6 @@ namespace ImagerAvalonia.Views
             {
                 _statusTextBlock.Foreground = Brushes.White;
             }
-
-            //if (!ApplyBrushAction(e, "sideBar.background", brush => _customMargin.BackGroundBrush = brush))
-            //{
-            //    _customMargin.SetDefaultBackgroundBrush();
-            //}
-
-            //Applying the Editor background to the whole window for demo sake.
             ApplyBrushAction(e, "editor.background", brush => Background = brush);
             ApplyBrushAction(e, "editor.foreground", brush => Foreground = brush);
         }
@@ -254,8 +362,6 @@ namespace ImagerAvalonia.Views
                 _textEditor.TextArea.Caret.Line,
                 _textEditor.TextArea.Caret.Column);
         }
-
-
 
         private void SyntaxModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -296,20 +402,47 @@ namespace ImagerAvalonia.Views
             }
         }
 
-        private void InitializeComponent()
+        
+        private EditorTextMarkerService _textMarkerService;
+
+        private void InitializeSmartFeatures()
         {
-            AvaloniaXamlLoader.Load(this);
+
+            _textMarkerService = new EditorTextMarkerService(_textEditor.Document);
+            _textEditor.TextArea.TextView.BackgroundRenderers.Add(_textMarkerService);
+            _textEditor.TextArea.TextView.LineTransformers.Add(_textMarkerService);
         }
+        private async void OnCompletionRequested(object? sender, EventArgs e)
+        {
+
+            var code = _textEditor.Text;
+            var line = _textEditor.TextArea.Caret.Line;
+            var col = _textEditor.TextArea.Caret.Column;
+
+
+
+            if (DataContext is PythonEditorWindowViewModel editorWindowViewModel)
+            {
+
+                int offset = _textEditor.CaretOffset;
+                int start = offset;
+  
+                char c = _textEditor.Document.GetCharAt(start - 1);
+                if(c=='.' && !char.IsLetterOrDigit(_textEditor.Document.GetCharAt(start)))
+                {
+                    List<CompletionItem> completions = await editorWindowViewModel.GetCompletion(code, line, col - 1, _savePath);
+                    ShowCompletion(true, completions);
+                }
+            }
+        }
+
 
         private void AddControlButton_Click(object sender, RoutedEventArgs e)
         {
             var button = new Button() { Content = "Click me", Cursor = Cursor.Default };
 
-            // The VerticalAlignment controls the alignment within a text line.
             button.VerticalAlignment = VerticalAlignment.Center;
 
-            // Optionally, TextBlock.BaseLineProperty can be set. Avalonia will align the baselines
-            // of all elements within a line.
             TextBlock.SetBaselineOffset(button, 22);
 
             _generator.controls.Add(new Pair(_textEditor.CaretOffset, button));
@@ -319,7 +452,6 @@ namespace ImagerAvalonia.Views
 
         private void ClearControlButton_Click(object sender, RoutedEventArgs e)
         {
-            //TODO: delete elements using back key
             _generator.controls.Clear();
             _textEditor.TextArea.TextView.Redraw();
         }
@@ -330,52 +462,80 @@ namespace ImagerAvalonia.Views
             {
                 if (!char.IsLetterOrDigit(e.Text[0]))
                 {
-                    // Whenever a non-letter is typed while the completion window is open,
-                    // insert the currently selected element.
                     _completionWindow.CompletionList.RequestInsertion(e);
                 }
             }
 
-            _insightWindow?.Hide();
 
-            // Do not set e.Handled=true.
-            // We still want to insert the character that was typed.
         }
 
-        private void textEditor_TextArea_TextEntered(object sender, TextInputEventArgs e)
+
+
+
+        private void ShowCompletion(bool force, List<CompletionItem> completions)
         {
-            if (e.Text == ".")
+
+
+            if (completions.Count() == 0) return;
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-
-                _completionWindow = new CompletionWindow(_textEditor.TextArea);
-                _completionWindow.Closed += (o, args) => _completionWindow = null;
-
-                var data = _completionWindow.CompletionList.CompletionData;
-
-                for (int i = 0; i < 500; i++)
+                try
                 {
-                    data.Add(new MyCompletionData("Item" + i.ToString()));
+
+                    if (_completionWindow == null)
+                    {
+                        _completionWindow = new CompletionWindow(_textEditor.TextArea);
+                        _completionWindow.Closed += (o, args) => _completionWindow = null;
+                    }
+
+                    int offset = _textEditor.CaretOffset;
+                    int start = offset;
+                    while (start > 0)
+                    {
+                        char c = _textEditor.Document.GetCharAt(start - 1);
+                        if (!char.IsLetterOrDigit(c) && c != '_') break;
+                        start--;
+                    }
+
+
+                    _completionWindow.StartOffset = start;
+                    _completionWindow.EndOffset = offset;
+
+
+                    var data = _completionWindow.CompletionList.CompletionData;
+                    data.Clear();
+
+                    var existing = new HashSet<string>();
+                    foreach (var item in completions)
+                    {
+                        string desc = "";
+                        if (item.Description != null)
+                        {
+                            if (!string.IsNullOrEmpty(item.Docstring) && item.Type != "keyword")
+                            {
+                                desc = string.Concat(new string[] { item.Description, "\n\n", item.Docstring });
+                            }
+                        }
+
+                        if (item.Name != null && !existing.Contains(item.Name))
+                        {
+                            data.Add(new MyCompletionData(item.Name, desc));
+                            existing.Add(item.Name);
+                        }
+                    }
+
+                    if (data.Count > 0)
+                    {
+                        _completionWindow.Show();
+                    }
+
                 }
-
-                data.Insert(20, new MyCompletionData("long item to demosntrate dynamic poup resizing"));
-
-                _completionWindow.Show();
-            }
-            else if (e.Text == "(")
-            {
-                _insightWindow = new OverloadInsightWindow(_textEditor.TextArea);
-                _insightWindow.Closed += (o, args) => _insightWindow = null;
-
-                _insightWindow.Provider = new MyOverloadProvider(new[]
-                {
-                    ("Method1(int, string)", "Method1 description"),
-                    ("Method2(int)", "Method2 description"),
-                    ("Method3(string)", "Method3 description"),
-                });
-
-                _insightWindow.Show();
-            }
+                catch { }
+                
+            });
         }
+
 
         class UnderlineAndStrikeThroughTransformer : DocumentColorizingTransformer
         {
@@ -451,10 +611,9 @@ namespace ImagerAvalonia.Views
                 {
                     _selectedIndex = value;
                     OnPropertyChanged();
-                    // ReSharper disable ExplicitCallerInfoArgument
                     OnPropertyChanged(nameof(CurrentHeader));
                     OnPropertyChanged(nameof(CurrentContent));
-                    // ReSharper restore ExplicitCallerInfoArgument
+
                 }
             }
 
@@ -473,19 +632,20 @@ namespace ImagerAvalonia.Views
 
         public class MyCompletionData : ICompletionData
         {
-            public MyCompletionData(string text)
+            private string _description;
+            public MyCompletionData(string text, string description = "")
             {
                 Text = text;
+                _description = description;
             }
 
             public IImage Image => null;
 
             public string Text { get; }
 
-            // Use this property if you want to show a fancy UIElement in the list.
             public object Content => _contentControl ??= BuildContentControl();
 
-            public object Description => "Description for " + Text;
+            public object Description => _description;
 
             public double Priority { get; } = 0;
 
@@ -511,11 +671,6 @@ namespace ImagerAvalonia.Views
         {
             public List<Pair> controls = new List<Pair>();
 
-            /// <summary>
-            /// Gets the first interested offset using binary search
-            /// </summary>
-            /// <returns>The first interested offset.</returns>
-            /// <param name="startOffset">Start offset.</param>
             public override int GetFirstInterestedOffset(int startOffset)
             {
                 int pos = controls.BinarySearch(new Pair(startOffset, null), this);
@@ -565,5 +720,163 @@ namespace ImagerAvalonia.Views
             snippet.Insert(_textEditor.TextArea);
             _textEditor.Focus();
         }
+
+       
     }
+    public interface ITextMarkerService : IBackgroundRenderer, IVisualLineTransformer
+    {
+        ITextMarker Create(int offset, int length);
+        void Remove(ITextMarker marker);
+        void RemoveAll(Predicate<ITextMarker> predicate);
+        IEnumerable<ITextMarker> TextMarkers { get; }
+    }
+
+    public interface ITextMarker
+    {
+        int StartOffset { get; }
+        int EndOffset { get; }
+        int Length { get; }
+        Color? BackgroundColor { get; set; }
+        Color? MarkerColor { get; set; }
+        TextMarkerType MarkerType { get; set; }
+        object ToolTip { get; set; }
+    }
+
+    public enum TextMarkerType
+    {
+        None,
+        SquigglyUnderline,
+        NormalUnderline,
+        DottedUnderline,
+        Block
+    }
+
+    public class EditorTextMarkerService : DocumentColorizingTransformer, ITextMarkerService
+    {
+        private readonly TextDocument _document;
+        private readonly TextSegmentCollection<TextMarker> _markers;
+
+        public EditorTextMarkerService(TextDocument document)
+        {
+            _document = document ?? throw new ArgumentNullException(nameof(document));
+            _markers = new TextSegmentCollection<TextMarker>(document);
+            document.Changed += OnDocumentChanged; 
+        }
+
+        private void OnDocumentChanged(object sender, DocumentChangeEventArgs e)
+        {
+        }
+
+        public ITextMarker Create(int offset, int length)
+        {
+            var m = new TextMarker(this, offset, length);
+            _markers.Add(m);
+            return m;
+        }
+
+        public void Remove(ITextMarker marker)
+        {
+            if (marker is TextMarker m && _markers.Remove(m))
+            {
+                Redraw(m);
+            }
+        }
+
+        public void RemoveAll(Predicate<ITextMarker> predicate)
+        {
+            var toRemove = _markers.Where(m => predicate(m)).ToList();
+            foreach (var m in toRemove)
+            {
+                Remove(m);
+            }
+        }
+
+        public IEnumerable<ITextMarker> TextMarkers => _markers;
+
+        public void Draw(TextView textView, DrawingContext drawingContext)
+        {
+            if (textView == null) throw new ArgumentNullException(nameof(textView));
+            if (drawingContext == null) throw new ArgumentNullException(nameof(drawingContext));
+
+            if (_markers == null || !textView.VisualLinesValid) return;
+
+            var visualLines = textView.VisualLines;
+            if (visualLines.Count == 0) return;
+
+            int viewStart = visualLines.First().FirstDocumentLine.Offset;
+            int viewEnd = visualLines.Last().LastDocumentLine.EndOffset;
+
+            foreach (var marker in _markers.FindOverlappingSegments(viewStart, viewEnd - viewStart))
+            {
+                if (marker.MarkerColor != null) 
+                {
+                    if (marker.MarkerType == TextMarkerType.Block)
+                    {
+                    }
+                    
+                    if (marker.MarkerType != TextMarkerType.None && marker.MarkerType != TextMarkerType.Block)  
+                    {
+                         foreach (var r in BackgroundGeometryBuilder.GetRectsForSegment(textView, marker))
+                         {
+                             var startPoint = r.BottomLeft;
+                             var endPoint = r.BottomRight;
+
+                             var pen = new Pen(new SolidColorBrush(marker.MarkerColor.Value));
+                             
+                             if (marker.MarkerType == TextMarkerType.SquigglyUnderline)
+                             {
+                                 double offset = 2.5;
+                                 int count = (int)(r.Width / offset) / 2;
+                                 var g = new StreamGeometry();
+                                 using (var ctx = g.Open())
+                                 {
+                                     ctx.BeginFigure(new Point(startPoint.X, startPoint.Y - 2), false);
+                                     for (int i = 0; i < count; i++)
+                                     {
+                                         double x = startPoint.X + (i * 2 * offset);
+                                         ctx.LineTo(new Point(x + offset, startPoint.Y + 2));
+                                         ctx.LineTo(new Point(x + 2 * offset, startPoint.Y - 2));
+                                     }
+                                 }
+                                 drawingContext.DrawGeometry(null, pen, g);
+                             }
+                             else 
+                             {
+                                 drawingContext.DrawLine(pen, new Point(startPoint.X, startPoint.Y), new Point(endPoint.X, endPoint.Y));
+                             }
+                         }
+                    }
+                }
+            }
+        }
+
+        public KnownLayer Layer => KnownLayer.Selection; 
+
+        protected override void ColorizeLine(DocumentLine line)
+        {
+        }
+
+        private void Redraw(ISegment segment)
+        {
+        }
+    }
+
+    public class TextMarker : TextSegment, ITextMarker
+    {
+        private readonly EditorTextMarkerService _service;
+        public TextMarker(EditorTextMarkerService service, int offset, int length)
+        {
+            _service = service;
+            StartOffset = offset;
+            Length = length;
+        }
+        
+        public Color? BackgroundColor { get; set; }
+        public Color? MarkerColor { get; set; }
+        public TextMarkerType MarkerType { get; set; }
+        public object ToolTip { get; set; }
+    }
+
+
+
 }

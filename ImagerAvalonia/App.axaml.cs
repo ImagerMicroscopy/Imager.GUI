@@ -95,11 +95,14 @@ public partial class App : Application
 
         builder.RegisterType<SmartProgramOutputViewModel>().SingleInstance();
         builder.RegisterType<SmartProgramViewModel>().InstancePerDependency().PropertiesAutowired();
+        builder.RegisterType<PythonEditorWindowViewModel>().InstancePerDependency().PropertiesAutowired();
         builder.RegisterType<StageLoopViewModel>().InstancePerDependency();
         builder.RegisterType<RelStageViewModel>().InstancePerDependency();
         builder.RegisterType<ExperimentSerialization>().As<IExperimentSerialization>().InstancePerLifetimeScope();
         builder.RegisterType<SmartProcessingRegisterViewModel>().SingleInstance().PropertiesAutowired();
-        builder.RegisterType<PythonHttpComService>().SingleInstance().As<IPythonComService>();
+
+        builder.RegisterType<PythonHttpComService>().SingleInstance().As<IPythonCom>();
+        builder.RegisterType<PythonLintingService>().SingleInstance().As<IPythonLinting>();
 
         builder.Register(ctx =>
         {
@@ -133,7 +136,8 @@ public partial class App : Application
 
 
         var serviceCollection = new ServiceCollection();
-        serviceCollection.AddHttpClient<IPythonComService, PythonHttpComService>();
+        serviceCollection.AddHttpClient<IPythonCom, PythonHttpComService>();
+        serviceCollection.AddHttpClient<IPythonLinting, PythonLintingService>();
         builder.Populate(serviceCollection);
         Container = builder.Build();
 
