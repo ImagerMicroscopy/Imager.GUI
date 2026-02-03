@@ -9,8 +9,6 @@ using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.ReactiveUI;
-using Avalonia.Threading;
 using AvaloniaEdit;
 using AvaloniaEdit.CodeCompletion;
 using AvaloniaEdit.Document;
@@ -19,22 +17,18 @@ using AvaloniaEdit.Folding;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.Snippets;
 using AvaloniaEdit.TextMate;
+using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.PythonEditor.Resources;
-using ImagerAvalonia.Services;
+using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using ReactiveUI;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.ComponentModel.Design;
 using System.IO;
 using System.Linq;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
 using TextMateSharp.Grammars;
 using Snippet = AvaloniaEdit.Snippets.Snippet;
@@ -258,15 +252,26 @@ namespace ImagerAvalonia.Views
             }
         }
 
-        public void SaveDocument(object? sender, RoutedEventArgs e)
+
+        public async Task SaveDocument(object? sender, RoutedEventArgs e)
         {
-            if (_savePath is not null)
+            if (_savePath is null)
+                return;
+
+            try
             {
-                using (FileStream fs = new FileStream(_savePath, FileMode.Create, FileAccess.Write, FileShare.None))
-                {
-                    _textEditor.Save(fs);
-                }
+                using FileStream fs = new FileStream(
+                    _savePath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None);
+
+                _textEditor.Save(fs);
                 OnReloadRequested?.Invoke(this, _savePath);
+            }
+            catch (Exception ex)
+            {
+                await ExceptionWindowHandler.ShowExceptionAsync(ex);
             }
         }
 
