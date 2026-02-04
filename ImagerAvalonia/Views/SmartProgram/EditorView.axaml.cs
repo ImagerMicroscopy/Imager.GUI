@@ -426,7 +426,7 @@ namespace ImagerAvalonia.Views
 
                 int offset = _textEditor.CaretOffset;
                 int start = offset;
-                if (start > 1)
+                if (start >= 1)
                 {
                     char c = _textEditor.Document.GetCharAt(start - 1);
                     if (c == '.' && !char.IsLetterOrDigit(_textEditor.Document.GetCharAt(start)))
