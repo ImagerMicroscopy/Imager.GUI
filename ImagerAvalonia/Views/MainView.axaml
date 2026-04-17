@@ -365,7 +365,7 @@
 															Background="Gray"
 															HorizontalAlignment="Center"
 															x:Name="AvailableAcquisitions"
-															ItemsSource="{Binding UserDefinedAcquisitionSettings.Acquisitions}"
+															ItemsSource="{Binding SystemDefinedSettings.Acquisitions}"
 															SelectedItem="{Binding SelectedAcquisition}"
 															Margin="0 0 0 0"
 															Height="100">

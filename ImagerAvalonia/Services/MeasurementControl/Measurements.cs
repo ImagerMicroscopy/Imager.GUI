@@ -77,7 +77,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     public class Detection :  IMeasurementTypes
     {
         
-        public Detection(UserDefinedAcquisitions availableAcquisitions)
+        public Detection(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ActionType;
             MeasurementName = "Detection";
@@ -186,7 +186,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     {
 
 
-        public Irradiation(UserDefinedAcquisitions availableAcquisitions)
+        public Irradiation(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ActionType;
             MeasurementName = "Irradiation";
@@ -197,7 +197,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         }
         public ObservableCollection<AcquisitionSettingsViewModel> AvailableAcquisitions => UserAcquisitionSettings.Acquisitions;
-        public UserDefinedAcquisitions UserAcquisitionSettings { get; set; }
+        public SystemDefinedSettingsViewModel UserAcquisitionSettings { get; set; }
         public string ElementType;
         public TreeMeasurementType NodeType { get;  }
         public string MeasurementName { get; }
@@ -272,25 +272,59 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
 
 
+    public class Robot : IMeasurementTypes
+    {
+        public string MeasurementName => "Robot";
+        public string ElementType => "executerobotprogram";
+        public UserControl MeasurementView { get; }
 
+        public TreeMeasurementType NodeType => TreeMeasurementType.ActionType;
 
+        public Robot(SystemDefinedSettingsViewModel availableAcquisitions)
+        {
+            MeasurementView = new RobotControlView(availableAcquisitions);
 
+        }
 
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void DetectionWiseTraversal(NodeBase node, TraversalState traversal)
+        {
+
+        }
+
+        public JObject Serialize(IExperimentSerialization experimentSerialization)
+        {
+            if(MeasurementView.DataContext is RobotControlViewModel vm)
+            {
+                JObject serializedRobot = new JObject(new JProperty("elementtype", ElementType));
+                serializedRobot["elementid"] = vm.Elementid;
+                serializedRobot["programparameters"] = vm.Serialize();
+
+                string val = serializedRobot.ToString();
+                return serializedRobot;
+            }
+            throw new Exception($"Robot element contains invalid view model type");
+
+        }
+    }
 
     public class WaitForTime :  IMeasurementTypes
     {
 
 
-        public WaitForTime(UserDefinedAcquisitions availableAcquisitions)
+        public WaitForTime(SystemDefinedSettingsViewModel availableAcquisitions)
         {
-            NodeType = TreeMeasurementType.ActionType;
             ElementType = "wait"; 
             MeasurementName = "Wait";
             MeasurementView = new Views.WaitView(availableAcquisitions);
 
         }
         public ObservableCollection<AcquisitionSettings> AvailableAcquisitions { get; } = new();
-        public TreeMeasurementType NodeType { get; }
+        public TreeMeasurementType NodeType => TreeMeasurementType.ActionType;
         public string ElementType { get;  }
         public NodeBase? Node { get; set; }
         public string MeasurementName { get; }
@@ -336,7 +370,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     public class UpdateAcquisition: IMeasurementTypes
     {
 
-        public UpdateAcquisition(UserDefinedAcquisitions availableAcquisitions)
+        public UpdateAcquisition(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ActionType;
             ElementType = "updateacquisition";
@@ -399,7 +433,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     public class RelativeStageLoop : IMeasurementTypes
     {
 
-        public RelativeStageLoop(UserDefinedAcquisitions availableAcquisitions)
+        public RelativeStageLoop(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ExperimentType;
             ElementType = "relativestageloop";
@@ -545,7 +579,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     public class DoTimes : IMeasurementTypes
     {
 
-        public DoTimes(UserDefinedAcquisitions availableAcquisitions)
+        public DoTimes(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ExperimentType;
             MeasurementName = "Do Times";
@@ -626,7 +660,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         public bool IsSerializable { get; private set; } = true;
 
-        public StageLoop(UserDefinedAcquisitions availableAcquisitions)
+        public StageLoop(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ExperimentType;
             MeasurementName = "Stage loop";
@@ -748,7 +782,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
     public class TimeLapse : IMeasurementTypes
     {
 
-        public TimeLapse(UserDefinedAcquisitions availableAcquisitions)
+        public TimeLapse(SystemDefinedSettingsViewModel availableAcquisitions)
         {
             NodeType = TreeMeasurementType.ExperimentType;
             MeasurementName = "Time lapse";

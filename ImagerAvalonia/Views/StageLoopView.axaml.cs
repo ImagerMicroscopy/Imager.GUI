@@ -20,7 +20,7 @@ public partial class StageLoopView : UserControl
     {
         InitializeComponent();
     }
-    public StageLoopView(UserDefinedAcquisitions availableAcquisitions)
+    public StageLoopView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = App.Container.Resolve<StageLoopViewModel>();

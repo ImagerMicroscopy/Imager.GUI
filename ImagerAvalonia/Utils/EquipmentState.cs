@@ -78,6 +78,26 @@ namespace ImagerAvalonia.Utils
             }
             return availableFilterWheels;
         }
+
+        public List<Robots> ParseAvailableRobots(List<Equipment> eq)
+        {
+            var robots = new List<Robots> ();
+            for (int rb = 0; rb < eq.Count; rb++)
+            {
+                if(eq[rb].availablerobots.Count !=0)
+                {
+                    foreach(var robot in eq[rb].availablerobots)
+                    {
+                        robot.EquipmentName = eq[rb].name;
+                    }    
+
+                    robots.AddRange(eq[rb].availablerobots);
+                }
+            }
+            return robots;
+        }
+
+
         public List<Source> ParseAvailableLightSources(List<Equipment> eq)
         {
             var availableSources = new List<Source>();

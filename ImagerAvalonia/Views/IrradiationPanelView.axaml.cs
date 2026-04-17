@@ -14,7 +14,7 @@ public partial class IrradiationPanelView : UserControl
     {
         InitializeComponent();
     }
-    public IrradiationPanelView(UserDefinedAcquisitions availableAcquisitions)
+    public IrradiationPanelView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = new IrradiationPanelViewModel(availableAcquisitions);

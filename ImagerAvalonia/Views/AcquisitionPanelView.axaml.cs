@@ -14,7 +14,7 @@ public partial class AcquisitionPanelView : UserControl
         InitializeComponent();
     }
 
-    public AcquisitionPanelView(UserDefinedAcquisitions availableAcquisitions)
+    public AcquisitionPanelView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = new AcquisitionPanelViewModel(availableAcquisitions); 

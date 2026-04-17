@@ -13,7 +13,7 @@ namespace ImagerAvalonia.ViewModels
     {
         [ObservableProperty] ObservableCollection<ToUpdateAcquisition> _toUpdateAcquisitions = new();
 
-        public UpdateAcquisitionViewModel(UserDefinedAcquisitions acquisitions)
+        public UpdateAcquisitionViewModel(SystemDefinedSettingsViewModel acquisitions)
         {
             ToUpdateAcquisitions = new ObservableCollection<ToUpdateAcquisition>
                 ( acquisitions.Acquisitions.Select(x => new ToUpdateAcquisition(x.Name, false)));

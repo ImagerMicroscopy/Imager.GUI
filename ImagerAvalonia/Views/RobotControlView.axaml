@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:measurementcontrol="using:ImagerAvalonia.Services.MeasurementControl"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+			 
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+             x:Class="ImagerAvalonia.Views.RobotControlView"
+			 x:DataType="vm:RobotControlViewModel">
+
+
+
+
+
+	<UserControl.Styles >
+
+		<Style Selector="Border.header-border">
+			<Setter Property="Background">
+				<Setter.Value>
+					<SolidColorBrush Color="#454545"  />
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="MaxWidth" Value="750" />
+			<Setter Property="Padding" Value="10" />
+		</Style>
+
+		<Style Selector="TextBlock.header">
+			<Setter Property="FontSize" Value="18" />
+			<Setter Property="FontWeight" Value="Bold" />
+		</Style>
+
+		<Style Selector="Border.thin">
+			<Setter Property="BorderBrush" Value="Black" />
+			<Setter Property="BorderThickness" Value="0.5" />
+			<Setter Property="CornerRadius" Value="0,0,5,5" />
+			<Setter Property="Margin" Value="0,0,0,15" />
+		</Style>
+
+	</UserControl.Styles>
+	
+	<StackPanel Orientation="Vertical">
+	<StackPanel Orientation="Horizontal">
+		<TextBlock Width="100" VerticalAlignment="Center" FontSize="12"> Robot name: </TextBlock>
+		<ComboBox   BorderThickness="0.5" HorizontalAlignment="Right" FontSize="10" Padding="0" MinHeight="20" Height="20" VerticalAlignment = "Center"  SelectedIndex="0"  Margin="20 0 0 0" 
+				SelectedItem="{Binding SelectedRobot}" ItemsSource="{Binding Robots}" DisplayMemberBinding="{Binding RobotDisplayName}" Width="130">
+			<ComboBox.Styles>
+				<Style Selector="ComboBox ContentPresenter">
+					<Setter Property="Margin" Value="5 0 0 0"/>
+				</Style>
+	
+			</ComboBox.Styles>
+		</ComboBox>
+	</StackPanel>
+	<StackPanel Orientation="Horizontal">
+		<TextBlock Width="100" VerticalAlignment="Center" FontSize="12"> Program name: </TextBlock>
+		<ComboBox   BorderThickness="0.5" HorizontalAlignment="Right" FontSize="10" Padding="0" MinHeight="20" Height="20" VerticalAlignment = "Center"  SelectedIndex="0"  Margin="20 0 0 0" 
+				SelectedItem="{Binding SelectedRobot.SelectedRobotProgram}" ItemsSource="{Binding SelectedRobot.RobotPrograms}" DisplayMemberBinding="{Binding ProgramName}" Width="130">
+			<ComboBox.Styles>
+				<Style Selector="ComboBox ContentPresenter">
+					<Setter Property="Margin" Value="5 0 0 0"/>
+				</Style>
+	
+			</ComboBox.Styles>
+		</ComboBox>
+	</StackPanel>
+
+	<ItemsControl Margin="0 20 0 0" ItemsSource="{Binding SelectedRobot.SelectedRobotProgram.ProgramArguments}">
+		<ItemsControl.DataTemplates>
+			<DataTemplate x:DataType="vm:DiscreteArgumentsViewModel">
+				<StackPanel Margin="0 0 0 0"  HorizontalAlignment="Stretch" Orientation="Horizontal">
+					<TextBlock TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ProgramArgumentName}" FontSize="12" HorizontalAlignment="Left" VerticalAlignment = "Center"
+				Text="{Binding ProgramArgumentName}" Width="100"/>
+					<ComboBox   BorderThickness="0.5" HorizontalAlignment="Right" FontSize="10" Padding="0" MinHeight="20" Height="20" VerticalAlignment = "Center"  SelectedIndex="0" 
+				 Margin="20 0 0 0" SelectedItem="{Binding SelectedValue}" ItemsSource="{Binding PermissibleValues}" Width="130">
+						<ComboBox.Styles>
+							<Style Selector="ComboBox ContentPresenter">
+								<Setter Property="Margin" Value="5 0 0 0"/>
+							</Style>
+	
+						</ComboBox.Styles>
+					</ComboBox>
+				</StackPanel>
+				
+			</DataTemplate>
+			<DataTemplate x:DataType="vm:ContinuousArgumentsViewModel">
+				<StackPanel  Margin="0 0 0 0"  HorizontalAlignment="Stretch" Orientation="Horizontal">
+					<TextBlock Text="{Binding ProgramArgumentName}" ToolTip.Tip="{Binding ProgramArgumentName}" FontSize="12" TextTrimming="CharacterEllipsis" HorizontalAlignment="Left"
+				VerticalAlignment = "Center"  Width="100"/>
+					<!--	<TextBlock FontSize="10" HorizontalAlignment="Right" VerticalAlignment = "Center" Text="{Binding MinValue}" Width="9"/> -->
+
+					<NumericUpDown Margin="25 0 0 0"  HorizontalAlignment="Right"  Classes="custom-numeric-style" 
+					 x:Name="UpDownSelector" Value="{Binding SelectedValue, Mode=TwoWay}" Increment="{Binding Incriment}" 
+					 Minimum="{Binding MinValue}" Maximum="{Binding MaxValue}" Width="124" ></NumericUpDown>
+
+					<!--    <TextBlock FontSize="10" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="{Binding MaxValue}" Width="20"/> -->
+
+
+			</StackPanel>
+			</DataTemplate>
+		</ItemsControl.DataTemplates>
+
+		
+	</ItemsControl>
+
+	</StackPanel>
+
+
+
+</UserControl>
+

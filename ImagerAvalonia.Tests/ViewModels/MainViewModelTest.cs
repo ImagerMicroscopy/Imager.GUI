@@ -155,7 +155,7 @@ namespace Imager.Tests.ViewModels
             out Mock<ComUtils> messages,
             out Mock<IStageControl> stageControl,
             out ImageControlPanelViewModel imagePanel,
-            out UserDefinedAcquisitions userDefinedAcquisitions,
+            out SystemDefinedSettingsViewModel userDefinedAcquisitions,
             out Mock<SmartProcessingRegisterViewModel> processViewModel,
             out Mock<AcquisitionStateService> acquisitionState,
             out Mock<EquipmentState> equipmentState)
@@ -165,7 +165,7 @@ namespace Imager.Tests.ViewModels
             stageControl = new Mock<IStageControl>();
             var stageControlVM = new Mock<StageControlPanelViewModel>(stageControl.Object);
             messages = new Mock<ComUtils>();
-            userDefinedAcquisitions =  new UserDefinedAcquisitions();
+            userDefinedAcquisitions =  new SystemDefinedSettingsViewModel();
             processViewModel = new Mock<SmartProcessingRegisterViewModel>();
             equipmentState = new Mock<EquipmentState>();
             acquisitionState = new Mock<AcquisitionStateService>(stageControl.Object, processViewModel.Object, messages.Object, equipmentState.Object);
@@ -272,7 +272,7 @@ namespace Imager.Tests.ViewModels
             vm.RemoveAcquisition();
 
             Assert.NotNull(acq_service.SelectedAcquisition);
-            Assert.Single(vm.UserDefinedAcquisitionSettings.Acquisitions);
+            Assert.Single(vm.SystemDefinedSettings.Acquisitions);
         }
 
         [Fact]

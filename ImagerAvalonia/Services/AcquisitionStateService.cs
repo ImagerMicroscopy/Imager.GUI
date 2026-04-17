@@ -57,9 +57,9 @@ namespace ImagerAvalonia.Services
 
                 ObservableCollection<AcquisitionSettings> acq_settings = EquipmentState.GetAcquisitionsFromImagerProgram(imager_program);
                 ObservableCollection<AcquisitionSettingsViewModel> acq_model = new ObservableCollection<AcquisitionSettingsViewModel>(acq_settings.Select(x => new AcquisitionSettingsViewModel(x)));
-                UserDefinedAcquisitions user_acqs = new UserDefinedAcquisitions();
+                SystemDefinedSettingsViewModel user_acqs = new SystemDefinedSettingsViewModel();
                 user_acqs.Acquisitions = acq_model;
-                ExperimentalPanelViewModel exp = new ExperimentalPanelViewModel(new UserDefinedAcquisitions(acq_settings), _stageControl);
+                ExperimentalPanelViewModel exp = new ExperimentalPanelViewModel(new SystemDefinedSettingsViewModel(acq_settings, new List<Robots>()), _stageControl);
 
                 experimentSerializer.SetExperiment(exp);
                 NodeBase exp_nodes = experimentSerializer.GetDeserializedExperiment(imager_program, user_acqs);

@@ -15,11 +15,11 @@ public partial class RelStageView : UserControl
 
     }
 
-    public RelStageView(UserDefinedAcquisitions availableAcquisitions)
+    public RelStageView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
 
-        DataContext = App.Container.Resolve<RelStageViewModel>(new TypedParameter(typeof(UserDefinedAcquisitions), availableAcquisitions));
+        DataContext = App.Container.Resolve<RelStageViewModel>(new TypedParameter(typeof(SystemDefinedSettingsViewModel), availableAcquisitions));
     }
     public void InitializeComponent()
     {

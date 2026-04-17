@@ -87,7 +87,7 @@ public partial class RelStageViewModel : MeasurementViewModel
 
     public string StageName;
 
-    public RelStageViewModel(UserDefinedAcquisitions availableAcquisitions, IStageControl stageControl)
+    public RelStageViewModel(SystemDefinedSettingsViewModel availableAcquisitions, IStageControl stageControl)
     {
         _stageControl = stageControl;
         

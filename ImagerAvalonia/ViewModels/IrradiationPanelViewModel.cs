@@ -19,7 +19,7 @@ public partial class IrradiationPanelViewModel  : MeasurementViewModel
 
 
 
-    public IrradiationPanelViewModel(UserDefinedAcquisitions availableAcquisitions) 
+    public IrradiationPanelViewModel(SystemDefinedSettingsViewModel availableAcquisitions) 
     {
         var sources = availableAcquisitions.Acquisitions.First().AcquisitionSettings.Sources;
         var newsources = sources.Select(x => {

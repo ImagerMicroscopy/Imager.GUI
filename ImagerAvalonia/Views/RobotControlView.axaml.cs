@@ -1,27 +1,26 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using ImagerAvalonia.ViewModels;
 using System.Collections.ObjectModel;
 using ImagerAvalonia.Services.MeasurementControl;
-using ImagerAvalonia.ViewModels;
 
 
 namespace ImagerAvalonia.Views;
 
-public partial class DoTimesView : UserControl
+public partial class RobotControlView : UserControl
 {
-    public DoTimesView()
+    public RobotControlView()
     {
         InitializeComponent();
     }
-    public DoTimesView(SystemDefinedSettingsViewModel availableAcquisitions)
+    public RobotControlView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
-        DataContext = new ViewModels.DoTimesViewModel();
+        DataContext = new RobotControlViewModel(availableAcquisitions.Robots);
     }
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);
-
     }
 }

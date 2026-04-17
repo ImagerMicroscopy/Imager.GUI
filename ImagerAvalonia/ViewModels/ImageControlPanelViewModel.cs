@@ -32,7 +32,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     private readonly ComUtils _comUtils;
     private readonly IImageDisplayViewModelFactory _imageVmFactory;
     private readonly AcquisitionStateService _acquisitionState;
-    public UserDefinedAcquisitions? DefinedAcquisitions;
+    public SystemDefinedSettingsViewModel? DefinedAcquisitions;
 
 
     public ImageHandler? LiveImageHandler { get; private set; }
@@ -291,9 +291,9 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     //    }
     //}
 
-    internal void SetAvailableAcquisitions(UserDefinedAcquisitions userDefinedAcquisitionSettings)
+    internal void SetAvailableAcquisitions(SystemDefinedSettingsViewModel SystemDefinedSettings)
     {
-        DefinedAcquisitions = userDefinedAcquisitionSettings;
+        DefinedAcquisitions = SystemDefinedSettings;
     }
 }
 

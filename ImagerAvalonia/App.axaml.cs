@@ -89,7 +89,7 @@ public partial class App : Application
         builder.RegisterType<ObservableLoggerProvider>().SingleInstance().As<ILoggerProvider>();
         builder.RegisterType<LoggerService>().SingleInstance().As<ILogger>();
         builder.RegisterType<ImageDisplayViewModelFactory>().As<IImageDisplayViewModelFactory>().SingleInstance();
-        builder.RegisterType<UserDefinedAcquisitions>().SingleInstance();
+        builder.RegisterType<SystemDefinedSettingsViewModel>().SingleInstance();
         builder.RegisterType<AcquisitionStateService>().SingleInstance();
         builder.RegisterType<EquipmentState>().SingleInstance();
 

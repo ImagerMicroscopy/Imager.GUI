@@ -14,7 +14,7 @@ public partial class WaitView : UserControl
     {
         InitializeComponent();
     }
-    public WaitView(UserDefinedAcquisitions availableAcquisitions)
+    public WaitView(SystemDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = new ViewModels.WaitViewModel();

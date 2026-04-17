@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,5 +32,26 @@ namespace ImagerAvalonia.Utils
             writer.WriteValue(value); // normal writing
         }
     }
-    
+
+    public class PrivateContractResolver : DefaultContractResolver
+    {
+        protected override System.Collections.Generic.IList<JsonProperty> CreateProperties(
+            System.Type type, MemberSerialization memberSerialization)
+        {
+            var properties = base.CreateProperties(type, memberSerialization);
+
+            foreach (var property in properties)
+            {
+                property.Writable = true;
+                property.Readable = true;
+            }
+
+            return properties;
+        }
+        protected override string ResolvePropertyName(string propertyName)
+        {
+            return propertyName.ToLower();
+        }
+    }
+
 }

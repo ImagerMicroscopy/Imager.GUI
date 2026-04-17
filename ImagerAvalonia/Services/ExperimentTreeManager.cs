@@ -18,12 +18,12 @@ public abstract partial class NodeBase : ObservableObject, IDisposable
     public abstract JObject Traverse(IExperimentSerialization experimentSerialization);
     public abstract IMeasurementTypes? MeasurementType { get; set; }
     public event EventHandler<ViewModelBase?>? OnNodeDeleted;
-    public MeasurementViewModel? NodeViewModel { get; protected set; }
+    public MeasurementViewModel NodeViewModel { get; protected set; }
     public NodeBase? Parent { get; set; }
     public string? Header { get; set; }
     [ObservableProperty] private string? _visibleInfo;
     public ObservableCollection<NodeBase> Children { get; set; } = new();
-    public UserDefinedAcquisitions? UserAcquisitionSettings { get; set; }
+    public SystemDefinedSettingsViewModel? UserAcquisitionSettings { get; set; }
 
     public ObservableCollection<AcquisitionSettingsViewModel> AvailableAcquisitions =>
         UserAcquisitionSettings.Acquisitions;
@@ -221,12 +221,12 @@ public class ExperimentNode : NodeBase
 
 public interface INodeFactory
 {
-    NodeBase CreateChildNodeOfType(string measurementName, UserDefinedAcquisitions acquisitions, NodeBase parent);
+    NodeBase CreateChildNodeOfType(string measurementName, SystemDefinedSettingsViewModel acquisitions, NodeBase parent);
 }
 
 public class NodeFactory : INodeFactory
 {
-    public NodeBase CreateChildNodeOfType(string measurementName, UserDefinedAcquisitions acquisitions, NodeBase parent)
+    public NodeBase CreateChildNodeOfType(string measurementName, SystemDefinedSettingsViewModel acquisitions, NodeBase parent)
     {
         string? currentNamespace = typeof(IMeasurementTypes).Namespace;
         

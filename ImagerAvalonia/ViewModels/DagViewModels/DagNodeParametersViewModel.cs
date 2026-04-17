@@ -76,11 +76,11 @@ public partial class AcquisitionNameParameter : DagNodeParametersViewModel
     [ObservableProperty] ObservableCollection<AcquisitionSettingsViewModel> _DefinedAcquisitions = new();
 
 
-    UserDefinedAcquisitions UserDefinedAcquisitions { get; set; }   
+    SystemDefinedSettingsViewModel UserDefinedAcquisitions { get; set; }   
 
     public AcquisitionNameParameter(Guid id, NodeParams parameters) : base(id, parameters.Name, parameters.Datatype)
     {
-        UserDefinedAcquisitions = App.Container.Resolve<UserDefinedAcquisitions>();
+        UserDefinedAcquisitions = App.Container.Resolve<SystemDefinedSettingsViewModel>();
         DefinedAcquisitions = UserDefinedAcquisitions.Acquisitions;
 
     }
@@ -92,13 +92,13 @@ public partial class DetectorNameParameter : DagNodeParametersViewModel
 {
     [ObservableProperty] DetectorEquipmentViewModel _detectorInput;
     [ObservableProperty] ObservableCollection<DetectorEquipmentViewModel> _DefinedDetectors = new();
-    UserDefinedAcquisitions UserDefinedAcquisitions { get; set; }
+    SystemDefinedSettingsViewModel UserDefinedAcquisitions { get; set; }
 
 
     public DetectorNameParameter(Guid id, NodeParams parameters) : base(id, parameters.Name, parameters.Datatype)
     {
 
-        UserDefinedAcquisitions = App.Container.Resolve<UserDefinedAcquisitions>();
+        UserDefinedAcquisitions = App.Container.Resolve<SystemDefinedSettingsViewModel>();
         DefinedDetectors = UserDefinedAcquisitions.Acquisitions.First().Detector;
     }
 }

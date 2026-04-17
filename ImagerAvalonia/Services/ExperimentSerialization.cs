@@ -22,7 +22,7 @@ public interface IExperimentSerialization
     public void TryAddStagePosition(XYStagePosition xyz);
     public List<XYStagePosition> ExperimentPositions { get; set; }
     public Dictionary<string, string> AcquisitionMaps { get; set; }
-    public NodeBase GetDeserializedExperiment(JToken serialized_progran, UserDefinedAcquisitions acquisitions);
+    public NodeBase GetDeserializedExperiment(JToken serialized_progran, SystemDefinedSettingsViewModel acquisitions);
     int GetMaxNumberOfDetectionsInTree(ExperimentalPanelViewModel experiment);
 
 
@@ -139,7 +139,7 @@ public class ExperimentSerialization : IExperimentSerialization
         return newTraversal;
     }
 
-    public NodeBase GetDeserializedExperiment(JToken serialized_program, UserDefinedAcquisitions acquisitions)
+    public NodeBase GetDeserializedExperiment(JToken serialized_program, SystemDefinedSettingsViewModel acquisitions)
     {
         NodeBase root = new RootNode();
         root.UserAcquisitionSettings = acquisitions;
@@ -147,7 +147,7 @@ public class ExperimentSerialization : IExperimentSerialization
         return exp_nodes;
     }
 
-    public NodeBase DeserializeExperiment(JToken serialized_program, NodeBase node, UserDefinedAcquisitions acquisitions)
+    public NodeBase DeserializeExperiment(JToken serialized_program, NodeBase node, SystemDefinedSettingsViewModel acquisitions)
     {
 
 

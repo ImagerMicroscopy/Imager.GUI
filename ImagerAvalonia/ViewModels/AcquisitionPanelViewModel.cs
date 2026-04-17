@@ -32,10 +32,10 @@ public partial class AcquisitionPanelViewModel : MeasurementViewModel
     [ObservableProperty]
     private ObservableCollection<EnabledAcquisition> _isAquisitionEnabled = new();
     public ObservableCollection<AcquisitionSettingsViewModel> AvailableAcquisitions => UserAcquisitionSettings.Acquisitions;
-    public UserDefinedAcquisitions UserAcquisitionSettings { get; set; }
+    public SystemDefinedSettingsViewModel UserAcquisitionSettings { get; set; }
     public EnabledAcquisitionTracker AcquisitionTracker = new();
 
-    public AcquisitionPanelViewModel(UserDefinedAcquisitions availableAcquisitions) : base()
+    public AcquisitionPanelViewModel(SystemDefinedSettingsViewModel availableAcquisitions) : base()
     {
         UserAcquisitionSettings = availableAcquisitions;
         AvailableAcquisitions.CollectionChanged += AvailableAcquisitions_CollectionChanged;

@@ -46,8 +46,6 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty] bool _IsExperimentEnabled = false;
     [ObservableProperty] bool _IsEnableExperimentalPanel = true;
-    [ObservableProperty] string _ExperimentText = "Start";
-    [ObservableProperty] string _BackgroundExperimentColor = "Red";
 
     [ObservableProperty] public ObservableCollection<AcquisitionSettingsViewModel> _Acquisitions = new();
     [ObservableProperty] public ObservableCollection<ExperimentalPanelViewModel> _Experiments = new();
@@ -57,10 +55,11 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] DetectorEquipmentViewModel? _SelectedDetector;
     [ObservableProperty] AcquisitionSettingsViewModel? _SelectedAcquisition;
     [ObservableProperty] ExperimentalPanelViewModel? _SelectedExperiment;
-    [ObservableProperty] UserDefinedAcquisitions _UserDefinedAcquisitionSettings;
+    [ObservableProperty] SystemDefinedSettingsViewModel _SystemDefinedSettings;
 
     public List<MovableComponent> AvailableFilterWheels = new();
     public List<Source> AvailableSources = new();
+    public List<Robots> AvailableRobots = new();
     public List<DetectorEquipment> AvailableDetectors = new List<DetectorEquipment> { };
 
     private readonly IStageControl _stageControl;
@@ -75,12 +74,12 @@ public partial class MainViewModel : ViewModelBase
     public MainViewModel(ComUtils messages, 
         IStageControl stageControl, 
         ImageControlPanelViewModel imagePanel, 
-        UserDefinedAcquisitions userDefinedAcquisitions, 
+        SystemDefinedSettingsViewModel userDefinedAcquisitions, 
         SmartProcessingRegisterViewModel processViewModel,
         AcquisitionStateService acquisitionState, 
         EquipmentState equipmentState)
     {
-        _UserDefinedAcquisitionSettings = userDefinedAcquisitions;
+        _SystemDefinedSettings = userDefinedAcquisitions;
         _stageControl = stageControl;
         _messages = messages;
         _processingViewModel = processViewModel;
@@ -88,7 +87,7 @@ public partial class MainViewModel : ViewModelBase
         _equipmentState = equipmentState;
 
         ImageControlPanel = imagePanel;
-        ImageControlPanel.SetAvailableAcquisitions(UserDefinedAcquisitionSettings);
+        ImageControlPanel.SetAvailableAcquisitions(SystemDefinedSettings);
     }
 
     public void InitializeImageControlPanel()
@@ -142,6 +141,7 @@ public partial class MainViewModel : ViewModelBase
 
             AvailableSources = _equipmentState.ParseAvailableLightSources(eq);
             AvailableFilterWheels = _equipmentState.ParseAvailableFilterWheels(eq);
+            AvailableRobots = _equipmentState.ParseAvailableRobots(eq);
 
         }, null);
 
@@ -157,8 +157,8 @@ public partial class MainViewModel : ViewModelBase
 
         init_acquisition.AcquisitionID = num_acquisition;
         DefaultAcquisition.AcquisitionSettingsID = num_acquisition;
-        UserDefinedAcquisitionSettings.Acquisitions.Add( init_acquisition );
-
+        SystemDefinedSettings.Acquisitions.Add( init_acquisition );
+        SystemDefinedSettings.Robots = AvailableRobots;
         SelectedAcquisition = init_acquisition;
         _acquisitionStateService.SelectedAcquisition = SelectedAcquisition;
         _acquisitionStateService.SelectedExperiment = SelectedExperiment;
@@ -194,7 +194,7 @@ public partial class MainViewModel : ViewModelBase
             new_acq_model.AcquisitionID = num_acquisition;
 
 
-            UserDefinedAcquisitionSettings.Acquisitions.Add(new_acq_model);
+            SystemDefinedSettings.Acquisitions.Add(new_acq_model);
 
         }
     }
@@ -203,18 +203,18 @@ public partial class MainViewModel : ViewModelBase
 
     public void RemoveAcquisition()
     {
-        if (UserDefinedAcquisitionSettings.Acquisitions.Count > 1)
+        if (SystemDefinedSettings.Acquisitions.Count > 1)
         {
             num_acquisition++;
-            var toRemove = UserDefinedAcquisitionSettings.Acquisitions
+            var toRemove = SystemDefinedSettings.Acquisitions
             .FirstOrDefault(a => a == SelectedAcquisition);
 
             if (toRemove != null)
             {
-                UserDefinedAcquisitionSettings.Acquisitions.Remove(toRemove);
+                SystemDefinedSettings.Acquisitions.Remove(toRemove);
             }
 
-            SelectedAcquisition = UserDefinedAcquisitionSettings.Acquisitions[UserDefinedAcquisitionSettings.Acquisitions.Count - 1];
+            SelectedAcquisition = SystemDefinedSettings.Acquisitions[SystemDefinedSettings.Acquisitions.Count - 1];
         }
 
     }
@@ -222,7 +222,7 @@ public partial class MainViewModel : ViewModelBase
     public void AddExperiment()
     {
 
-        ExperimentalPanelViewModel exp = new ExperimentalPanelViewModel(UserDefinedAcquisitionSettings, _stageControl);
+        ExperimentalPanelViewModel exp = new ExperimentalPanelViewModel(SystemDefinedSettings, _stageControl);
 
 
         List<string?> exp_names = Experiments.Select(x => x.ExperimentName).ToList();
@@ -287,7 +287,7 @@ public partial class MainViewModel : ViewModelBase
                 int id = 0;
                 string previous_name = x.Name;
 
-                while (UserDefinedAcquisitionSettings.Acquisitions.Select(acq => acq.Name).Any(y => y == x.Name))
+                while (SystemDefinedSettings.Acquisitions.Select(acq => acq.Name).Any(y => y == x.Name))
                 {
                     x.Name = $"{x.Name}_{id}";
                     experimentSerializer.AcquisitionMaps.Add(previous_name, x.Name);
@@ -298,7 +298,7 @@ public partial class MainViewModel : ViewModelBase
                 var modified_acquisition = new AcquisitionSettingsViewModel(
                     AcquisitionSettingsFactory.CopyFromDeserializedModel(defaultacquisition, x));
 
-                UserDefinedAcquisitionSettings.Acquisitions.Add(modified_acquisition);
+                SystemDefinedSettings.Acquisitions.Add(modified_acquisition);
             });
         }
         catch (Exception ex)
@@ -306,12 +306,12 @@ public partial class MainViewModel : ViewModelBase
             await ShowExceptionDialogAsync("Error in loading acquisitions", ex);
         }
 
-        var expVM = new ExperimentalPanelViewModel(UserDefinedAcquisitionSettings, _stageControl);
+        var expVM = new ExperimentalPanelViewModel(SystemDefinedSettings, _stageControl);
 
         try
         {
             experimentSerializer.SetExperiment(expVM);
-            NodeBase exp_nodes = experimentSerializer.GetDeserializedExperiment(json_program, UserDefinedAcquisitionSettings);
+            NodeBase exp_nodes = experimentSerializer.GetDeserializedExperiment(json_program, SystemDefinedSettings);
             expVM.SetExpNodes(new ObservableCollection<NodeBase>() { exp_nodes });
         }
         catch (Exception ex)
@@ -358,19 +358,23 @@ public partial class MainViewModel : ViewModelBase
     }
 }
 
-public partial class UserDefinedAcquisitions : ViewModelBase
+public partial class SystemDefinedSettingsViewModel : ViewModelBase
 {
     [ObservableProperty] ObservableCollection<AcquisitionSettingsViewModel> _Acquisitions = new();
-    public UserDefinedAcquisitions(ObservableCollection<AcquisitionSettingsViewModel> Acquisitions)
+    public List<Robots> Robots { get; set; } = new();  
+    public SystemDefinedSettingsViewModel(ObservableCollection<AcquisitionSettingsViewModel> acquisitions, List<Robots> robots)
     {
-        this.Acquisitions = Acquisitions;
+        this.Acquisitions = acquisitions;
+        this.Robots = robots;
     }
-    public UserDefinedAcquisitions(ObservableCollection<AcquisitionSettings> acquisitionSettings)
+    public SystemDefinedSettingsViewModel(ObservableCollection<AcquisitionSettings> acquisitionSettings, List<Robots> robots)
     {
         this.Acquisitions = new ObservableCollection<AcquisitionSettingsViewModel>( acquisitionSettings.Select(x => new AcquisitionSettingsViewModel(x)));
+        this.Robots = robots;
+
     }
 
-    public UserDefinedAcquisitions()
+    public SystemDefinedSettingsViewModel()
     {
 
     }

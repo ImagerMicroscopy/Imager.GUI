@@ -12,6 +12,36 @@ using System.Linq;
 
 namespace ImagerAvalonia.Services.MeasurementControl
 {
+
+    public class Stages
+    {
+        public List<Stage> MotorizedStages = new List<Stage>();
+        public Stages() { }
+
+    }
+
+    public class Stage : IEquipment
+    {
+        public string Name;
+
+        public string EquipmentName { get; set; }
+
+        public bool IsEnabled;
+
+        public Stage(string equipmentName, string name)
+        {
+            Name = name;
+            EquipmentName = equipmentName;
+            IsEnabled = false;
+        }
+
+        public JObject Serialize()
+        {
+            throw new NotImplementedException("Stage does not support serialization");
+        }
+    }
+
+
     public interface IStageControl
     {
         XYStagePosition? ReadStagePosition();

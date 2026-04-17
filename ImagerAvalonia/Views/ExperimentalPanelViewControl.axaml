@@ -285,6 +285,9 @@
 
 					<MenuItem Header="UpdateAcquisition"
 							  	Click ="OnAddElementClick"/>
+
+					<MenuItem Header="Robot"
+							  	Click ="OnAddElementClick"/>
 						<!--		Command="{Binding Root.AppendNextItemToNode}"
 								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" />-->
 				</MenuFlyout>

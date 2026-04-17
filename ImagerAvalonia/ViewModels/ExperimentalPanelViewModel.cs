@@ -19,7 +19,7 @@ public partial class ExperimentalPanelViewModel :  ViewModelBase
     public List<AcqDetPair> AcqDetPairs = new();
 
     public ObservableCollection<NodeBase> Items { get; set; }
-    public UserDefinedAcquisitions AcquisitionSettings;
+    public SystemDefinedSettingsViewModel AcquisitionSettings;
     [ObservableProperty] public string? _ExperimentName;
     [ObservableProperty] public ViewModelBase _ContentPane;
     [ObservableProperty] public NodeBase _SelectedTreeItem;
@@ -34,7 +34,7 @@ public partial class ExperimentalPanelViewModel :  ViewModelBase
     private readonly INodeFactory _nodeFactory = new NodeFactory();
     public readonly EnabledAcquisitionTracker AcquisitionTracker = new();
 
-    public ExperimentalPanelViewModel(UserDefinedAcquisitions user_acq,  IStageControl stageControl)
+    public ExperimentalPanelViewModel(SystemDefinedSettingsViewModel user_acq,  IStageControl stageControl)
     {
 
         Root = new RootNode();
@@ -81,9 +81,16 @@ public partial class ExperimentalPanelViewModel :  ViewModelBase
 
     public string GetStoragePath()
     {
-        RootPanelViewModel main_storage_directory = (RootPanelViewModel)this.Items[0].NodeViewModel;
-        return System.IO.Path.Combine(main_storage_directory.GetOutputFolder(), $"{main_storage_directory.GetUniqueFileName()}.tif");
+        if (this.Items[0].NodeViewModel is RootPanelViewModel root_vm)
+        {
+            RootPanelViewModel main_storage_directory =root_vm;
+            return System.IO.Path.Combine(main_storage_directory.GetOutputFolder(), $"{main_storage_directory.GetUniqueFileName()}.tif");
 
+        }
+        else
+        {
+            throw new Exception("Could not get storage path");
+        }
     }
 
     public void DeleteNode()
@@ -94,9 +101,10 @@ public partial class ExperimentalPanelViewModel :  ViewModelBase
         }
     }
 
-    public void AddNode(string elementName)
+    public void AddNode(string? elementName)
     {
-        NodeBase node = _nodeFactory.CreateChildNodeOfType(elementName, Root.UserAcquisitionSettings, Root);
+
+        NodeBase node = _nodeFactory.CreateChildNodeOfType(elementName==null ? string.Empty : elementName , Root.UserAcquisitionSettings, Root);
         if(node.NodeViewModel is AcquisitionPanelViewModel acquisition_vm)
         {
             acquisition_vm.SetAcquisitionTracker(AcquisitionTracker);
