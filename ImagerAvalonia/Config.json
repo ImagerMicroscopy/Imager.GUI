@@ -1,5 +1,5 @@
 {
-  "pythonpath": "C:\\Documents\\ImagerAvalonia\\ImagerTest\\imageravalonia_ongit\\imageravalonia\\Python\\venv\\Scripts\\python.exe",
+  "pythonpath": "python\\python.exe",
   "isdockerenabled": false,
   "isrunfromimager": true,
   "pythonadress": "localhost:5100",
