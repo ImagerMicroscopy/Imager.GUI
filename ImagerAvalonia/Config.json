@@ -3,5 +3,6 @@
   "isdockerenabled": false,
   "isrunfromimager": true,
   "pythonadress": "localhost:5100",
-  "islogbookenabled" : false
+  "islogbookenabled" : false,
+  "fromexternal": false
 }
