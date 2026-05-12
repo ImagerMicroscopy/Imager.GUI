@@ -26,6 +26,13 @@
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <AvaloniaXaml Remove="ViewModels\ViewUtils\**" />
+    <Compile Remove="ViewModels\ViewUtils\**" />
+    <EmbeddedResource Remove="ViewModels\ViewUtils\**" />
+    <None Remove="ViewModels\ViewUtils\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Autofac" />
@@ -166,15 +173,13 @@
     <Compile Update="Views\NumericDetectorPropertyView.axaml.cs">
       <DependentUpon>NumericDetectorPropertyView.axaml</DependentUpon>
     </Compile>
+    <Compile Update="Views\RobotControlView.axaml.cs">
+      <DependentUpon>RobotControlView.axaml</DependentUpon>
+    </Compile>
     <Compile Update="Views\WaitView.axaml.cs">
       <DependentUpon>WaitView.axaml</DependentUpon>
     </Compile>
   </ItemGroup>
-
-
-   <ItemGroup>
-     <Folder Include="ViewModels\ViewUtils\" />
-   </ItemGroup>
 
    <ItemGroup>
      <None Update="Config.json">

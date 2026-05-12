@@ -76,10 +76,10 @@ namespace ImagerAvalonia.Utils
         private const string DllName = "MeasurementImageStorageDLL";
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern unsafe int MISOpenFile(IntPtr outputFilePath);
+        public static extern unsafe int MISOpenFile(IntPtr outputFilePath, out int storerId);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern unsafe int MISNewStorage(IntPtr outputFilePath, IntPtr measurementDescriptor);
+        public static extern unsafe int MISNewStorage(IntPtr outputFilePath, IntPtr measurementDescriptor, out int storerId);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISClose(long storerID);
@@ -95,9 +95,10 @@ namespace ImagerAvalonia.Utils
             double stageZ,
             long detectionIndex,
             IntPtr stagePositionName,
+            int imageType,
             int nRows,
             int nCols,
-            ushort* data);
+            byte* data);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISAddSmartProgramDecision(
@@ -117,7 +118,7 @@ namespace ImagerAvalonia.Utils
         public static extern unsafe int MISGetNumberOfImages(long storerID, IntPtr acqTypeName, IntPtr detectorName, IntPtr nImages);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern unsafe int MISGetImageIndexAtDetectionIndex(
+        public static extern unsafe int MISGetImageIndex(
             long storerID,
             IntPtr acqTypeName,
             IntPtr detectorName,
@@ -269,7 +270,7 @@ namespace ImagerAvalonia.Utils
                 IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acqName);
                 IntPtr detectorName = Marshal.StringToHGlobalAnsi(detName);
                 IntPtr image_idx_pointer = Marshal.AllocHGlobal(sizeof(int));
-                MISGetImageIndexAtDetectionIndex(_storageId, acqTypeName, detectorName, requestedTime, image_idx_pointer);
+                MISGetImageIndex(_storageId, acqTypeName, detectorName, requestedTime, image_idx_pointer);
                 int imageIdx = Marshal.ReadInt32(image_idx_pointer);
 
                 Marshal.FreeHGlobal(detectorName);
@@ -337,7 +338,10 @@ namespace ImagerAvalonia.Utils
             {
 
                 IntPtr input_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
-                _storageId = MISOpenFile(input_path_ptr);
+                int storageIdPtr;
+
+                MISOpenFile(input_path_ptr, out storageIdPtr);
+                _storageId = storageIdPtr;
                 OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
             }
         }
@@ -367,7 +371,10 @@ namespace ImagerAvalonia.Utils
                 string measurement_program = _measurementProgram.ToString(Newtonsoft.Json.Formatting.None);
                 IntPtr measurement_descriptor_ptr = Marshal.StringToHGlobalAnsi(measurement_program);
                 IntPtr storage_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
-                _storageId = MISNewStorage(storage_path_ptr, measurement_descriptor_ptr);
+                int storerId;
+
+                MISNewStorage(storage_path_ptr, measurement_descriptor_ptr, out storerId);
+                _storageId = (int)storerId;
                 OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
 
                 Marshal.FreeHGlobal(measurement_descriptor_ptr);
@@ -427,8 +434,9 @@ namespace ImagerAvalonia.Utils
             {
                 if (_storagePath != null   && _isStorageEnabled)
                 {
-                    ushort[] frame_data = new ushort[data_buffer[buf_ind].Length / 2];
-                    Buffer.BlockCopy(data_buffer[buf_ind], 0, frame_data, 0, data_buffer[buf_ind].Length);
+                    byte[] frame_data = data_buffer[buf_ind];
+                    //ushort[] frame_data = new ushort[data_buffer[buf_ind].Length / 2];
+                    //Buffer.BlockCopy(data_buffer[buf_ind], 0, frame_data, 0, data_buffer[buf_ind].Length);
 
 
                     IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(metadata[buf_ind].AcquisitionName);
@@ -438,11 +446,11 @@ namespace ImagerAvalonia.Utils
                     long detectionIdx = metadata[buf_ind].DetectionIndex;
                     unsafe
                     {
-                        fixed (ushort* data_buf_ptr = frame_data)
+                        fixed (byte* data_buf_ptr = frame_data)
                         {
                             System.Diagnostics.Debug.WriteLine(detectionIdx);
                             MISAddNewImage(_storageId, acqTypeName, detectorName, metadata[buf_ind].TimePoint, metadata[buf_ind].PositionX, metadata[buf_ind].PositionY, metadata[buf_ind].PositionZ,
-                                           detectionIdx, posName, (int)metadata[buf_ind].Width, (int)metadata[buf_ind].Height, data_buf_ptr);
+                                           detectionIdx, posName,metadata[buf_ind].Type, (int)metadata[buf_ind].Width, (int)metadata[buf_ind].Height, data_buf_ptr);
                         }
                     }
                 }
@@ -514,6 +522,8 @@ namespace ImagerAvalonia.Utils
         public string DetectorName = string.Empty;
         public double TimePoint;
 
+
+        public int Type; 
         public double PositionX;
         public double PositionY;
         public double PositionZ;

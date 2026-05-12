@@ -99,7 +99,7 @@ namespace ImagerAvalonia.Utils
                     {
                         num_datasets += 1;
                         imageData.Images.Add(image_data);
-                        var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, e.RequestedTime);
+                        var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
                         imageData.Metadata.Add(plane_metadata);
                         imageData.Sizes.Add(_storageProvider.GetPlaneSize());
                         imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
@@ -145,15 +145,9 @@ namespace ImagerAvalonia.Utils
 
                     if (_acquisitionHandler.IsNewDataAvailable)
                     {
-                        //_imageReader.Writer.TryWrite(images);
-                        //if (images.ImageResponseType == "acquireddatamessage")
-                        //{
+
                         Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
-                        //}
-                        //else
-                        //{
-                        //    Console.WriteLine(images.ImageResponseType);    
-                        //}
+
 
                         _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { _logger.LogInformation(response_message); }, response_data => { });
 

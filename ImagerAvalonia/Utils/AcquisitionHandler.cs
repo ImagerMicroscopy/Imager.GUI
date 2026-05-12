@@ -206,6 +206,7 @@ namespace ImagerAvalonia.Utils
                         Width = (uint)data.data.ncols,
                         Height = (uint)data.data.nrows,
                         TimePoint = data.data.timestamp,
+                        Type = data.data.numtype,
                         DetectionIndex = data.metadata.detectionindex,
                         PositionName = data.metadata.stagepositionname,
                         ElementID = data.metadata.detectionelementid,
