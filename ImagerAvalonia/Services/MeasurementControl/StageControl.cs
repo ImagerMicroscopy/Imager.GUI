@@ -70,43 +70,35 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public string StageName { get; set; } = string.Empty;
         public XYStagePosition PinnedPosition { get; set; } = IStageControl.DefaultXYStagePosition;
         public bool IsStageAvailable { get; private set; }
-        private readonly ComUtils _messages;
+        private readonly IImagerConnectionHandler _connectionHandler;
 
-        public StageControl(ComUtils messages)
+        public StageControl(IImagerConnectionHandler connectionHandler)
         {
-            _messages = messages;
+            _connectionHandler = connectionHandler;
 
         }
 
         public async void InitializeStageInfo()
         {
-            //ComUtils messages = new ComUtils();
             this.AvailableStages = new Stages() { };
 
             try
             {
-                _messages.SendDataRequest(_messages.listavailableequipment, _messages.availableequipment, message_response =>
+                var response = await _connectionHandler.SendRequestAsync(new ListAvailableEquipmentRequest());
+                if (response is AvailableEquipmentResponse equipResp)
                 {
-                    var info = JObject.Parse(message_response);
-                    var equipments = info["equipment"];
-                    if (equipments != null)
+                    var equipments = equipResp.Equipment;
+                    List<Equipment> eq = System.Text.Json.JsonSerializer.Deserialize<List<Equipment>>(equipments.GetRawText()) ?? new List<Equipment>();
+                    foreach (var equipment in eq)
                     {
-                        List<Equipment> eq = equipments?.ToObject<List<Equipment>>() ?? new List<Equipment>();
-
-                        foreach (var equipment in eq)
+                        if (equipment.hasmotorizedstage)
                         {
-                            if (equipment.hasmotorizedstage)
-                            {
-                                this.StageName = equipment.motorizedstageName;
-                                this.AvailableStages.MotorizedStages.Add(new Stage(equipment.motorizedstageName, equipment.name));
-                                IsStageAvailable = true;
-                            }
+                            this.StageName = equipment.motorizedstageName;
+                            this.AvailableStages.MotorizedStages.Add(new Stage(equipment.motorizedstageName, equipment.name));
+                            IsStageAvailable = true;
                         }
                     }
-
-
-
-                }, null);
+                }
             }
 
             catch (SocketException socketEx)
@@ -140,63 +132,45 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         public XYStagePosition? ReadStagePosition()
         {
-            //XYStagePosition xy_pos = new XYStagePosition();
-
-            if (StageName == null)
+            if (string.IsNullOrEmpty(StageName))
             {
                 InitializeStageInfo();
             }
 
-
-
-            if (StageName != null)
+            if (!string.IsNullOrEmpty(StageName))
             {
-
-                JObject response = new JObject();
-
-                _messages.SendDataRequest(
-                ComUtils.get_stageposition(StageName), "", message_response => { response = JObject.Parse(message_response); }, null);
-
-
-                if(response.TryGetValue("position", out var xy_properties) )
+                var response = System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new GetMotorizedStagePositionRequest(StageName))).GetAwaiter().GetResult();
+                
+                if (response is MotorizedStagePositionResponse posResponse)
                 {
-                    var xy_pos = JsonConvert.DeserializeObject<XYStagePosition>(xy_properties.ToString());
-                    return StageName != null ? xy_pos : null;
-
+                    var pos = posResponse.Position;
+                    return new XYStagePosition((float)pos.X, (float)pos.Y, (float)pos.Z, pos.UsingHardwareAutofocus, (float)pos.HardwareAutofocusOffset, StageName);
                 }
-
                 else
                 {
                     throw new NotImplementedException("Response contains no position key");
                 }
-
             }
             return null;
-
         }
-
-
-
 
         public void SetStagePosition(XYStagePosition selected_position)
         {
-
-
-            if (StageName == null)
+            if (string.IsNullOrEmpty(StageName))
             {
                 InitializeStageInfo();
             }
-            if (StageName != null)
+            if (!string.IsNullOrEmpty(StageName))
             {
+                StagePosition pos = new StagePosition(
+                    HardwareAutofocusOffset: selected_position.PFSOffset,
+                    UsingHardwareAutofocus: selected_position.IsPFSEnabled,
+                    X: selected_position.XPos,
+                    Y: selected_position.YPos,
+                    Z: selected_position.ZPos
+                );
 
-                ComUtils.SendSingleMessage(
-                ComUtils.set_stageposition(StageName,
-                                            selected_position.PFSOffset.ToString("F1"),
-                                            selected_position.IsPFSEnabled.ToString(),
-                                            selected_position.XPos.ToString("F1"),
-                                            selected_position.YPos.ToString("F1"),
-                                            selected_position.ZPos.ToString("F1")));
-
+                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new SetMotorizedStagePositionRequest(StageName, pos))).GetAwaiter().GetResult();
             }
         }
     }

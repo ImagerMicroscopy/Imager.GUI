@@ -153,6 +153,7 @@ namespace Imager.Tests.ViewModels
 
         private MainViewModel CreateViewModel(
             out Mock<ComUtils> messages,
+            out Mock<IImagerConnectionHandler> connectionHandler,
             out Mock<IStageControl> stageControl,
             out ImageControlPanelViewModel imagePanel,
             out SystemDefinedSettingsViewModel userDefinedAcquisitions,
@@ -163,6 +164,7 @@ namespace Imager.Tests.ViewModels
 
 
             stageControl = new Mock<IStageControl>();
+            connectionHandler = new Mock<IImagerConnectionHandler>();
             var stageControlVM = new Mock<StageControlPanelViewModel>(stageControl.Object);
             messages = new Mock<ComUtils>();
             userDefinedAcquisitions =  new SystemDefinedSettingsViewModel();
@@ -185,6 +187,7 @@ namespace Imager.Tests.ViewModels
                 liveViewMock.Object,
                 fieldViewMock.Object,
                 messages.Object,
+                connectionHandler.Object,
                 imageVmFactoryMock.Object,
                 acquisitionState.Object
             );
@@ -215,7 +218,7 @@ namespace Imager.Tests.ViewModels
 
 
             var vm = new MainViewModel(
-               messages.Object,
+               connectionHandler.Object,
                stageControl.Object,
                imagePanel,
                userDefinedAcquisitions,
@@ -228,7 +231,7 @@ namespace Imager.Tests.ViewModels
             vm.InitializeEquipment();
 
             return new MainViewModel(
-                messages.Object,
+                connectionHandler.Object,
                 stageControl.Object,
                 imagePanel,
                 userDefinedAcquisitions,
@@ -244,7 +247,7 @@ namespace Imager.Tests.ViewModels
         public void Get_Parameters()
         {
             // Tests the getting of the parameters and their assignment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -264,7 +267,7 @@ namespace Imager.Tests.ViewModels
         public void Add_and_RemoveAcquisition()
         {
             // Tests if single acquisition can be removed (at least one acquisition must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -280,7 +283,7 @@ namespace Imager.Tests.ViewModels
         {
 
             // Tests if an experiment can be added (at least one experiment must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             vm.AddExperiment();
             Assert.Single(vm.Experiments);
@@ -292,7 +295,7 @@ namespace Imager.Tests.ViewModels
         public void Select_Experiment()
         {
             // Tests if selection changes properly when user selects an experiment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
 
             var mockVM = new Mock<MainViewModel>(MockBehavior.Strict, null!); // if ctor needs deps

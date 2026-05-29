@@ -32,13 +32,13 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
     [ObservableProperty] private DetectorEquipment _detectorEquipmentProperties;
     public event PropertyChangedEventHandler? WhenDetectorEnabled;
 
-    private readonly ComUtils _comUtils;
+    private readonly IImagerConnectionHandler _connectionHandler;
     private readonly AcquisitionStateService _acquisitionState;
     private CancellationTokenSource _numericThrottleCts;
 
     public DetectorEquipmentViewModel(DetectorEquipment detEquipment)
     {
-        _comUtils = App.Container.Resolve<ComUtils>();
+        _connectionHandler = App.Container.Resolve<IImagerConnectionHandler>();
         _acquisitionState = App.Container.Resolve<AcquisitionStateService>();
         Name = detEquipment.Detectorname;
         DetectorEquipmentProperties = detEquipment;
@@ -150,23 +150,16 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         }
 
         var catProperty = DetectorEquipmentProperties.GetPropertyByName(property.Label);
-        var wrapper = new
-        {
-            action = "setdetectorproperty",
-            detectorname = Name,
-            property = catProperty
-        };
 
         string message = string.Empty;
         await _acquisitionState.CheckIfAcquisitionFinsihed();
 
-
-        string serialized = JsonConvert.SerializeObject(wrapper, Formatting.None);
-        string response;
-        _comUtils.SendDataRequest(serialized, "", x => { response = x; }, x => { });
-        _comUtils.SendDataRequest(ComUtils.get_detectorproperties(Name), _comUtils.detectorproperties, (Action<string>)(message_response =>
+        await _connectionHandler.SendRequestAsync(new SetDetectorPropertyRequest(Name, catProperty));
+        
+        var response = await _connectionHandler.SendRequestAsync(new GetDetectorPropertiesRequest(Name));
+        if (response is DetectorPropertiesResponse propsResponse)
         {
-            JToken detector_properties = JObject.Parse(message_response);
+            JToken detector_properties = JObject.Parse(propsResponse.DetectorProperties.GetRawText());
             var detProperties = new DetectorEquipment(Name, detector_properties);
             foreach (var prop in Properties)
             {
@@ -174,8 +167,7 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
             }
             Properties.Clear();
             AssignModelProperties(detProperties.DetectorProperties);
-
-        }), null);
+        }
     }
 
 

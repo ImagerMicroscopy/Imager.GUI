@@ -27,7 +27,7 @@ public partial class MainViewModel : ViewModelBase
 {
 
 
-    public ComUtils _messages;
+    public IImagerConnectionHandler _connectionHandler;
     public ImageDisplayViewModel? ImageView { get; private set; }
 
     public bool IsLiveEnabled = false;
@@ -71,7 +71,7 @@ public partial class MainViewModel : ViewModelBase
 
 
 
-    public MainViewModel(ComUtils messages, 
+    public MainViewModel(IImagerConnectionHandler connectionHandler, 
         IStageControl stageControl, 
         ImageControlPanelViewModel imagePanel, 
         SystemDefinedSettingsViewModel userDefinedAcquisitions, 
@@ -81,7 +81,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _SystemDefinedSettings = userDefinedAcquisitions;
         _stageControl = stageControl;
-        _messages = messages;
+        _connectionHandler = connectionHandler;
         _processingViewModel = processViewModel;
         _acquisitionStateService = acquisitionState;
         _equipmentState = equipmentState;
@@ -111,41 +111,41 @@ public partial class MainViewModel : ViewModelBase
         IsEnableExperimentalPanel = false;
     }
 
-    public void InitializeEquipment()
+    public async void InitializeEquipment()
     {
 
         List<string> detector_names = new List<string> { };
-        _messages.SendDataRequest(ComUtils.cancelacquisition, "", null, null);
+        await _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest());
 
-
-        _messages.SendDataRequest(_messages.listdetectors, _messages.detectors, message_response =>
+        var listDetectorsResponse = await _connectionHandler.SendRequestAsync(new ListAvailableDetectorsRequest());
+        if (listDetectorsResponse is AvailableDetectorsResponse detectorsResponse)
         {
-            var detectors = JObject.Parse(message_response);
-            var equipment = detectors["detectornames"];
-            detector_names = equipment?.ToObject<List<string>>() ?? new List<string>();
-        }, null);
+            detector_names = detectorsResponse.DetectorNames.ToList();
+        }
 
-        detector_names.ForEach((Action<string>)(x => _messages.SendDataRequest(ComUtils.get_detectorproperties(x), _messages.detectorproperties, (Action<string>)(message_response =>
+        foreach (var x in detector_names)
         {
-            JToken detector_properties = JObject.Parse(message_response);
-            AvailableDetectors.Add(new DetectorEquipment(x, detector_properties));
+            var propsResponse = await _connectionHandler.SendRequestAsync(new GetDetectorPropertiesRequest(x));
+            if (propsResponse is DetectorPropertiesResponse detPropsResp)
+            {
+                // Reconstruct JSON to match the old JToken structure DetectorEquipment expects
+                var equipmentObj = new JObject
+                {
+                    ["detectorproperties"] = JArray.Parse(detPropsResp.DetectorProperties.GetRawText())
+                };
+                AvailableDetectors.Add(new DetectorEquipment(x, equipmentObj));
+            }
+        }
 
-        }), null)));
-
-
-        _messages.SendDataRequest(_messages.listavailableequipment, _messages.availableequipment, message_response =>
+        var availableEqResponse = await _connectionHandler.SendRequestAsync(new ListAvailableEquipmentRequest());
+        if (availableEqResponse is AvailableEquipmentResponse eqResponse)
         {
-            var info = JObject.Parse(message_response);
-            var equipment = info["equipment"];
-            List<Equipment> eq = equipment?.ToObject<List<Equipment>>() ?? new List<Equipment>(); 
+            List<Equipment> eq = System.Text.Json.JsonSerializer.Deserialize<List<Equipment>>(eqResponse.Equipment.GetRawText()) ?? new List<Equipment>();
 
             AvailableSources = _equipmentState.ParseAvailableLightSources(eq);
             AvailableFilterWheels = _equipmentState.ParseAvailableFilterWheels(eq);
             AvailableRobots = _equipmentState.ParseAvailableRobots(eq);
-
-        }, null);
-
-
+        }
 
         _stageControl.InitializeStageInfo();
 

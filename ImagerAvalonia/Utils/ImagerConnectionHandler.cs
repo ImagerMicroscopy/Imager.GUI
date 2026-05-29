@@ -27,50 +27,70 @@ public abstract record ImagerRequest
     }
 }
 
-public record AcquireDataRequest(
-    [property: JsonPropertyName("params")] object Params
-) : ImagerRequest { public AcquireDataRequest() { Action = "acquiredata"; } }
+public record AcquireDataRequest : ImagerRequest
+{
+    [JsonPropertyName("params")] public object Params { get; init; }
+    public AcquireDataRequest(object parameters) { Params = parameters; Action = "acquiredata"; }
+}
 
 public record ListWavelengthsRequest : ImagerRequest { public ListWavelengthsRequest() { Action = "listwavelengths"; } }
 public record ListAvailableEquipmentRequest : ImagerRequest { public ListAvailableEquipmentRequest() { Action = "listavailableequipment"; } }
 
-public record GetMotorizedStagePositionRequest(
-    [property: JsonPropertyName("name")] string StageName
-) : ImagerRequest { public GetMotorizedStagePositionRequest() { Action = "getmotorizedstageposition"; } }
+public record GetMotorizedStagePositionRequest : ImagerRequest
+{
+    [JsonPropertyName("name")] public string StageName { get; init; }
+    public GetMotorizedStagePositionRequest(string stageName) { StageName = stageName; Action = "getmotorizedstageposition"; }
+}
 
-public record SetMotorizedStagePositionRequest(
-    [property: JsonPropertyName("name")] string StageName,
-    [property: JsonPropertyName("position")] StagePosition Position
-) : ImagerRequest { public SetMotorizedStagePositionRequest() { Action = "setmotorizedstageposition"; } }
+public record SetMotorizedStagePositionRequest : ImagerRequest
+{
+    [JsonPropertyName("name")] public string StageName { get; init; }
+    [JsonPropertyName("position")] public StagePosition Position { get; init; }
+    public SetMotorizedStagePositionRequest(string stageName, StagePosition position) { StageName = stageName; Position = position; Action = "setmotorizedstageposition"; }
+}
 
 public record ListAvailableDetectorsRequest : ImagerRequest { public ListAvailableDetectorsRequest() { Action = "listavailabledetectors"; } }
 
-public record GetDetectorPropertiesRequest(
-    [property: JsonPropertyName("detectorname")] string DetectorName
-) : ImagerRequest { public GetDetectorPropertiesRequest() { Action = "getdetectorproperties"; } }
+public record GetDetectorPropertiesRequest : ImagerRequest
+{
+    [JsonPropertyName("detectorname")] public string DetectorName { get; init; }
+    public GetDetectorPropertiesRequest(string detectorName) { DetectorName = detectorName; Action = "getdetectorproperties"; }
+}
 
-public record SetDetectorPropertyRequest(
-    [property: JsonPropertyName("detectorname")] string DetectorName,
-    [property: JsonPropertyName("property")] object PropertyValue
-) : ImagerRequest { public SetDetectorPropertyRequest() { Action = "setdetectorproperty"; } }
+public record SetDetectorPropertyRequest : ImagerRequest
+{
+    [JsonPropertyName("detectorname")] public string DetectorName { get; init; }
+    [JsonPropertyName("property")] public object PropertyValue { get; init; }
+    public SetDetectorPropertyRequest(string detectorName, object propertyValue) { DetectorName = detectorName; PropertyValue = propertyValue; Action = "setdetectorproperty"; }
+}
 
 public record PingRequest : ImagerRequest { public PingRequest() { Action = "ping"; } }
 
-public record ExecuteMeasurementProgramRequest(
-    [property: JsonPropertyName("program")] object Program,
-    [property: JsonPropertyName("defineddetections")] object DefinedDetections,
-    [property: JsonPropertyName("smartprogramcode")] object SmartProgramCode
-) : ImagerRequest { public ExecuteMeasurementProgramRequest() { Action = "executemeasurementprogram"; } }
+public record ExecuteMeasurementProgramRequest : ImagerRequest
+{
+    [JsonPropertyName("program")] public object Program { get; init; }
+    [JsonPropertyName("defineddetections")] public object DefinedDetections { get; init; }
+    [JsonPropertyName("smartprogramcode")] public object SmartProgramCode { get; init; }
+    public ExecuteMeasurementProgramRequest(object program, object definedDetections, object smartProgramCode) 
+    { 
+        Program = program; DefinedDetections = definedDetections; SmartProgramCode = smartProgramCode; Action = "executemeasurementprogram"; 
+    }
+}
 
 public record FetchAsyncDataRequest : ImagerRequest { public FetchAsyncDataRequest() { Action = "fetchasyncspectra"; } }
 
-public record UseSharedMemoryForTransferRequest(
-    [property: JsonPropertyName("usesharedmemory")] bool UseSharedMemory
-) : ImagerRequest { public UseSharedMemoryForTransferRequest() { Action = "usesharedmemoryfortransfer"; } }
+public record UseSharedMemoryForTransferRequest : ImagerRequest
+{
+    [JsonPropertyName("usesharedmemory")] public bool UseSharedMemory { get; init; }
+    public UseSharedMemoryForTransferRequest(bool useSharedMemory) { UseSharedMemory = useSharedMemory; Action = "usesharedmemoryfortransfer"; }
+}
 
-public record AcknowledgeDataReceiptRequest(
-    [property: JsonPropertyName("uptoandincluding")] ulong UpToAndIncluding
-) : ImagerRequest { public AcknowledgeDataReceiptRequest() { Action = "acknowledgedatareceipt"; } }
+public record AcknowledgeDataReceiptRequest : ImagerRequest
+{
+    [JsonPropertyName("uptoandincluding")] public ulong UpToAndIncluding { get; init; }
+    public AcknowledgeDataReceiptRequest(ulong upToAndIncluding) { UpToAndIncluding = upToAndIncluding; Action = "acknowledgedatareceipt"; }
+}
+
 
 public record FetchAsyncStatusMessagesRequest : ImagerRequest { public FetchAsyncStatusMessagesRequest() { Action = "fetchasyncstatusmessages"; } }
 public record CancelAsyncAcquisitionRequest : ImagerRequest { public CancelAsyncAcquisitionRequest() { Action = "cancelasyncacquisition"; } }

@@ -55,6 +55,7 @@ public partial class App : Application
         var builder = new ContainerBuilder();
 
         builder.RegisterType<MainViewModel>().AsSelf().SingleInstance();  // Register MainViewModel as transient
+        builder.RegisterType<ImagerConnectionHandler>().As<IImagerConnectionHandler>().SingleInstance();
         builder.RegisterType<ComUtils>().AsSelf().SingleInstance();  // Register ComUtils as singleton
 
         builder.RegisterType<MainView>().AsSelf();  // Register MainView
@@ -241,17 +242,18 @@ public partial class App : Application
     {
         try
         {
-            using (ImagerCommunication ImagerCommunicator = new ImagerCommunication())
-            {
-                ImagerCommunicator.EstablishConnectionStream();
-            }
+            var handler = Container.Resolve<IImagerConnectionHandler>();
+            await handler.SendRequestAsync(new PingRequest());
         }
         catch (SocketException socketEx)
         {
             await ExceptionWindowHandler.ShowDialogAsync("A socket error occurred", socketEx.Message, socketEx.StackTrace, mainWindow);
             desktop.Shutdown();
-
-
+        }
+        catch (Exception ex)
+        {
+            await ExceptionWindowHandler.ShowDialogAsync("Connection Error", ex.Message, ex.StackTrace, mainWindow);
+            desktop.Shutdown();
         }
     }
     private void IncreaseValue(object sender, RoutedEventArgs e)

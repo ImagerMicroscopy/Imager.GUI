@@ -30,6 +30,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     private CancellationTokenSource _cancelLive = new();
     private readonly ILogger _logger;
     private readonly ComUtils _comUtils;
+    private readonly IImagerConnectionHandler _connectionHandler;
     private readonly IImageDisplayViewModelFactory _imageVmFactory;
     private readonly AcquisitionStateService _acquisitionState;
     public SystemDefinedSettingsViewModel? DefinedAcquisitions;
@@ -49,6 +50,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         ImageDisplayViewModel liveView,
         FieldViewerViewModel fieldView,
         ComUtils comUtils,
+        IImagerConnectionHandler connectionHandler,
         IImageDisplayViewModelFactory imageVmFactory,
         AcquisitionStateService acquisitionStateService)
     {
@@ -56,6 +58,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         _liveView = liveView;
         _fieldView = fieldView;
         _comUtils = comUtils;
+        _connectionHandler = connectionHandler;
         _imageVmFactory = imageVmFactory;
         _acquisitionState = acquisitionStateService;
 
@@ -131,7 +134,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             try
             {
                 _cancelLive = new CancellationTokenSource();
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
+                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
 
                 InitializeLive(scope);
                 LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
@@ -209,7 +212,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             _cancelLive = new CancellationTokenSource();
             try
             {
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
+                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
                 InitializeExperiment(scope);
 
                 LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
@@ -249,7 +252,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             {
                 LiveView.IsDataStreaming = false;
                 IsExperimentEnabled = false;
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
+                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
                 await ExceptionWindowHandler.ShowExceptionAsync(ex);
                 OnFinishExperiment?.Invoke(this, EventArgs.Empty);
                 if (LiveImageHandler != null)
