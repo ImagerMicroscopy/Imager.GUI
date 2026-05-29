@@ -6,7 +6,6 @@
 	  <LangVersion>latest</LangVersion>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-	  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	  <Platforms>AnyCPU;x64</Platforms>
 
   </PropertyGroup>

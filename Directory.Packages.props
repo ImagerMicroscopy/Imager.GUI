@@ -42,6 +42,7 @@
     <PackageVersion Include="System.Drawing.Common" Version="9.0.0" />
     <PackageVersion Include="TiffLibrary" Version="0.6.65" />
     <PackageVersion Include="TiffLibrary.ImageSharpAdapter" Version="0.6.65" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.1" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="xunit" Version="2.5.3" />
