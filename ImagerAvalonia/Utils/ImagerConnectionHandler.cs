@@ -68,10 +68,10 @@ public record PingRequest : ImagerRequest { public PingRequest() { Action = "pin
 
 public record ExecuteMeasurementProgramRequest : ImagerRequest
 {
-    [JsonPropertyName("program")] public object Program { get; init; }
-    [JsonPropertyName("defineddetections")] public object DefinedDetections { get; init; }
-    [JsonPropertyName("smartprogramcode")] public object SmartProgramCode { get; init; }
-    public ExecuteMeasurementProgramRequest(object program, object definedDetections, object smartProgramCode) 
+    [JsonPropertyName("program")] public JsonElement Program { get; init; }
+    [JsonPropertyName("defineddetections")] public JsonElement? DefinedDetections { get; init; }
+    [JsonPropertyName("smartprogramcode")] public JsonElement? SmartProgramCode { get; init; }
+    public ExecuteMeasurementProgramRequest(JsonElement program, JsonElement? definedDetections, JsonElement? smartProgramCode) 
     { 
         Program = program; DefinedDetections = definedDetections; SmartProgramCode = smartProgramCode; Action = "executemeasurementprogram"; 
     }
@@ -198,7 +198,13 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
         await client.ConnectAsync(_host, _port, linkedCts.Token);
         await using var stream = client.GetStream();
 
-        byte[] payloadBytes = Encoding.UTF8.GetBytes(request.ToJson());
+        string jsonPayload = request.ToJson();
+        if (request is ExecuteMeasurementProgramRequest)
+        {
+            Console.WriteLine($"[ImagerConnectionHandler] Starting measurement. Sent JSON payload:\n{jsonPayload}");
+        }
+
+        byte[] payloadBytes = Encoding.UTF8.GetBytes(jsonPayload);
         await stream.WriteAsync(payloadBytes, linkedCts.Token);
 
         byte[] sizeBuffer = new byte[sizeof(int)];

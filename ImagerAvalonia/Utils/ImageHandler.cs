@@ -20,7 +20,7 @@ namespace ImagerAvalonia.Utils
 
         private readonly MessagePackAcquisitionHandler? _acquisitionHandler;
 
-        private readonly ComUtils? _comUtils;
+        private readonly IImagerConnectionHandler _connectionHandler;
 
         private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
 
@@ -34,12 +34,12 @@ namespace ImagerAvalonia.Utils
             _storageProvider = storageProvider; 
         }
 
-        public ImageHandler(IStorageProvider storageProvider, ILogger logger, ComUtils comUtils )
+        public ImageHandler(IStorageProvider storageProvider, ILogger logger, IImagerConnectionHandler connectionHandler )
         {
             _storageProvider = storageProvider;
             _logger = logger;
-            _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, comUtils);
-            _comUtils = comUtils;
+            _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, connectionHandler);
+            _connectionHandler = connectionHandler;
             _throttleTimer.Elapsed += (_, _) => _canFire = true;
         }
 
@@ -148,48 +148,45 @@ namespace ImagerAvalonia.Utils
 
         public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src)
         {
-
-
-            CancellationTokenSource source = src;
-
-
-            Task _Enable_live_view = new Task(() =>
+            await Task.Run(async () =>
             {
-                if (_acquisitionHandler is not null)
+                await _acquisitionHandler.StartAcquisitionAsync(src.Token);
+
+                while (_acquisitionHandler.state == AcquisitionState.Running )
                 {
-                    _acquisitionHandler.StartAcquisition();
-
-
-                    while (_acquisitionHandler.state == AcquisitionState.Running)
+                    try
                     {
-
-                        var images = _acquisitionHandler.FetchData(src);
+                        var images = await _acquisitionHandler.FetchDataAsync(src);
 
                         if (_acquisitionHandler.IsNewDataAvailable)
                         {
+                            var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
 
-                            Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
-
-                            if (_comUtils is not null)
+                            var statusResponse = await _connectionHandler.SendRequestAsync(new FetchAsyncStatusMessagesRequest(), src.Token);
+                            if (statusResponse is AsyncStatusMessagesResponse statusMsgs)
                             {
-                                _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { _logger?.LogInformation(response_message); }, response_data => { });
+                                foreach (var msg in statusMsgs.Messages)
+                                {
+                                    _logger.LogInformation(msg);
+                                }
                             }
 
                             _acquisitionHandler.IsNewDataAvailable = false;
                         }
                     }
+                    catch (TaskCanceledException)
+                    {
+                        break; // Normal cancellation
+                    }
+                    
+                    if (!src.IsCancellationRequested)
+                    {
+                        await Task.Delay(50, src.Token); // Yield and prevent tight loop
+                    }
                 }
-            }
-            , source.Token);
+            }, src.Token);
 
-
-            _Enable_live_view.Start();
-            await _Enable_live_view;
-
-            
-
-            return _Enable_live_view.IsCompleted;
-            
+            return true;
         }       
 
         

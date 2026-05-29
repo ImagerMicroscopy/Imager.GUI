@@ -186,7 +186,6 @@ namespace Imager.Tests.ViewModels
                 loggerFactoryMock.Object,
                 liveViewMock.Object,
                 fieldViewMock.Object,
-                messages.Object,
                 connectionHandler.Object,
                 imageVmFactoryMock.Object,
                 acquisitionState.Object

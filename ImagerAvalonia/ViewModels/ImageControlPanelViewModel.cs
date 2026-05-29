@@ -29,7 +29,6 @@ public partial class ImageControlPanelViewModel : ViewModelBase
 
     private CancellationTokenSource _cancelLive = new();
     private readonly ILogger _logger;
-    private readonly ComUtils _comUtils;
     private readonly IImagerConnectionHandler _connectionHandler;
     private readonly IImageDisplayViewModelFactory _imageVmFactory;
     private readonly AcquisitionStateService _acquisitionState;
@@ -49,7 +48,6 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         ILoggerFactory loggerFactory,
         ImageDisplayViewModel liveView,
         FieldViewerViewModel fieldView,
-        ComUtils comUtils,
         IImagerConnectionHandler connectionHandler,
         IImageDisplayViewModelFactory imageVmFactory,
         AcquisitionStateService acquisitionStateService)
@@ -57,7 +55,6 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         _logger = loggerFactory.CreateLogger("Imager");
         _liveView = liveView;
         _fieldView = fieldView;
-        _comUtils = comUtils;
         _connectionHandler = connectionHandler;
         _imageVmFactory = imageVmFactory;
         _acquisitionState = acquisitionStateService;
@@ -98,7 +95,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         storageProvider.SetStoragePath(path);
         InitializeTifReader(scope);
 
-        var tifHandler = new ImageHandler(storageProvider, _logger, _comUtils);
+        var tifHandler = new ImageHandler(storageProvider, _logger, _connectionHandler);
 
         tifViewer.SetOpenID(storageProvider.GetOpenID());
         tifViewer.SetGridData(storageProvider.GetStorageSchema());  
@@ -134,10 +131,10 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             try
             {
                 _cancelLive = new CancellationTokenSource();
-                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
+                
 
                 InitializeLive(scope);
-                LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
+                LiveImageHandler = new ImageHandler(storageProvider, _logger, _connectionHandler);
                 LiveImageHandler.UpdateImageDisplay += LiveView.ProcessImages;
                 LiveImageHandler.UpdateImageElements += LiveView.ProcessImageElements;
                 LiveImageHandler.UpdateFieldViewDisplay  += FieldView.ProcessImages;
@@ -177,6 +174,9 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             if (LiveImageHandler is not null)
             {
                 _cancelLive?.Cancel();
+                try {
+                    System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
+                } catch {}
                 LiveView.IsDataStreaming = false;
                 LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
                 LiveImageHandler.UpdateImageDisplay -= LiveView.ProcessImages;
@@ -212,10 +212,11 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             _cancelLive = new CancellationTokenSource();
             try
             {
-                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
+                // Removed cancel here as well!
+                // System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest())).GetAwaiter().GetResult();
                 InitializeExperiment(scope);
 
-                LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
+                LiveImageHandler = new ImageHandler(storageProvider, _logger, _connectionHandler);
                 LiveView.SetAvailableXYPositions(experimentSerializer.ExperimentPositions);
                 LiveView.ShowLiveView = true;
                 LiveView.SetExperimentSerializer(experimentSerializer);

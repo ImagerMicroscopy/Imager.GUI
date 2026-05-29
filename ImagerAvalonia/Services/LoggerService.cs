@@ -29,14 +29,6 @@ namespace ImagerAvalonia.Services
             if(_categoryName=="Imager")
             {
                 response = response.TrimEnd('\0');
-
-                using JsonDocument doc = JsonDocument.Parse(response);
-                if (doc.RootElement.TryGetProperty("messages", out JsonElement messages))
-                {
-                    response = messages.GetRawText();
-
-                }
-
             }
 
             string logentry = $"{DateTime.Now:HH:mm:ss}: [{_categoryName}] {response}";

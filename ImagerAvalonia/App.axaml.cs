@@ -55,7 +55,8 @@ public partial class App : Application
         var builder = new ContainerBuilder();
 
         builder.RegisterType<MainViewModel>().AsSelf().SingleInstance();  // Register MainViewModel as transient
-        builder.RegisterType<ImagerConnectionHandler>().As<IImagerConnectionHandler>().SingleInstance();
+        builder.RegisterType<ImagerConnectionManager>().As<IImagerConnectionManager>().SingleInstance();
+        builder.Register(ctx => ctx.Resolve<IImagerConnectionManager>().ConnectionHandler).As<IImagerConnectionHandler>().SingleInstance();
         builder.RegisterType<ComUtils>().AsSelf().SingleInstance();  // Register ComUtils as singleton
 
         builder.RegisterType<MainView>().AsSelf();  // Register MainView
@@ -64,7 +65,6 @@ public partial class App : Application
         builder.RegisterType<MISStorageProvider>().As<IStorageProvider>().InstancePerLifetimeScope();
         builder.RegisterType<StageControl>().As<IStageControl>().SingleInstance();
         builder.RegisterType<StageControlPanelViewModel>().SingleInstance();
-        builder.RegisterType<AcquisitionHandler>().AsSelf().InstancePerDependency();
         builder.RegisterType<MessagePackAcquisitionHandler>().AsSelf().InstancePerDependency();
 
         builder.RegisterType<ImageDisplayViewModel>().InstancePerDependency().AsSelf().PropertiesAutowired();

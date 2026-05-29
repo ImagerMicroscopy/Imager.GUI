@@ -1,14 +1,12 @@
-﻿// Required namespaces for measurement control, JSON handling, threading, and collections
-
-using ImagerAvalonia.Services.MeasurementControl;
-using MessagePack;
-using Newtonsoft.Json.Linq;
-
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Threading;
-
+using System.Buffers;
+using MessagePack;
+using Newtonsoft.Json.Linq;
+using ImagerAvalonia.Services.MeasurementControl;
+using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace ImagerAvalonia.Utils
 {
@@ -21,80 +19,51 @@ namespace ImagerAvalonia.Utils
     // Stores X, Y, Z positional data
     public class PositionData
     {
-        public List<double> XPositions { get; } = new();
-        public List<double> YPositions { get; } = new();
-        public List<double> ZPositions { get; } = new();
+        public List<XYStagePosition> Positions = new();
     }
 
-    // Stores image byte data, size info, and metadata for each image plane
+    // Stores multi-channel image data and metadata
     public class ImageData
     {
-        public List<byte[]> Images { get; set; } = new();
-        public List<List<uint>> Sizes = new List<List<uint>>();
-        public List<TiffPlaneMetadata> Metadata = new List<TiffPlaneMetadata>();
-        public List<string> Decisions = new List<string>();
-        public List<XYStagePosition> TraversedPositions = new();
-        public string? Payload { get; set; }
+        public List<byte[]> Images = new();
+        public List<TiffPlaneMetadata> Metadata = new();
         public List<string> ImageResponseType = new();
-        public string? Comment { get; internal set; }
-
-        public ImageData this[int index]
-        {
-            get
-            {
-                return new ImageData
-                {
-                    Images = new List<byte[]> { Images[index] },
-                    Sizes = new List<List<uint>> { Sizes[index] },
-                    Metadata = new List<TiffPlaneMetadata> { Metadata[index] },
-                };
-            }
-        }
+        public List<List<uint>> Sizes = new();
+        public List<XYStagePosition> TraversedPositions = new();
+        public List<string> Decisions = new();
+        public TimeSpan? AcquistionTime = null;
     }
 
-    // Stores acquisition metadata including detector and acquisition names and timestamps
+    // Represents experimental variables/conditions
     public class DetectionData
     {
-        public List<string> DetectorNames { get; set; } = new();
-        public List<string> AcquisitionNames { get; set; } = new();
-        public List<double> Timestamps { get; set; } = new();
+        public Dictionary<string, string> ExperimentalVariables = new();
     }
 
-    // Represents the state of acquisition
-    public enum AcquisitionState
-    {
-        Running,
-        Completed,
-        Canceled
-    }
-
+    // Main data structure combining positions, images, and detections
     public class ImagerData
     {
-        public ImageData AcquiredImages { get; set; } = new();
-        public PositionData AcquiredPositionData { get; set; } = new();
-        public DetectionData AcquiredDetectionData { get; set; } = new();
+        public PositionData positions = new();
+        public ImageData images = new();
+        public DetectionData acquisitions = new();
     }
 
-
-
+    // Handles acquisition using MessagePack formatting
     public class MessagePackAcquisitionHandler
     {
-
         private readonly IStorageProvider _storageProvider;
-        private readonly ComUtils _comUtils;
+        private readonly IImagerConnectionHandler _connectionHandler;
 
         public List<TiffPlaneMetadata> receivedMetaData = new();
-        private int numReceivedData = -1;
+        private ulong numReceivedData = 0;
         public AcquisitionState state = AcquisitionState.Running;
 
         public bool IsNewDataAvailable = false;
 
-
-        public MessagePackAcquisitionHandler(IStorageProvider storageProvider, ComUtils comUtils)
+        public MessagePackAcquisitionHandler(IStorageProvider storageProvider, IImagerConnectionHandler connectionHandler)
         {
             _storageProvider = storageProvider;
-            _comUtils = comUtils;
-
+            _connectionHandler = connectionHandler;
         }
 
         public PositionData positions = new();
@@ -102,320 +71,170 @@ namespace ImagerAvalonia.Utils
         public DetectionData acquisitions = new();
         public int numDatasets = 0;
 
-        public void StartAcquisition()
+        public async Task StartAcquisitionAsync(CancellationToken cancellationToken)
         {
             JObject program = _storageProvider._measurementProgram;
-            var parsed_program = program["program"];
+            var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
             if (parsed_program != null)
             {
-                _comUtils.SendDataRequest(parsed_program.ToString(Newtonsoft.Json.Formatting.None), ComUtils.isokresponse, _ => { }, _ => { });
+                var innerProgram = parsed_program["program"];
+                var definedDetections = parsed_program["defineddetections"];
+                var smartProgramCode = parsed_program["smartprogramcode"];
+                
+                using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
+                JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+                JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+
+                var request = new ExecuteMeasurementProgramRequest(docProgram.RootElement.Clone(), docDefinedDetections?.Clone(), docSmartProgramCode?.Clone());
+                await _connectionHandler.SendRequestAsync(request, cancellationToken);
             }
             _storageProvider.OpenWriteStream();
         }
 
-        public ImageData FetchData(CancellationTokenSource src)
+        public async Task<ImageData> FetchDataAsync(CancellationTokenSource src)
         {
-            string response = "";
             var image_data = new ImageData();
 
-            Console.WriteLine($"[{DateTime.Now}] Requesting data image");
+            Console.WriteLine($"[{DateTime.Now}] Requesting async data");
 
-            // Send fetch request and process response
-            _comUtils.SendDataRequest(ComUtils.fetchmessage, "", response_message => { response = response_message; }, receivedData => {
-                image_data = ProcessIncomingData(receivedData);
-                Console.WriteLine($"[{DateTime.Now}] Received data: number of images = {image_data.Images.Count}, Number of decisions: {image_data.Decisions.Count}, Received data: {numReceivedData}");
-
-                if (image_data.Images.Count > 0)
-                {
-                    _storageProvider.SavePlanes(image_data.Images, image_data.Metadata);
-                }
-                if (image_data.Decisions.Count > 0)
-                {
-                    _storageProvider.SaveDecisions(image_data.Decisions);
-                }
-                AcknowledgeData(numReceivedData);
-                IsNewDataAvailable = true;
-
-            });
-
-            // Handle special cases in response string
-            if (!String.IsNullOrEmpty(response))
+            ImagerResponse response = null;
+            try
             {
-                if (response.Contains(ComUtils.no_more_spectra))
+                // Send fetch request and process response
+                response = await _connectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), src.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("FetchDataAsync operation was cancelled.");
+            }
+
+            if (response != null)
+            {
+                if (response is AsyncAcquiredImagesResponse imagesResponse)
                 {
+                    image_data = ProcessMessages(imagesResponse.Messages);
+                    Console.WriteLine($"[{DateTime.Now}] Received data: number of images = {image_data.Images.Count}");
+
+                    if (image_data.Images.Count > 0)
+                    {
+                        _storageProvider.SavePlanes(image_data.Images, image_data.Metadata);
+                    }
+                    if (image_data.Decisions.Count > 0)
+                    {
+                        _storageProvider.SaveDecisions(image_data.Decisions);
+                    }
+                    try {
+                        await AcknowledgeDataAsync(numReceivedData, src.Token);
+                    } catch (OperationCanceledException) {}
+                    IsNewDataAvailable = true;
+                }
+                else if (response is StatusNoNewAsyncDataResponse)
+                {
+                    // no more spectra
                     state = AcquisitionState.Completed;
                     IsNewDataAvailable = true;
                     return new ImageData();
                 }
-                if (response.Contains("error"))
+                else if (response is StatusNoNewAsyncDataComingResponse)
                 {
+                    // just no new data right now, but might come later
+                }
+                else if (response is StatusErrorResponse err)
+                {
+                    if (err.Error.Contains("AsyncCancelled"))
+                    {
+                        Console.WriteLine("Server reported AsyncCancelled. Setting state to Canceled.");
+                        state = AcquisitionState.Canceled;
+                        return image_data;
+                    }
                     state = AcquisitionState.Completed;
-                    throw new AcquisitionException($"User error {response}");
+                    Console.WriteLine($"SERVER RETURNED ERROR: {err.Error}"); 
+                    throw new AcquisitionException($"User error {err.Error}");
                 }
             }
 
             // If cancellation is requested, send cancel message
             if (src.IsCancellationRequested)
             {
-             
                 state = AcquisitionState.Canceled;
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
+                await _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest());
             }
             return image_data;
         }
 
-        public ImageData ProcessIncomingData(byte[] receivedData)
+        public ImageData ProcessMessages(ChannelMessage[] messages)
         {
+            var images_data = new ImageData();
 
-            var images = new ImageData();
-        
-
-            var reader = new MessagePackReader(new ReadOnlySequence<byte>(receivedData));
-
-            while (reader.Consumed <= receivedData.Length - 5)
+            foreach (var message_data in messages)
             {
+                images_data.ImageResponseType.Add(message_data.Message.Type);
+                numReceivedData = message_data.Index;
 
-                MessagePackData message_data = MessagePackSerializer.Deserialize<MessagePackData>(ref reader);
-                images.ImageResponseType.Add(message_data.message.type);
-                numReceivedData = message_data.index;
-
-                if (message_data.message.type == "smartprogramdecisionmessage")
+                if (message_data.Message.Type == "smartprogramdecisionmessage")
                 {
-                    if (message_data.message.decision is null)
+                    if (message_data.Message.Decision is null)
                     {
-                        images.Decisions.Add(string.Empty);
+                        images_data.Decisions.Add(string.Empty);
                     }
                     else
-                    { images.Decisions.Add(message_data.message.decision); }
+                    { 
+                        images_data.Decisions.Add(message_data.Message.Decision); 
+                    }
                 }
 
-                var data = message_data.message;
+                var msg = message_data.Message;
 
-
-                if (data.metadata is not null)
+                if (msg.MetaData is not null && msg.Data is not null)
                 {
-
+                    var sp = msg.MetaData.StagePosition;
                     var tiffMeta = new TiffPlaneMetadata
                     {
-
-                        PositionX = data.metadata.stageposition.x,
-                        PositionY = data.metadata.stageposition.y,
-                        PositionZ = data.metadata.stageposition.z,
-                        AcquisitionName = data.metadata.acquisitiontype,
-                        DetectorName = data.data.detectorname,
-                        Width = (uint)data.data.ncols,
-                        Height = (uint)data.data.nrows,
-                        TimePoint = data.data.timestamp,
-                        Type = data.data.numtype,
-                        DetectionIndex = data.metadata.detectionindex,
-                        PositionName = data.metadata.stagepositionname,
-                        ElementID = data.metadata.detectionelementid,
-                        CurrentStagePosition = new XYStagePosition(data.metadata.stageposition.x,
-                        data.metadata.stageposition.y, data.metadata.stageposition.z, data.metadata.stageposition.usinghardwareautofocus,
-                        data.metadata.stageposition.hardwareautofocusoffset, data.metadata.stagepositionname ?? string.Empty)
-
+                        PositionX = sp.X,
+                        PositionY = sp.Y,
+                        PositionZ = sp.Z,
+                        AcquisitionName = msg.MetaData.AcquisitionType,
+                        DetectorName = msg.Data.DetectorName,
+                        Width = (uint)msg.Data.NCols,
+                        Height = (uint)msg.Data.NRows,
+                        TimePoint = msg.Data.TimeStamp,
+                        Type = msg.Data.PixelFormat,
+                        DetectionIndex = msg.MetaData.DetectionIndex,
+                        PositionName = msg.MetaData.StagePositionName ?? string.Empty,
+                        ElementID = msg.MetaData.DetectionElementId,
+                        CurrentStagePosition = new XYStagePosition(
+                            (float)sp.X, (float)sp.Y, (float)sp.Z, sp.UsingHardwareAutofocus,
+                            (float)sp.HardwareAutofocusOffset, msg.MetaData.StagePositionName ?? string.Empty)
                     };
 
-
-                    images.ImageResponseType.Add(message_data.message.type);
-                    images.Metadata.Add(tiffMeta);
-                    images.Images.Add(data.data.imagedata);
-                    images.Sizes.Add(new List<uint>() { (uint)data.data.ncols, (uint)data.data.nrows });
+                    images_data.Metadata.Add(tiffMeta);
+                    images_data.Images.Add(msg.Data.ImageData);
+                    images_data.Sizes.Add(new List<uint>() { (uint)msg.Data.NCols, (uint)msg.Data.NRows });
                 }
             }
 
-            return images;
+            return images_data;
         }
 
         // Sends an acknowledgment for received data
-        public void AcknowledgeData(int total_data_length)
+        public async Task AcknowledgeDataAsync(ulong lastIndex, CancellationToken cancellationToken)
         {
-             _comUtils.SendDataRequest(ComUtils.acknowledgemessage(total_data_length), "", _ => { }, _ => { });
+            await _connectionHandler.SendRequestAsync(new AcknowledgeDataReceiptRequest(lastIndex), cancellationToken);
         }
     }
 
-
-
-
-
-
-
-
-    // Main handler for managing acquisition process
-    public class AcquisitionHandler 
+    public enum AcquisitionState
     {
-        private readonly IStorageProvider _storageProvider;
-        private readonly ComUtils _comUtils;
-
-        public List<TiffPlaneMetadata> receivedMetaData = new();
-        private int numReceivedData = -1;
-        public AcquisitionState state = AcquisitionState.Running;
-
-        public bool IsNewDataAvailable = false;
-
-        // Constants for parsing incoming byte data
-        const int MAGIC_NUMBER_SIZE = 2;
-        const int MESSAGE_SIZE_BYTES = 4;
-        const int NUM_TYPE_BYTES = 1;
-        const int NUM_DATASETS_BYTES = 4;
-
-
-        public AcquisitionHandler(IStorageProvider storageProvider, ComUtils comUtils)
-        {
-            _storageProvider = storageProvider;
-            _comUtils = comUtils;
-        }
-
-        // Data containers for current acquisition
-        public PositionData positions = new();
-        public ImageData images = new();
-        public DetectionData acquisitions = new();
-        public int numDatasets = 0;
-
-        // Starts the acquisition by sending a program request and opening the storage stream
-        public void StartAcquisition()
-        {
-            JObject program = _storageProvider._measurementProgram;
-            var parsed_program = program["program"];
-            if (parsed_program != null)
-            {
-                _comUtils.SendDataRequest(parsed_program.ToString(Newtonsoft.Json.Formatting.None), ComUtils.isokresponse, _ => { }, _ => { });
-            }
-            _storageProvider.OpenWriteStream();
-        }
-
-        // Fetches data, handles incoming response and state transitions, and saves the data
-        public ImageData FetchData(CancellationTokenSource src)
-        {
-            string response = "";
-            var s = new System.Diagnostics.Stopwatch();
-            var image_data = new ImageData();
-
-            // Send fetch request and process response
-            _comUtils.SendDataRequest(ComUtils.fetchmessage, "", response_message => { response = response_message; }, receivedData => {
-                image_data = ProcessIncomingData(receivedData);
-                AcknowledgeData(numReceivedData);
-                IsNewDataAvailable = true;
-
-                // Save image data and update stored frame counts
-                _storageProvider.SavePlanes(images.Images, images.Metadata);
-            });
-
-            // Handle special cases in response string
-            if (!String.IsNullOrEmpty(response))
-            {
-                if (response.Contains(ComUtils.no_more_spectra))
-                {
-                    state = AcquisitionState.Completed;
-                    IsNewDataAvailable = false;
-                    return image_data;
-                }
-                if (response.Contains("error"))
-                {
-                    state = AcquisitionState.Completed;
-                    throw new AcquisitionException($"User error {response}");
-                }
-            }
-
-            // If cancellation is requested, send cancel message
-            if (src.IsCancellationRequested)
-            {
-                state = AcquisitionState.Canceled;
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
-            }
-            return image_data;
-        }
-
-        // Parses incoming byte data into structured acquisition info
-        public ImageData ProcessIncomingData(byte[] receivedData)
-        {
-            // Reset data containers
-            positions = new();
-            images = new();
-            acquisitions = new();
-
-            // Local helper to copy bytes
-            void CopyBytes(byte[] source, int startIndex, byte[] destination)
-            {
-                Array.Copy(source, startIndex, destination, 0, destination.Length);
-            }
-
-            // Buffers for parsing header values
-            byte[] magicNumber = new byte[MAGIC_NUMBER_SIZE];
-            byte[] totalMessageSize = new byte[MESSAGE_SIZE_BYTES];
-            byte[] numType = new byte[NUM_TYPE_BYTES];
-            byte[] numDatasetsArray = new byte[NUM_DATASETS_BYTES];
-
-            // Copy header data
-            CopyBytes(receivedData, 0, magicNumber);
-            CopyBytes(receivedData, MAGIC_NUMBER_SIZE, totalMessageSize);
-            CopyBytes(receivedData, MAGIC_NUMBER_SIZE + MESSAGE_SIZE_BYTES, numType);
-            CopyBytes(receivedData, MAGIC_NUMBER_SIZE + MESSAGE_SIZE_BYTES + NUM_TYPE_BYTES, numDatasetsArray);
-
-            int startIndex = MAGIC_NUMBER_SIZE + MESSAGE_SIZE_BYTES + NUM_TYPE_BYTES + NUM_DATASETS_BYTES;
-
-            // Read number of datasets and parse the rest of the data
-            numDatasets = BitConverter.ToInt32(numDatasetsArray);
-            List<ulong> dataset_index = ImagerCommunication.FetchUInt64ParameterFromBytesAtOffset(numDatasets, receivedData, ref startIndex);
-            receivedMetaData = new List<TiffPlaneMetadata>();
-
-            // Parse and store positional metadata for each dataset
-            for (int i = 0; i < numDatasets; i++)
-            {
-                TiffPlaneMetadata tiffPlaneMetadata = new TiffPlaneMetadata
-                {
-                    PositionX = BitConverter.ToDouble(receivedData, startIndex),
-                    PositionY = BitConverter.ToDouble(receivedData, startIndex + 8),
-                    PositionZ = BitConverter.ToDouble(receivedData, startIndex + 16)
-                };
-
-                images.Metadata.Add(tiffPlaneMetadata);
-                startIndex += 24;
-            }
-
-            // Extract remaining metadata and image data
-            acquisitions.AcquisitionNames = ImagerCommunication.FetchAcquisitionOrDetectorName(numDatasets, receivedData, ref startIndex);
-            acquisitions.DetectorNames = ImagerCommunication.FetchAcquisitionOrDetectorName(numDatasets, receivedData, ref startIndex);
-            images.Sizes = ImagerCommunication.FetchUInt32ParameterFromBytesAtOffset(numDatasets, receivedData, ref startIndex);
-            acquisitions.Timestamps = ImagerCommunication.FetchFloat64ParameterFromBytesAtOffset(numDatasets, receivedData, ref startIndex);
-            images.Images = ImagerCommunication.FetchImageData(numDatasets, receivedData, ref startIndex, images.Sizes, new byte[1]);
-
-            // Populate full metadata structure
-            for (int i = 0; i < numDatasets; i++)
-            {
-                images.Metadata[i].AcquisitionName = acquisitions.AcquisitionNames[i];
-                images.Metadata[i].DetectorName = acquisitions.DetectorNames[i];
-                images.Metadata[i].Width = images.Sizes[i][0];
-                images.Metadata[i].Height = images.Sizes[i][1];
-                images.Metadata[i].TimePoint = acquisitions.Timestamps[i];
-                //Console.WriteLine(acquisitions.Timestamps[i]);
-
-
-            }
-
-            // Track how many datasets have been received
-            numReceivedData += numDatasets;
-            return images;
-        }
-
-        // Sends an acknowledgment for received data
-        public void AcknowledgeData(int total_data_length)
-        {
-            _comUtils.SendDataRequest(ComUtils.acknowledgemessage(total_data_length), "", _ => { }, _ => { });
-        }
+        Running,
+        Completed,
+        Failed,
+        Canceled
     }
 
-    // Custom exception for acquisition errors
     public class AcquisitionException : Exception
     {
-        private string _message;
-
-        // Custom message formatting
-        public override string Message => $"Exception occured during acquisition run: {_message}";
-
         public AcquisitionException(string message) : base(message)
         {
-            _message = message;
         }
     }
 }
