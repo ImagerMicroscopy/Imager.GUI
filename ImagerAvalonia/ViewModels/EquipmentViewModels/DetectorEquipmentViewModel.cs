@@ -159,8 +159,11 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         var response = await _connectionHandler.SendRequestAsync(new GetDetectorPropertiesRequest(Name));
         if (response is DetectorPropertiesResponse propsResponse)
         {
-            JToken detector_properties = JObject.Parse(propsResponse.DetectorProperties.GetRawText());
-            var detProperties = new DetectorEquipment(Name, detector_properties);
+            var equipmentObj = new JObject
+            {
+                ["detectorproperties"] = JArray.Parse(propsResponse.DetectorProperties.GetRawText())
+            };
+            var detProperties = new DetectorEquipment(Name, equipmentObj);
             foreach (var prop in Properties)
             {
                 prop.PropertyChanged -= SetChangedValueInModel;
