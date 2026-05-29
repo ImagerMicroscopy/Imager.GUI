@@ -261,21 +261,21 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
                     "acquireddatacopiedtosharedmemory" => new StatusAcquiredDataCopiedToSharedMemoryResponse(
                         root.TryGetProperty("sharedmemoryname", out var smName) ? smName.GetString() ?? "" : ""),
                     
-                    "acquireddata" => new AcquiredDataResponse(root.GetProperty("data")),
-                    "wavelengths" => new WavelengthsResponse(root.GetProperty("wavelengths")),
-                    "availableequipment" => new AvailableEquipmentResponse(root.GetProperty("equipment")),
-                    
+                    "acquireddata" => new AcquiredDataResponse(root.GetProperty("data").Clone()),
+                    "wavelengths" => new WavelengthsResponse(root.GetProperty("wavelengths").Clone()),
+                    "availableequipment" => new AvailableEquipmentResponse(root.GetProperty("equipment").Clone()),
+                      
                     "motorizedstageposition" => new MotorizedStagePositionResponse(
-                        JsonSerializer.Deserialize<StagePosition>(root.GetProperty("position").GetRawText())!),
-                    
+                          JsonSerializer.Deserialize<StagePosition>(root.GetProperty("position").GetRawText())!),
+                      
                     "availabledetectors" => new AvailableDetectorsResponse(
-                        JsonSerializer.Deserialize<string[]>(root.GetProperty("detectornames").GetRawText()) ?? Array.Empty<string>()),
-                    
+                          JsonSerializer.Deserialize<string[]>(root.GetProperty("detectornames").GetRawText()) ?? Array.Empty<string>()),
+                      
                     "detectorproperties" => new DetectorPropertiesResponse(
-                        root.GetProperty("detectorproperties"), root.TryGetProperty("framerate", out var fr) ? fr.GetDouble() : 0.0),
-                    
+                          root.GetProperty("detectorproperties").Clone(), root.TryGetProperty("framerate", out var fr) ? fr.GetDouble() : 0.0),
+                      
                     "pong" => new PongResponse(),
-                    "asyncdata" => new AsyncAcquiredDataResponse(root.GetProperty("data")),
+                    "asyncdata" => new AsyncAcquiredDataResponse(root.GetProperty("data").Clone()),
                     
                     "sharedmemoryname" => new SharedMemoryNameResponse(
                         root.TryGetProperty("name", out var name) ? name.GetString() ?? "" : ""),
