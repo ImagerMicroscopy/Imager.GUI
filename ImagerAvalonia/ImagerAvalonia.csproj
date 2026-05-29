@@ -46,7 +46,6 @@
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Include="Avalonia.Xaml.Behaviors" />
     <PackageReference Include="AvaloniaEdit.TextMate" />
-    <PackageReference Include="BitMiracle.LibTiff.NET" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="MessagePack" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -62,12 +61,6 @@
 
 
 
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="BitMiracle.LibTiff.NET">
-      <HintPath>..\..\libtiff.net-master\Result\net7.0\BitMiracle.LibTiff.NET.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
   <ItemGroup>

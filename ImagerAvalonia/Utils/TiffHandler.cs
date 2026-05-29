@@ -1,6 +1,5 @@
 ﻿using Avalonia;
 using Avalonia.Media.Imaging;
-using BitMiracle.LibTiff.Classic;
 using DynamicData.Diagnostics;
 using ImagerAvalonia.Views;
 using System;
