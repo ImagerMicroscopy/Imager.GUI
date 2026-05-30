@@ -70,11 +70,11 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public string StageName { get; set; } = string.Empty;
         public XYStagePosition PinnedPosition { get; set; } = IStageControl.DefaultXYStagePosition;
         public bool IsStageAvailable { get; private set; }
-        private readonly IImagerConnectionHandler _connectionHandler;
+        private readonly IImagerCommunicationManager _communicationManager;
 
-        public StageControl(IImagerConnectionHandler connectionHandler)
+        public StageControl(IImagerCommunicationManager communicationManager)
         {
-            _connectionHandler = connectionHandler;
+            _communicationManager = communicationManager;
 
         }
 
@@ -84,19 +84,14 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
             try
             {
-                var response = await _connectionHandler.SendRequestAsync(new ListAvailableEquipmentRequest());
-                if (response is AvailableEquipmentResponse equipResp)
+                var eq = await _communicationManager.ListAvailableEquipmentAsync();
+                foreach (var equipment in eq)
                 {
-                    var equipments = equipResp.Equipment;
-                    List<Equipment> eq = System.Text.Json.JsonSerializer.Deserialize<List<Equipment>>(equipments.GetRawText()) ?? new List<Equipment>();
-                    foreach (var equipment in eq)
+                    if (equipment.hasmotorizedstage)
                     {
-                        if (equipment.hasmotorizedstage)
-                        {
-                            this.StageName = equipment.motorizedstageName;
-                            this.AvailableStages.MotorizedStages.Add(new Stage(equipment.motorizedstageName, equipment.name));
-                            IsStageAvailable = true;
-                        }
+                        this.StageName = equipment.motorizedstageName;
+                        this.AvailableStages.MotorizedStages.Add(new Stage(equipment.motorizedstageName, equipment.name));
+                        IsStageAvailable = true;
                     }
                 }
             }
@@ -139,17 +134,8 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
             if (!string.IsNullOrEmpty(StageName))
             {
-                var response = System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new GetMotorizedStagePositionRequest(StageName))).GetAwaiter().GetResult();
-                
-                if (response is MotorizedStagePositionResponse posResponse)
-                {
-                    var pos = posResponse.Position;
-                    return new XYStagePosition((float)pos.X, (float)pos.Y, (float)pos.Z, pos.UsingHardwareAutofocus, (float)pos.HardwareAutofocusOffset, StageName);
-                }
-                else
-                {
-                    throw new NotImplementedException("Response contains no position key");
-                }
+                var pos = System.Threading.Tasks.Task.Run(() => _communicationManager.GetMotorizedStagePositionAsync(StageName)).GetAwaiter().GetResult();
+                return new XYStagePosition((float)pos.X, (float)pos.Y, (float)pos.Z, pos.UsingHardwareAutofocus, (float)pos.HardwareAutofocusOffset, StageName);
             }
             return null;
         }
@@ -170,7 +156,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
                     Z: selected_position.ZPos
                 );
 
-                System.Threading.Tasks.Task.Run(() => _connectionHandler.SendRequestAsync(new SetMotorizedStagePositionRequest(StageName, pos))).GetAwaiter().GetResult();
+                System.Threading.Tasks.Task.Run(() => _communicationManager.SetMotorizedStagePositionAsync(StageName, pos)).GetAwaiter().GetResult();
             }
         }
     }

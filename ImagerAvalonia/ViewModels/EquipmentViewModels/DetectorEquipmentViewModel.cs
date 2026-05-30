@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Runtime.CompilerServices;
@@ -32,13 +33,13 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
     [ObservableProperty] private DetectorEquipment _detectorEquipmentProperties;
     public event PropertyChangedEventHandler? WhenDetectorEnabled;
 
-    private readonly IImagerConnectionHandler _connectionHandler;
+    private readonly IImagerCommunicationManager _communicationManager;
     private readonly AcquisitionStateService _acquisitionState;
-    private CancellationTokenSource _numericThrottleCts;
+    private CancellationTokenSource? _numericThrottleCts;
 
     public DetectorEquipmentViewModel(DetectorEquipment detEquipment)
     {
-        _connectionHandler = App.Container.Resolve<IImagerConnectionHandler>();
+        _communicationManager = App.Container.Resolve<IImagerCommunicationManager>();
         _acquisitionState = App.Container.Resolve<AcquisitionStateService>();
         Name = detEquipment.Detectorname;
         DetectorEquipmentProperties = detEquipment;
@@ -154,22 +155,24 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         string message = string.Empty;
         await _acquisitionState.CheckIfAcquisitionFinsihed();
 
-        await _connectionHandler.SendRequestAsync(new SetDetectorPropertyRequest(Name, catProperty));
+        await _communicationManager.SetDetectorPropertyAsync(Name, catProperty);
         
-        var response = await _connectionHandler.SendRequestAsync(new GetDetectorPropertiesRequest(Name));
-        if (response is DetectorPropertiesResponse propsResponse)
+        var detectors = await _communicationManager.ListAvailableDetectorsAsync();
+        var detProperties = detectors.FirstOrDefault(x => x.Detectorname == Name);
+        
+        if (detProperties != null)
         {
-            var equipmentObj = new JObject
-            {
-                ["detectorproperties"] = JArray.Parse(propsResponse.DetectorProperties.GetRawText())
-            };
-            var detProperties = new DetectorEquipment(Name, equipmentObj);
             foreach (var prop in Properties)
             {
                 prop.PropertyChanged -= SetChangedValueInModel;
             }
             Properties.Clear();
             AssignModelProperties(detProperties.DetectorProperties);
+        }
+
+        if (waslive)
+        {
+            _acquisitionState.InvokeLiveStart();
         }
     }
 
@@ -230,7 +233,7 @@ public partial class NumericDetectorPropertyViewModel : DetectorEquipmentViewMod
             .Subscribe(v => ThrottledValue = v);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         _throttledSubscription?.Dispose();
     }

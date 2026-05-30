@@ -14,17 +14,17 @@ namespace ImagerAvalonia.Services
 
     public class SourceComponentModel
     {
-        public string lightsourcename;
-        public string equipmentname;
-        public List<string> lightsourcechannel;
-        public List<double> lightsourcepower;
+        public string lightsourcename = string.Empty;
+        public string equipmentname = string.Empty;
+        public List<string> lightsourcechannel = new();
+        public List<double> lightsourcepower = new();
     }
 
 
     public class MovableComponentModel
     {
-        public List<MovableSettingPart> movablecomponentsettings;
-        public string equipmentname;
+        public List<MovableSettingPart> movablecomponentsettings = new();
+        public string equipmentname = string.Empty;
     }
 
 

@@ -27,7 +27,7 @@ public partial class MainViewModel : ViewModelBase
 {
 
 
-    public IImagerConnectionHandler _connectionHandler;
+    public IImagerCommunicationManager _communicationManager;
     public ImageDisplayViewModel? ImageView { get; private set; }
 
     public bool IsLiveEnabled = false;
@@ -71,7 +71,7 @@ public partial class MainViewModel : ViewModelBase
 
 
 
-    public MainViewModel(IImagerConnectionHandler connectionHandler, 
+    public MainViewModel(IImagerCommunicationManager communicationManager, 
         IStageControl stageControl, 
         ImageControlPanelViewModel imagePanel, 
         SystemDefinedSettingsViewModel userDefinedAcquisitions, 
@@ -81,7 +81,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _SystemDefinedSettings = userDefinedAcquisitions;
         _stageControl = stageControl;
-        _connectionHandler = connectionHandler;
+        _communicationManager = communicationManager;
         _processingViewModel = processViewModel;
         _acquisitionStateService = acquisitionState;
         _equipmentState = equipmentState;
@@ -113,39 +113,18 @@ public partial class MainViewModel : ViewModelBase
 
     public async void InitializeEquipment()
     {
+        await _communicationManager.CancelMeasurementProgramAsync();
 
-        List<string> detector_names = new List<string> { };
-        await _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest());
-
-        var listDetectorsResponse = await _connectionHandler.SendRequestAsync(new ListAvailableDetectorsRequest());
-        if (listDetectorsResponse is AvailableDetectorsResponse detectorsResponse)
+        var detectors = await _communicationManager.ListAvailableDetectorsAsync();
+        foreach (var detector in detectors)
         {
-            detector_names = detectorsResponse.DetectorNames.ToList();
+            AvailableDetectors.Add(detector);
         }
 
-        foreach (var x in detector_names)
-        {
-            var propsResponse = await _connectionHandler.SendRequestAsync(new GetDetectorPropertiesRequest(x));
-            if (propsResponse is DetectorPropertiesResponse detPropsResp)
-            {
-                // Reconstruct JSON to match the old JToken structure DetectorEquipment expects
-                var equipmentObj = new JObject
-                {
-                    ["detectorproperties"] = JArray.Parse(detPropsResp.DetectorProperties.GetRawText())
-                };
-                AvailableDetectors.Add(new DetectorEquipment(x, equipmentObj));
-            }
-        }
-
-        var availableEqResponse = await _connectionHandler.SendRequestAsync(new ListAvailableEquipmentRequest());
-        if (availableEqResponse is AvailableEquipmentResponse eqResponse)
-        {
-            List<Equipment> eq = System.Text.Json.JsonSerializer.Deserialize<List<Equipment>>(eqResponse.Equipment.GetRawText()) ?? new List<Equipment>();
-
-            AvailableSources = _equipmentState.ParseAvailableLightSources(eq);
-            AvailableFilterWheels = _equipmentState.ParseAvailableFilterWheels(eq);
-            AvailableRobots = _equipmentState.ParseAvailableRobots(eq);
-        }
+        var eq = await _communicationManager.ListAvailableEquipmentAsync();
+        AvailableSources = _equipmentState.ParseAvailableLightSources(eq);
+        AvailableFilterWheels = _equipmentState.ParseAvailableFilterWheels(eq);
+        AvailableRobots = _equipmentState.ParseAvailableRobots(eq);
 
         _stageControl.InitializeStageInfo();
 

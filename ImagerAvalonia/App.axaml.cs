@@ -244,8 +244,8 @@ public partial class App : Application
     {
         try
         {
-            var handler = Container.Resolve<IImagerConnectionHandler>();
-            await handler.SendRequestAsync(new PingRequest());
+            var manager = Container.Resolve<IImagerCommunicationManager>();
+            await manager.PingAsync();
         }
         catch (SocketException socketEx)
         {

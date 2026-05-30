@@ -97,9 +97,9 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
         
         List<DetectorEquipment> detectors = [];
         foreach (var detName in names.DetectorNames) {
-            var (Properties, FrameRate) = await GetDetectorPropertiesAsync(detName, cancellationToken);
-            var detector = new DetectorEquipment(detName, Properties);
-            detector.Framerate = FrameRate;
+            var propsResult = await SendAndValidateAsync<DetectorPropertiesResponse>(new GetDetectorPropertiesRequest(detName), cancellationToken);
+            var detector = new DetectorEquipment(detName, propsResult.DetectorProperties);
+            detector.Framerate = propsResult.FrameRate;
             detectors.Add(detector);
         }
 
@@ -113,11 +113,6 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
     public async Task SetMotorizedStagePositionAsync(string stageName, StagePosition position, CancellationToken cancellationToken = default) {
         await SendAndValidateAsync<StatusOkResponse>(new SetMotorizedStagePositionRequest(stageName, position), cancellationToken);
-    }
-
-    public async Task<(JsonElement Properties, double FrameRate)> GetDetectorPropertiesAsync(string detectorName, CancellationToken cancellationToken = default) {
-        var result = await SendAndValidateAsync<DetectorPropertiesResponse>(new GetDetectorPropertiesRequest(detectorName), cancellationToken);
-        return (result.DetectorProperties, result.FrameRate);
     }
 
     public async Task SetDetectorPropertyAsync(string detectorName, object propertyValue, CancellationToken cancellationToken = default) {
