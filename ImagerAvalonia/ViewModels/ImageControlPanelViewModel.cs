@@ -50,7 +50,6 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         ImageDisplayViewModel liveView,
         FieldViewerViewModel fieldView,
         IImagerConnectionHandler connectionHandler,
-        IImagerCommunicationManager communicationManager,
         IImageDisplayViewModelFactory imageVmFactory,
         AcquisitionStateService acquisitionStateService)
     {
@@ -58,7 +57,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         _liveView = liveView;
         _fieldView = fieldView;
         _connectionHandler = connectionHandler;
-        _communicationManager = communicationManager;
+        _communicationManager = ImagerCommunicationManager.Instance;
         _imageVmFactory = imageVmFactory;
         _acquisitionState = acquisitionStateService;
 

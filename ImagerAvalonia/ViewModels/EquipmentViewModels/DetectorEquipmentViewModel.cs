@@ -39,7 +39,7 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
 
     public DetectorEquipmentViewModel(DetectorEquipment detEquipment)
     {
-        _communicationManager = App.Container.Resolve<IImagerCommunicationManager>();
+        _communicationManager = ImagerCommunicationManager.Instance;
         _acquisitionState = App.Container.Resolve<AcquisitionStateService>();
         Name = detEquipment.Detectorname;
         DetectorEquipmentProperties = detEquipment;

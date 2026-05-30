@@ -72,9 +72,9 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public bool IsStageAvailable { get; private set; }
         private readonly IImagerCommunicationManager _communicationManager;
 
-        public StageControl(IImagerCommunicationManager communicationManager)
+        public StageControl()
         {
-            _communicationManager = communicationManager;
+            _communicationManager = ImagerCommunicationManager.Instance;
 
         }
 

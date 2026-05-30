@@ -34,54 +34,81 @@ public record MeasurementCompletedEvent : MeasurementEvent;
 
 public class ImagerCommunicationManager : IImagerCommunicationManager
 {
-    private readonly IImagerConnectionHandler _connectionHandler;
-    private readonly ILogger<ImagerCommunicationManager> _logger;
+    private static ImagerCommunicationManager? _instance;
+    public static ImagerCommunicationManager Instance => _instance ??= new ImagerCommunicationManager();
 
-    public ImagerCommunicationManager(ILogger<ImagerCommunicationManager> logger) {
-        _connectionHandler = new ImagerConnectionHandler();
-        _logger = logger;
+    private IImagerConnectionHandler? _connectionHandler;
+
+    private IImagerConnectionHandler ConnectionHandler
+    {
+        get
+        {
+            if (_connectionHandler == null && App.Container != null)
+            {
+                _connectionHandler = Autofac.ResolutionExtensions.Resolve<IImagerConnectionHandler>(App.Container);
+            }
+            return _connectionHandler ?? throw new InvalidOperationException("Connection handler not initialized yet.");
+        }
+    }
+
+    private ILogger<ImagerCommunicationManager>? _logger;
+
+    private ILogger<ImagerCommunicationManager>? Logger
+    {
+        get
+        {
+            if (_logger == null && App.Container != null)
+            {
+                _logger = Autofac.ResolutionExtensions.Resolve<ILogger<ImagerCommunicationManager>>(App.Container);
+            }
+            return _logger;
+        }
+    }
+
+    private ImagerCommunicationManager() {
+        
     }
 
     /// <summary>
-    /// Helper to send a request, validate the expected response type, and handle errors.
+    /// Helper to send a request, validate the expected response type, and return either the expected response or an error response.
     /// </summary>
-    private async Task<TResponse> SendAndValidateAsync<TResponse>(ImagerRequest request, CancellationToken cancellationToken) 
+    private async Task<(TResponse? Result, StatusErrorResponse? Error)> SendAndValidateAsync<TResponse>(ImagerRequest request, CancellationToken cancellationToken) 
         where TResponse : ImagerResponse {
         try {
-            var response = await _connectionHandler.SendRequestAsync(request, cancellationToken);
+            var response = await ConnectionHandler.SendRequestAsync(request, cancellationToken);
             
-
             if (response is TResponse expected) {
-                return expected;
+                return (expected, null);
             }
             
-
             if (response is StatusErrorResponse errorRes) {
-                _logger.LogError("Imager request '{Action}' failed with error: {Error}", request.Action, errorRes.Error);
+                return (null, errorRes);
             }
-            else {
-                _logger.LogError("Imager request '{Action}' returned unexpected response type: {ResponseType}", request.Action, response.GetType().Name);
-            }
+            
+            Logger?.LogError("Imager request '{Action}' returned unexpected response type: {ResponseType}", request.Action, response.GetType().Name);
+            return (null, new StatusErrorResponse($"Unexpected response type: {response.GetType().Name}"));
         }
         catch (Exception ex) {
-            _logger.LogError(ex, "Imager request '{Action}' encountered an exception.", request.Action);
+            Logger?.LogError(ex, "Imager request '{Action}' encountered an exception.", request.Action);
+            return (null, new StatusErrorResponse($"Exception: {ex.Message}"));
         }
-
-        throw new InvalidOperationException("Failed to send and validate request.");
     }
 
     public async Task PingAsync(CancellationToken cancellationToken = default) {
-        await SendAndValidateAsync<PongResponse>(new PingRequest(), cancellationToken);
+        var (result, error) = await SendAndValidateAsync<PongResponse>(new PingRequest(), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"Ping failed: {error.Error}");
     }
 
     public async Task<JsonElement> ListWavelengthsAsync(CancellationToken cancellationToken = default) {
-        var result = await SendAndValidateAsync<WavelengthsResponse>(new ListWavelengthsRequest(), cancellationToken);
-        return result.Wavelengths;
+        var (result, error) = await SendAndValidateAsync<WavelengthsResponse>(new ListWavelengthsRequest(), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"ListWavelengths failed: {error.Error}");
+        return result!.Wavelengths;
     }
 
     public async Task<List<Equipment>> ListAvailableEquipmentAsync(CancellationToken cancellationToken = default) {
-        var result = await SendAndValidateAsync<AvailableEquipmentResponse>(new ListAvailableEquipmentRequest(), cancellationToken);
-        var equipmentElement = result.Equipment;
+        var (result, error) = await SendAndValidateAsync<AvailableEquipmentResponse>(new ListAvailableEquipmentRequest(), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"ListAvailableEquipment failed: {error.Error}");
+        var equipmentElement = result!.Equipment;
         if (equipmentElement.ValueKind != JsonValueKind.Array) {
             throw new InvalidOperationException("Expected 'equipment' to be a JSON array.");
         }
@@ -93,12 +120,14 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
     }
 
     public async Task<List<DetectorEquipment>> ListAvailableDetectorsAsync(CancellationToken cancellationToken = default) {
-        var names = await SendAndValidateAsync<AvailableDetectorsResponse>(new ListAvailableDetectorsRequest(), cancellationToken);
+        var (names, error) = await SendAndValidateAsync<AvailableDetectorsResponse>(new ListAvailableDetectorsRequest(), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"ListAvailableDetectors failed: {error.Error}");
         
         List<DetectorEquipment> detectors = [];
-        foreach (var detName in names.DetectorNames) {
-            var propsResult = await SendAndValidateAsync<DetectorPropertiesResponse>(new GetDetectorPropertiesRequest(detName), cancellationToken);
-            var detector = new DetectorEquipment(detName, propsResult.DetectorProperties);
+        foreach (var detName in names!.DetectorNames) {
+            var (propsResult, propsError) = await SendAndValidateAsync<DetectorPropertiesResponse>(new GetDetectorPropertiesRequest(detName), cancellationToken);
+            if (propsError != null) throw new InvalidOperationException($"GetDetectorProperties for {detName} failed: {propsError.Error}");
+            var detector = new DetectorEquipment(detName, propsResult!.DetectorProperties);
             detector.Framerate = propsResult.FrameRate;
             detectors.Add(detector);
         }
@@ -107,16 +136,19 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
     }
 
     public async Task<StagePosition> GetMotorizedStagePositionAsync(string stageName, CancellationToken cancellationToken = default) {
-        var result = await SendAndValidateAsync<MotorizedStagePositionResponse>(new GetMotorizedStagePositionRequest(stageName), cancellationToken);
-        return result.Position ?? throw new InvalidOperationException("Motorized stage position was null.");
+        var (result, error) = await SendAndValidateAsync<MotorizedStagePositionResponse>(new GetMotorizedStagePositionRequest(stageName), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"GetMotorizedStagePosition failed: {error.Error}");
+        return result!.Position ?? throw new InvalidOperationException("Motorized stage position was null.");
     }
 
     public async Task SetMotorizedStagePositionAsync(string stageName, StagePosition position, CancellationToken cancellationToken = default) {
-        await SendAndValidateAsync<StatusOkResponse>(new SetMotorizedStagePositionRequest(stageName, position), cancellationToken);
+        var (result, error) = await SendAndValidateAsync<StatusOkResponse>(new SetMotorizedStagePositionRequest(stageName, position), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"SetMotorizedStagePosition failed: {error.Error}");
     }
 
     public async Task SetDetectorPropertyAsync(string detectorName, object propertyValue, CancellationToken cancellationToken = default) {
-        await SendAndValidateAsync<StatusOkResponse>(new SetDetectorPropertyRequest(detectorName, propertyValue), cancellationToken);
+        var (result, error) = await SendAndValidateAsync<StatusOkResponse>(new SetDetectorPropertyRequest(detectorName, propertyValue), cancellationToken);
+        if (error != null) throw new InvalidOperationException($"SetDetectorProperty failed: {error.Error}");
     }
 
     public void ExecuteMeasurementProgram(JsonElement program, JsonElement? definedDetections, JsonElement? smartProgramCode, System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter, CancellationToken cancellationToken = default)
@@ -127,7 +159,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
             {
                 // 1. Send Initialization Request
                 var request = new ExecuteMeasurementProgramRequest(program, definedDetections, smartProgramCode);
-                var startResponse = await _connectionHandler.SendRequestAsync(request, cancellationToken);
+                var startResponse = await ConnectionHandler.SendRequestAsync(request, cancellationToken);
 
                 if (startResponse is StatusErrorResponse err)
                 {
@@ -148,7 +180,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 while (keepPolling && !cancellationToken.IsCancellationRequested)
                 {
                     // A. Fetch Data Streams (Images / Binary Decision Payloads)
-                    var dataResponse = await _connectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
+                    var dataResponse = await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
                     
                     if (dataResponse is AsyncAcquiredImagesResponse imgs)
                     {
@@ -171,7 +203,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                     // B. Fetch Strings / Status Messages
                     if (keepPolling)
                     {
-                        var msgResponse = await _connectionHandler.SendRequestAsync(new FetchAsyncStatusMessagesRequest(), cancellationToken);
+                        var msgResponse = await ConnectionHandler.SendRequestAsync(new FetchAsyncStatusMessagesRequest(), cancellationToken);
                         if (msgResponse is AsyncStatusMessagesResponse textMsgs && textMsgs.Messages.Length > 0)
                         {
                             await channelWriter.WriteAsync(new MeasurementStatusTextEvent(textMsgs.Messages), cancellationToken);
@@ -201,6 +233,9 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
     public async Task CancelMeasurementProgramAsync(CancellationToken cancellationToken = default)
     {
-        await SendAndValidateAsync<StatusOkResponse>(new CancelAsyncAcquisitionRequest(), cancellationToken);
+        var (result, error) = await SendAndValidateAsync<StatusOkResponse>(new CancelAsyncAcquisitionRequest(), cancellationToken);
+        if (error != null) {
+            Logger?.LogInformation("Cancel measurement returned error (expected if not running): {Error}", error.Error);
+        }
     }
 }

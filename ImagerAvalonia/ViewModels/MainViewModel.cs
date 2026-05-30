@@ -71,7 +71,7 @@ public partial class MainViewModel : ViewModelBase
 
 
 
-    public MainViewModel(IImagerCommunicationManager communicationManager, 
+    public MainViewModel(
         IStageControl stageControl, 
         ImageControlPanelViewModel imagePanel, 
         SystemDefinedSettingsViewModel userDefinedAcquisitions, 
@@ -81,7 +81,7 @@ public partial class MainViewModel : ViewModelBase
     {
         _SystemDefinedSettings = userDefinedAcquisitions;
         _stageControl = stageControl;
-        _communicationManager = communicationManager;
+        _communicationManager = ImagerCommunicationManager.Instance;
         _processingViewModel = processViewModel;
         _acquisitionStateService = acquisitionState;
         _equipmentState = equipmentState;
