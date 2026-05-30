@@ -55,8 +55,8 @@ public partial class App : Application
         var builder = new ContainerBuilder();
 
         builder.RegisterType<MainViewModel>().AsSelf().SingleInstance();  // Register MainViewModel as transient
-        builder.RegisterType<ImagerConnectionManager>().As<IImagerConnectionManager>().SingleInstance();
-        builder.Register(ctx => ctx.Resolve<IImagerConnectionManager>().ConnectionHandler).As<IImagerConnectionHandler>().SingleInstance();
+        builder.RegisterType<ImagerConnectionHandler>().As<IImagerConnectionHandler>().SingleInstance();
+        builder.RegisterType<ImagerCommunicationManager>().As<IImagerCommunicationManager>().SingleInstance();
         builder.RegisterType<ComUtils>().AsSelf().SingleInstance();  // Register ComUtils as singleton
 
         builder.RegisterType<MainView>().AsSelf();  // Register MainView
@@ -182,6 +182,8 @@ public partial class App : Application
 
             await TryEstablishImagerCommunication(mainWindow, desktop);
 
+            var debugManager = Container.Resolve<IImagerCommunicationManager>();
+            var debugDetectors = await debugManager.ListAvailableDetectorsAsync();
 
             mainWindow.InitializeUserEquipment();
             mainWindow.InitializeImageControlPanel();

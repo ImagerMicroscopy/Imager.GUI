@@ -41,6 +41,23 @@ namespace ImagerAvalonia.Services.MeasurementControl
             this.LightsourcePower = new();
         }
 
+        public Source(System.Text.Json.JsonElement element)
+        {
+            this.allowmultiplechannels = element.TryGetProperty("allowmultiplechannels", out var amc) && amc.GetBoolean();
+            this.cancontrolpower = element.TryGetProperty("cancontrolpower", out var ccp) && ccp.GetBoolean();
+            this.LightSourceName = element.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            
+            this.AvailableChannels = new List<string>();
+            if (element.TryGetProperty("channels", out var ch) && ch.ValueKind == System.Text.Json.JsonValueKind.Array) {
+                foreach (var channel in ch.EnumerateArray()) {
+                    this.AvailableChannels.Add(channel.GetString() ?? "");
+                }
+            }
+
+            this.LightsourceChannel = new();
+            this.LightsourcePower = new();
+        }
+
 
         public Source(Source old_source)
         {

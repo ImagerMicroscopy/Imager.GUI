@@ -210,6 +210,39 @@ namespace ImagerAvalonia.Services.MeasurementControl
             }
         }
 
+        public MovableComponentPart(System.Text.Json.JsonElement element)
+        {
+            var componentname = element.GetProperty("componentname").GetString() ?? "";
+            var type = element.GetProperty("type").GetString() ?? "";
+            
+            Name = componentname;
+            if (!Enum.TryParse<MovableComponentType>(type, out var component_type))
+            {
+                throw new Exception($"Invalid component type encountered when parsing movablecomponent {componentname}");
+            }
+
+            switch (component_type)
+            {
+                case MovableComponentType.discretemovablecomponent:
+                    var possiblesettings = new List<string>();
+                    var settingsArr = element.GetProperty("possiblesettings");
+                    foreach (var s in settingsArr.EnumerateArray()) possiblesettings.Add(s.GetString() ?? "");
+                    var dsetting = element.TryGetProperty("desiredsetting", out var dsn) ? dsn.GetString() : null;
+                    movablecomponent = new DiscreteMovableComponentPartProperties(componentname, possiblesettings, dsetting);
+                    break;
+                case MovableComponentType.continuousmovablecomponent:
+                    var minvalue = element.GetProperty("minvalue").GetDouble();
+                    var maxvalue = element.GetProperty("maxvalue").GetDouble();
+                    var increment = element.GetProperty("increment").GetDouble();
+                    double? csetting = null;
+                    if (element.TryGetProperty("desiredsetting", out var csn) && csn.ValueKind == System.Text.Json.JsonValueKind.Number) {
+                        csetting = csn.GetDouble();
+                    }
+                    movablecomponent = new ContinuousMovableComponentPartProperties(componentname, minvalue, maxvalue, increment, csetting);
+                    break;
+            }
+        }
+
         public MovableComponentPart(MovableComponentPart src)
         {
             FilterNames = src.FilterNames;

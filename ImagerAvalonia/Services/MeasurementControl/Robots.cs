@@ -16,6 +16,18 @@ namespace ImagerAvalonia.Services.MeasurementControl
         {
             return new JObject();
         }
+
+        public Robots() {}
+
+        public Robots(System.Text.Json.JsonElement element)
+        {
+            robotname = element.GetProperty("robotname").GetString() ?? "";
+            if (element.TryGetProperty("robotprograms", out var rps) && rps.ValueKind == System.Text.Json.JsonValueKind.Array) {
+                foreach (var rp in rps.EnumerateArray()) {
+                    robotPrograms.Add(new RobotPrograms(rp));
+                }
+            }
+        }
     }
 
     [JsonConverter(typeof(ProgramArgumentConverter))]
@@ -43,6 +55,32 @@ namespace ImagerAvalonia.Services.MeasurementControl
     {
         public ProgramArguments? programArguments { get; set; }
         public string programname = String.Empty;
+
+        public RobotPrograms() {}
+
+        public RobotPrograms(System.Text.Json.JsonElement element) {
+            programname = element.GetProperty("programname").GetString() ?? "";
+            var list = new List<ProgramArgumentsSettingsBase>();
+            if (element.TryGetProperty("programarguments", out var pas) && pas.ValueKind == System.Text.Json.JsonValueKind.Array) {
+                foreach (var pa in pas.EnumerateArray()) {
+                    var type = pa.GetProperty("type").GetString() ?? "";
+                    var name = pa.GetProperty("programargumentname").GetString() ?? "";
+                    if (type == "discreteargument") {
+                        var values = new List<string>();
+                        if (pa.TryGetProperty("permissiblevalues", out var pvs)) {
+                            foreach (var v in pvs.EnumerateArray()) values.Add(v.GetString() ?? "");
+                        }
+                        list.Add(new DiscreterProgramArgumentSetting { ProgramArgumentName = name, PermissibleValues = values });
+                    } else if (type == "continuousargument") {
+                        var min = (float)pa.GetProperty("minvalue").GetDouble();
+                        var max = (float)pa.GetProperty("maxvalue").GetDouble();
+                        var inc = (float)pa.GetProperty("increment").GetDouble();
+                        list.Add(new ContinuousProgramArgumentSetting { ProgramArgumentName = name, MinValue = min, MaxValue = max, Increment = inc });
+                    }
+                }
+            }
+            programArguments = new ProgramArguments(list);
+        }
     }
 
 
