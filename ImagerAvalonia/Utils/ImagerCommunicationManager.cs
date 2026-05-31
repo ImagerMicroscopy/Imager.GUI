@@ -187,6 +187,11 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                         if (imgs.Messages.Length > 0)
                         {
                             await channelWriter.WriteAsync(new MeasurementDataEvent(imgs.Messages), cancellationToken);
+
+                            ulong lastIndex = imgs.Messages[^1].Index;
+                            _ = await SendAndValidateAsync<StatusOkResponse>(
+                                new AcknowledgeDataReceiptRequest(lastIndex), 
+                                cancellationToken);
                         }
                     }
                     else if (dataResponse is StatusNoNewAsyncDataComingResponse)

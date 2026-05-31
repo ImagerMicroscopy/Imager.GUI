@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using System.Text.Json;
 
 namespace ImagerAvalonia.Utils
 {
@@ -146,42 +148,52 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src)
-        {
-            await Task.Run(async () =>
-            {
-                await _acquisitionHandler.StartAcquisitionAsync(src.Token);
+        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src){
+            await Task.Run(async () => {
+                JObject program = _storageProvider._measurementProgram;
+                var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
+                if (parsed_program != null) {
+                    var innerProgram = parsed_program["program"];
+                    var definedDetections = parsed_program["defineddetections"];
+                    var smartProgramCode = parsed_program["smartprogramcode"];
+                    
+                    using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
+                    JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+                    JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
 
-                while (_acquisitionHandler.state == AcquisitionState.Running )
-                {
-                    try
-                    {
-                        var images = await _acquisitionHandler.FetchDataAsync(src);
+                    var channel = Channel.CreateUnbounded<MeasurementEvent>();
+                    ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(
+                        docProgram.RootElement.Clone(), 
+                        docDefinedDetections?.Clone(), 
+                        docSmartProgramCode?.Clone(), 
+                        channel.Writer, 
+                        src.Token);
 
-                        if (_acquisitionHandler.IsNewDataAvailable)
-                        {
-                            var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                    _storageProvider.OpenWriteStream();
 
-                            var statusResponse = await _connectionHandler.SendRequestAsync(new FetchAsyncStatusMessagesRequest(), src.Token);
-                            if (statusResponse is AsyncStatusMessagesResponse statusMsgs)
-                            {
-                                foreach (var msg in statusMsgs.Messages)
-                                {
+                    await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
+                        switch (measurementEvent) {
+                            case MeasurementDataEvent dataEvent:
+                                var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
+                                if (images.Images.Count > 0) {
+                                    _storageProvider.SavePlanes(images.Images, images.Metadata);
+                                    var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                                }
+                                break;
+
+                            case MeasurementStatusTextEvent statusEvent:
+                                foreach (var msg in statusEvent.Messages) {
                                     _logger.LogInformation(msg);
                                 }
-                            }
+                                break;
 
-                            _acquisitionHandler.IsNewDataAvailable = false;
+                            case MeasurementErrorEvent errorEvent:
+                                _logger.LogError($"Measurement Error: {errorEvent.Error}");
+                                break;
+
+                            case MeasurementCompletedEvent _:
+                                return; // End of stream
                         }
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        break; // Normal cancellation
-                    }
-                    
-                    if (!src.IsCancellationRequested)
-                    {
-                        await Task.Delay(50, src.Token); // Yield and prevent tight loop
                     }
                 }
             }, src.Token);
