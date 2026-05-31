@@ -49,8 +49,7 @@ namespace ImagerAvalonia.Utils
     }
 
     // Handles acquisition using MessagePack formatting
-    public class MessagePackAcquisitionHandler
-    {
+    public class MessagePackAcquisitionHandler {
         private readonly IStorageProvider _storageProvider;
         private readonly IImagerConnectionHandler _connectionHandler;
 
@@ -60,8 +59,7 @@ namespace ImagerAvalonia.Utils
 
         public bool IsNewDataAvailable = false;
 
-        public MessagePackAcquisitionHandler(IStorageProvider storageProvider, IImagerConnectionHandler connectionHandler)
-        {
+        public MessagePackAcquisitionHandler(IStorageProvider storageProvider, IImagerConnectionHandler connectionHandler) {
             _storageProvider = storageProvider;
             _connectionHandler = connectionHandler;
         }
@@ -71,122 +69,25 @@ namespace ImagerAvalonia.Utils
         public DetectionData acquisitions = new();
         public int numDatasets = 0;
 
-        public async Task StartAcquisitionAsync(CancellationToken cancellationToken)
-        {
-            JObject program = _storageProvider._measurementProgram;
-            var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
-            if (parsed_program != null)
-            {
-                var innerProgram = parsed_program["program"];
-                var definedDetections = parsed_program["defineddetections"];
-                var smartProgramCode = parsed_program["smartprogramcode"];
-                
-                using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
-                JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
-                JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
-
-                var request = new ExecuteMeasurementProgramRequest(docProgram.RootElement.Clone(), docDefinedDetections?.Clone(), docSmartProgramCode?.Clone());
-                await _connectionHandler.SendRequestAsync(request, cancellationToken);
-            }
-            _storageProvider.OpenWriteStream();
-        }
-
-        public async Task<ImageData> FetchDataAsync(CancellationTokenSource src)
-        {
-            var image_data = new ImageData();
-
-            Console.WriteLine($"[{DateTime.Now}] Requesting async data");
-
-            ImagerResponse response = null;
-            try
-            {
-                // Send fetch request and process response
-                response = await _connectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), src.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                Console.WriteLine("FetchDataAsync operation was cancelled.");
-            }
-
-            if (response != null)
-            {
-                if (response is AsyncAcquiredImagesResponse imagesResponse)
-                {
-                    image_data = ProcessMessages(imagesResponse.Messages);
-                    Console.WriteLine($"[{DateTime.Now}] Received data: number of images = {image_data.Images.Count}");
-
-                    if (image_data.Images.Count > 0)
-                    {
-                        _storageProvider.SavePlanes(image_data.Images, image_data.Metadata);
-                    }
-                    if (image_data.Decisions.Count > 0)
-                    {
-                        _storageProvider.SaveDecisions(image_data.Decisions);
-                    }
-                    try {
-                        await AcknowledgeDataAsync(numReceivedData, src.Token);
-                    } catch (OperationCanceledException) {}
-                    IsNewDataAvailable = true;
-                }
-                else if (response is StatusNoNewAsyncDataResponse)
-                {
-                    // no more spectra
-                    state = AcquisitionState.Completed;
-                    IsNewDataAvailable = true;
-                    return new ImageData();
-                }
-                else if (response is StatusNoNewAsyncDataComingResponse)
-                {
-                    // just no new data right now, but might come later
-                }
-                else if (response is StatusErrorResponse err)
-                {
-                    if (err.Error.Contains("AsyncCancelled"))
-                    {
-                        Console.WriteLine("Server reported AsyncCancelled. Setting state to Canceled.");
-                        state = AcquisitionState.Canceled;
-                        return image_data;
-                    }
-                    state = AcquisitionState.Completed;
-                    Console.WriteLine($"SERVER RETURNED ERROR: {err.Error}"); 
-                    throw new AcquisitionException($"User error {err.Error}");
-                }
-            }
-
-            // If cancellation is requested, send cancel message
-            if (src.IsCancellationRequested)
-            {
-                state = AcquisitionState.Canceled;
-                await _connectionHandler.SendRequestAsync(new CancelAsyncAcquisitionRequest());
-            }
-            return image_data;
-        }
-
-        public ImageData ProcessMessages(ChannelMessage[] messages)
-        {
+        public ImageData ProcessMessages(ChannelMessage[] messages) {
             var images_data = new ImageData();
 
-            foreach (var message_data in messages)
-            {
+            foreach (var message_data in messages) {
                 images_data.ImageResponseType.Add(message_data.Message.Type);
                 numReceivedData = message_data.Index;
 
-                if (message_data.Message.Type == "smartprogramdecisionmessage")
-                {
-                    if (message_data.Message.Decision is null)
-                    {
+                if (message_data.Message.Type == "smartprogramdecisionmessage") {
+                    if (message_data.Message.Decision is null){
                         images_data.Decisions.Add(string.Empty);
                     }
-                    else
-                    { 
+                    else { 
                         images_data.Decisions.Add(message_data.Message.Decision); 
                     }
                 }
 
                 var msg = message_data.Message;
 
-                if (msg.MetaData is not null && msg.Data is not null)
-                {
+                if (msg.MetaData is not null && msg.Data is not null) {
                     var sp = msg.MetaData.StagePosition;
                     var tiffMeta = new TiffPlaneMetadata
                     {
@@ -214,12 +115,6 @@ namespace ImagerAvalonia.Utils
             }
 
             return images_data;
-        }
-
-        // Sends an acknowledgment for received data
-        public async Task AcknowledgeDataAsync(ulong lastIndex, CancellationToken cancellationToken)
-        {
-            await _connectionHandler.SendRequestAsync(new AcknowledgeDataReceiptRequest(lastIndex), cancellationToken);
         }
     }
 
