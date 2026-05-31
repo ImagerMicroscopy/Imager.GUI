@@ -32,6 +32,7 @@ namespace ImagerAvalonia.Services.MeasurementControl {
         [JsonConverter(typeof(StringEnumConverter))]
         public override PropertyKind kind => PropertyKind.numeric;
 
+        public NumericDetectorProperty() { }
 
         public NumericDetectorProperty(string descriptor, int propertycode, double value) {
             this.value = value;
@@ -45,6 +46,11 @@ namespace ImagerAvalonia.Services.MeasurementControl {
         public string current { get; set; }
         public List<string> availableoptions { get; set; }
         public override PropertyKind kind => PropertyKind.discrete;
+
+        public CategoricDetectorProperty() {
+            current = string.Empty;
+            availableoptions = new List<string>();
+        }
 
         public CategoricDetectorProperty(string descriptor, int propertycode, string value, List<string> options) {
             this.current = value;
