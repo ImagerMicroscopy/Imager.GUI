@@ -183,7 +183,7 @@ namespace ImagerAvalonia.Services
             StartLive?.Invoke(this, new EventArgs());
         }
 
-        internal async Task CheckIfAcquisitionFinsihed()
+        internal async Task CheckIfAcquisitionFinished()
         {
             string message = string.Empty;
             _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { message = response_message; }, response_data => { });

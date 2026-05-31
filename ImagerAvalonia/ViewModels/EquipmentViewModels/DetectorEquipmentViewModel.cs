@@ -153,7 +153,7 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         var catProperty = DetectorEquipmentProperties.GetPropertyByName(property.Label);
 
         string message = string.Empty;
-        await _acquisitionState.CheckIfAcquisitionFinsihed();
+        await _acquisitionState.CheckIfAcquisitionFinished();
 
         await _communicationManager.SetDetectorPropertyAsync(Name, catProperty);
         
