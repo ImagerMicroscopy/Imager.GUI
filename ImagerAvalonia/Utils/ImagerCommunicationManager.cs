@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Data;
+using ImagerAvalonia.Data.Measurements;
 using Newtonsoft.Json.Linq;
 
 namespace ImagerAvalonia.Utils;
@@ -22,6 +24,7 @@ public interface IImagerCommunicationManager
     Task SetDetectorPropertyAsync(string detectorName, object propertyValue, CancellationToken cancellationToken = default);
     
     void ExecuteMeasurementProgram(JsonElement program, JsonElement? definedDetections, JsonElement? smartProgramCode, System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter, CancellationToken cancellationToken = default);
+    void ExecuteMeasurementProgram(MeasurementElement program, List<DefinedDetection> definedDetections, List<object> smartProgramCode, System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter, CancellationToken cancellationToken = default);
     Task CancelMeasurementProgramAsync(CancellationToken cancellationToken = default);
 }
 
@@ -149,6 +152,23 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
     public async Task SetDetectorPropertyAsync(string detectorName, object propertyValue, CancellationToken cancellationToken = default) {
         var (result, error) = await SendAndValidateAsync<StatusOkResponse>(new SetDetectorPropertyRequest(detectorName, propertyValue), cancellationToken);
         if (error != null) throw new InvalidOperationException($"SetDetectorProperty failed: {error.Error}");
+    }
+
+    public void ExecuteMeasurementProgram(MeasurementElement program, List<DefinedDetection> definedDetections, List<object> smartProgramCode, System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter, CancellationToken cancellationToken = default)
+    {
+        var programJson = JsonSerializer.SerializeToElement(program, MeasurementElementsSerializer.Options);
+        
+        var dict = new Dictionary<string, DetectionParams>();
+        foreach (var det in definedDetections)
+        {
+            dict[det.Name] = det.Settings;
+        }
+        JsonElement definedDetectionsJson = JsonSerializer.SerializeToElement(dict, MeasurementElementsSerializer.Options);
+            
+        var payload = new SmartProgramCodePayload { Programs = smartProgramCode };
+        JsonElement smartProgramCodeJson = JsonSerializer.SerializeToElement(payload, MeasurementElementsSerializer.Options);
+
+        ExecuteMeasurementProgram(programJson, definedDetectionsJson, smartProgramCodeJson, channelWriter, cancellationToken);
     }
 
     public void ExecuteMeasurementProgram(JsonElement program, JsonElement? definedDetections, JsonElement? smartProgramCode, System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter, CancellationToken cancellationToken = default)

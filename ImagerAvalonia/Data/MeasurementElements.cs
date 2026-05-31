@@ -139,6 +139,12 @@ public class RelativeStageLoopParams
     public bool ReturnToStartingPosition { get; set; }
 }
 
+public class DefinedDetection
+{
+    public string Name { get; set; } = string.Empty;
+    public DetectionParams Settings { get; set; } = new();
+}
+
 // ---------------------------------------------------------
 // Detection Details (Stored in DefinedDetections Map)
 // ---------------------------------------------------------
