@@ -217,7 +217,6 @@ namespace Imager.Tests.ViewModels
 
 
             var vm = new MainViewModel(
-               connectionHandler.Object,
                stageControl.Object,
                imagePanel,
                userDefinedAcquisitions,
@@ -230,7 +229,6 @@ namespace Imager.Tests.ViewModels
             vm.InitializeEquipment();
 
             return new MainViewModel(
-                connectionHandler.Object,
                 stageControl.Object,
                 imagePanel,
                 userDefinedAcquisitions,
@@ -301,6 +299,7 @@ namespace Imager.Tests.ViewModels
             var view = new MainView();
             vm.AddExperiment();
             var control = view.FindControl<ListBox>("AvailableExperiments");
+            Assert.NotNull(control);
             control.SelectedItem = vm.Experiments[0];
 
             Assert.NotNull(vm.SelectedExperiment);
