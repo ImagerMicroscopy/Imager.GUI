@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 
 namespace ImagerAvalonia.ViewModels;
@@ -25,6 +25,9 @@ public partial class WaitViewModel : MeasurementViewModel
     partial void OnWaitPeriodChanged(double value)
     {
         DisplayedInfo = $"({WaitPeriod} seconds)";
+        
+        // Delegate to ExperimentBuilder to update state
+        ExperimentBuilder?.UpdateWaitDuration(Elementid, WaitPeriod);
     }
 }
 

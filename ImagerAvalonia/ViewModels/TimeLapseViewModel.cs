@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 
 namespace ImagerAvalonia.ViewModels;
@@ -35,6 +35,14 @@ public partial class TimeLapseViewModel : MeasurementViewModel
     {
         if (value == null || value < 0.001m)
             TimeDelta = 0.001m;
+        else
+        {
+            // Delegate to ExperimentBuilder to update state
+            ExperimentBuilder?.UpdateTimeLapse(
+                Elementid,
+                (int)(NTimes ?? 1),
+                (double)(TimeDelta ?? 0.001m));
+        }
     }
 
     // Called automatically when NTimes changes
@@ -42,6 +50,14 @@ public partial class TimeLapseViewModel : MeasurementViewModel
     {
         if (value == null || value < 1)
             NTimes = 1;
+        else
+        {
+            // Delegate to ExperimentBuilder to update state
+            ExperimentBuilder?.UpdateTimeLapse(
+                Elementid,
+                (int)(NTimes ?? 1),
+                (double)(TimeDelta ?? 0.001m));
+        }
     }
     public override void Dispose()
     {

@@ -1,4 +1,4 @@
-﻿
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services.MeasurementControl;
 using System;
@@ -42,7 +42,21 @@ public partial class StageLoopViewModel : MeasurementViewModel
     [ObservableProperty]
     public ObservableCollection<XYStagePosition> _XYPositions;
 
-    public string StageName;
+    private string _stageName = string.Empty;
+    public string StageName
+    {
+        get => _stageName;
+        set
+        {
+            if (_stageName != value)
+            {
+                _stageName = value;
+                OnPropertyChanged();
+                // Delegate to ExperimentBuilder to update state
+                ExperimentBuilder?.UpdateStageLoopStageName(Elementid, _stageName);
+            }
+        }
+    }
     public int num_frames { get { return XYPositions.Count(); } }
 
 

@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services.MeasurementControl;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -43,6 +43,7 @@ namespace ImagerAvalonia.ViewModels
     public partial class RobotViewModel : ViewModelBase
     {
         public string EquipmentName { get; set; } = string.Empty;
+        public string RobotName { get; private set; } = string.Empty;
 
         [ObservableProperty]
         private string robotDisplayName = string.Empty;
@@ -58,7 +59,7 @@ namespace ImagerAvalonia.ViewModels
 
         public RobotViewModel(Robots robot)
         {
-            _robotName = robot.robotname;
+            RobotName = robot.robotname;
             EquipmentName = robot.EquipmentName;
             RobotDisplayName = $"{robot.EquipmentName}/{robot.robotname}";
 
@@ -72,7 +73,7 @@ namespace ImagerAvalonia.ViewModels
             return new JObject
             {
                 ["equipmentname"] = EquipmentName,
-                ["robotname"] = _robotName,
+                ["robotname"] = RobotName,
                 ["programcallparameters"] = SelectedRobotProgram?.ToJson()
             };
         }
