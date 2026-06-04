@@ -20,7 +20,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
 {
     [ObservableProperty] private ImageDisplayViewModel _liveView;
     [ObservableProperty] private FieldViewerViewModel _fieldView;
-
+    [ObservableProperty] private ImageDisplayViewModel? _selectedView;
     [ObservableProperty] private bool _isExperimentEnabled = false;
     [ObservableProperty] private bool _isStageAvailable = true;
     [ObservableProperty] private bool _isLiveEnabled = false;
@@ -96,8 +96,11 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         InitializeTifReader(scope);
 
         var tifHandler = new ImageHandler(storageProvider, _logger, _comUtils);
+
+        tifViewer.SetOpenID(storageProvider.GetOpenID());
         tifViewer.SetGridData(storageProvider.GetStorageSchema());  
         tifViewer.SetAvailableXYPositions(expSerializer.ExperimentPositions);
+
 
         tifViewer.OnDetectionRequested += tifHandler.LoadImage;
         tifViewer.MaxFrameCount = storageProvider.GetMaxNumberOfFrames();

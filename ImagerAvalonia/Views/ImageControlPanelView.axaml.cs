@@ -44,7 +44,7 @@ public partial class ImageControlPanelView : UserControl
 
 
         _liveEnabled = this.FindControl<Button>("EnableLive")!;
-        _expEnabled  = this.FindControl<Button>("StartExperiment")!;
+        _expEnabled = this.FindControl<Button>("StartExperiment")!;
         _imageTabs = this.FindControl<TabControl>("TabLiveFocus")!;
         _imagePanel = (this.FindControl<UserControl>("ImagePanel")! as ImageDisplayView)!;
 
@@ -67,7 +67,7 @@ public partial class ImageControlPanelView : UserControl
             viewModel.PropertyChanged += OnLiveEnabled;
             var fieldView = this.FindControl<UserControl>("FieldViewer")!;
             fieldView.DataContext = viewModel.FieldView;
-            
+
         }
     }
 
@@ -76,7 +76,7 @@ public partial class ImageControlPanelView : UserControl
     {
         if (e.PropertyName == "IsLiveEnabled")
         {
-            _imagePanel.SetImProgress(false);    
+            _imagePanel.SetImProgress(false);
             _expEnabled.IsEnabled = !_expEnabled.IsEnabled;
             var livebutton_text = this.FindControl<TextBlock>("LiveButtonText");
             var livebutton_icon = this.Find<PathIcon>("PlayButtonDisplayIcon");
@@ -87,7 +87,7 @@ public partial class ImageControlPanelView : UserControl
                 livebutton_text.Text = "Stop";
                 livebutton_icon.Data = _pauseButtonIcon;
             }
-            else 
+            else
             {
                 livebutton_text.Text = "Live";
                 livebutton_icon.Data = _playButtonIcon;
@@ -123,9 +123,9 @@ public partial class ImageControlPanelView : UserControl
 
     private void OnExperimentEnabled(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName=="IsExperimentEnabled")
+        if (e.PropertyName == "IsExperimentEnabled")
         {
-            _imagePanel.SetImProgress( true );
+            _imagePanel.SetImProgress(true);
             var expbutton_text = this.FindControl<TextBlock>("ExperimentButtonText");
             var recbutton_icon = this.Find<PathIcon>("RecButtonDisplayIcon");
 
@@ -196,7 +196,7 @@ public partial class ImageControlPanelView : UserControl
                 }
             }
         }
-    }   
+    }
 
     private void OnTabPointerDoubleTapped(object? sender, TappedEventArgs e)
     {
@@ -228,10 +228,22 @@ public partial class ImageControlPanelView : UserControl
 
     }
 
-
-
+    private void OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is TabControl tabView)
+        {
+            if (DataContext is ImageControlPanelViewModel vm)
+            {
+                if(tabView.SelectedContent is ImageDisplayView imageDisplay &&
+                    imageDisplay.DataContext is ImageDisplayViewModel imVM)
+                {
+                    vm.SelectedView = imVM;
+                }
+            }
+        }
+    }
 }
 
 
-    
+
 

@@ -40,6 +40,8 @@ namespace ImagerAvalonia.Utils
 
         int GetMaxNumberOfFrames();
 
+        int GetNumberOfImages(string acqname, string detname);
+
         void SetMaxFrameNumber(int max_frames);
         
         void OpenWriteStream();
@@ -60,6 +62,8 @@ namespace ImagerAvalonia.Utils
         int GetImageIndex(string acqName, string detName, int requestedTime);
         int LoadMaxFrameNumber();
         bool SetEnabledStorage(bool isExperimentStorageEnabled);
+        int GetOpenID();
+        void SetOpenID(int id);
 
         string _storagePath { get;  }
 
@@ -144,7 +148,7 @@ namespace ImagerAvalonia.Utils
             IntPtr acqTypeName,
             IntPtr detectorName,
             int imageIdx,
-            IntPtr timePoint);
+            double* timePoint);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISGetStagePosition(
@@ -257,6 +261,16 @@ namespace ImagerAvalonia.Utils
             }
         }
 
+        public int GetOpenID()
+        {
+            return _storageId; 
+        }
+
+        public void SetOpenID(int id)
+        {
+            _storageId = id;
+        }
+
         public bool SetEnabledStorage(bool isstorageenabled)
         {
             _isStorageEnabled = isstorageenabled;
@@ -294,12 +308,14 @@ namespace ImagerAvalonia.Utils
                     double[] posx = new double[1];
                     double[] posy = new double[1];
                     double[] posz = new double[1];
+                    double[] time_point = new double[1];
                     char* position_name_ptr;
 
-                    fixed (double* posx_ptr = posx, posy_ptr = posy, posz_ptr = posz)
+                    fixed (double* posx_ptr = posx, posy_ptr = posy, posz_ptr = posz, time_point_ptr = time_point)
                     {
                         MISGetStagePosition(_storageId, acqTypeName, detectorName, imageidx, posx_ptr, posy_ptr, posz_ptr);
                         MISGetStagePositionName(_storageId, acqTypeName, detectorName, imageidx, &position_name_ptr);
+                        MISGetTimePoint(_storageId, acqTypeName, detectorName, imageidx, time_point_ptr);
                         metadata.PositionX = posx[0];
                         metadata.PositionY = posy[0];
                         metadata.PositionZ = posz[0];
@@ -308,6 +324,7 @@ namespace ImagerAvalonia.Utils
                         metadata.PositionName = Marshal.PtrToStringAnsi((IntPtr)position_name_ptr);
                         metadata.Width = (uint)_width;
                         metadata.Height = (uint)_height;
+                        metadata.TimePoint = time_point[0];
                         metadata.CurrentStagePosition = new XYStagePosition((float)metadata.PositionX, (float)metadata.PositionY, (float)metadata.PositionZ,
                             false, 0, metadata.PositionName);
 
@@ -466,6 +483,23 @@ namespace ImagerAvalonia.Utils
             }
         }
 
+        public int GetNumberOfImages(string acquisition, string detector)
+        {
+
+            IntPtr acqName = Marshal.StringToHGlobalAnsi(acquisition);
+            IntPtr detectorName = Marshal.StringToHGlobalAnsi(detector);
+            IntPtr nimages_ptr = Marshal.AllocHGlobal(sizeof(int));
+
+            MISGetNumberOfImages(_storageId, acqName, detectorName, nimages_ptr);
+
+
+            int nimages = Marshal.ReadInt32(nimages_ptr);
+            Marshal.FreeHGlobal(acqName);
+            Marshal.FreeHGlobal(detectorName);
+            Marshal.FreeHGlobal(nimages_ptr);
+            return nimages;
+        }
+
         public int LoadMaxFrameNumber()
         {
             IntPtr num_detections = Marshal.AllocHGlobal(sizeof(int));
@@ -502,6 +536,8 @@ namespace ImagerAvalonia.Utils
         {
             return AcqDetPairs;
         }
+
+
     }
 
 

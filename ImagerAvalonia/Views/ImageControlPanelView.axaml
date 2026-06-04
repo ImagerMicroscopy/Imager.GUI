@@ -201,7 +201,7 @@
 
 		
 		
-		<TabControl Grid.Row="1"  DragDrop.AllowDrop="True"   Grid.Column="0"   x:Name="TabLiveFocus" TabStripPlacement="Top" Padding="0" Margin="5 0 5 0" >
+		<TabControl Grid.Row="1" SelectionChanged="OnSelectionChanged" DragDrop.AllowDrop="True"   Grid.Column="0"   x:Name="TabLiveFocus" TabStripPlacement="Top" Padding="0" Margin="5 0 5 0" >
             <TabControl.Styles>
                 <Style Selector="TabItem > ContentControl">
                     <Setter Property="BorderThickness" Value="0.5"/>

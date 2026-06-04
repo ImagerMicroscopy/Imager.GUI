@@ -64,7 +64,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public TreeMeasurementType NodeType { get; }
 
         public JObject Serialize(IExperimentSerialization experimentSerialization);
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization);
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings);
         public void DetectionWiseTraversal(NodeBase node, TraversalState traversal);
     }
 
@@ -96,7 +96,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (parameters is not null &&
                 parameters.TryGetValue("detectionnames",out JToken? detection_names) )
@@ -204,7 +204,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public NodeBase Node { get; set; }
         public UserControl MeasurementView { get; }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (MeasurementView.DataContext is not IrradiationPanelViewModel irr_settings)
                 return; 
@@ -286,9 +286,64 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
-            throw new NotImplementedException();
+            if (MeasurementView.DataContext is RobotControlViewModel robot_settings && parameters is not null)
+            {
+                if(parameters.TryGetValue("programparameters", out var program_params))
+                {
+                    string? robot_name = program_params["robotname"]?.Value<string>();
+                    int index = currentSettings.Robots.FindIndex(x => x.robotname == robot_name);
+
+                    if (index!=-1 && program_params["programcallparameters"] is JToken programcall_params)
+                    {
+                        string? program_name = programcall_params["programname"]?.Value<string>();
+
+                        var found_robot = currentSettings.Robots[index];
+                        int found_program_ind = found_robot.robotPrograms.FindIndex(y => y.programname == program_name); 
+                       
+                        if(found_program_ind!=-1)
+                        {
+                            var found_program = found_robot.robotPrograms[found_program_ind].programname;
+
+                            robot_settings.SelectedRobot = robot_settings.Robots.
+                                First(x => x.RobotName == robot_name);
+                            robot_settings.SelectedRobot.SelectedRobotProgram = robot_settings.SelectedRobot.RobotPrograms.
+                                First(x => x.ProgramName == found_program);
+
+                            var program = robot_settings.SelectedRobot.SelectedRobotProgram;
+
+                            JArray? args = programcall_params["arguments"] as JArray;
+
+                            if (args != null)
+                            {
+                                foreach (JToken arg in args)
+                                {
+                                    string? name = arg["argumentname"]?.Value<string>();
+                                    string? type = arg["robotprogramargumenttype"]?.Value<string>();
+                                    string? value = arg["argument"]?.Value<string>();
+
+                                    if (program.ProgramArguments.First(x => x.ProgramArgumentName == name) is var programArgument && value !=null)
+                                    {
+                                        if (programArgument is DiscreteArgumentsViewModel discrecteArgumentSetting &&
+                                            discrecteArgumentSetting.PermissibleValues.Contains(value))
+                                        {
+                                            discrecteArgumentSetting.SelectedValue = value;
+                                        }
+                                        if (programArgument is ContinuousArgumentsViewModel continuousArgumentSetting)
+                                        {
+                                            if (float.TryParse(value, out float numeric_val))
+                                            {
+                                                continuousArgumentSetting.SelectedValue = numeric_val;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         public void DetectionWiseTraversal(NodeBase node, TraversalState traversal)
@@ -331,7 +386,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         public UserControl MeasurementView { get; }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (MeasurementView.DataContext is WaitViewModel wait_settings && parameters is not null)
             {
@@ -386,7 +441,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         public UserControl MeasurementView { get; }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
 
         }
@@ -452,7 +507,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
         public UserControl MeasurementView { get; set; }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (parameters is not null  && MeasurementView.DataContext is RelStageViewModel relstage_settings &&
                 parameters["params"] is JObject paramsObj)
@@ -596,7 +651,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public string MeasurementType { get; }
         public UserControl MeasurementView { get; }
 
-        public void Deserialize(JObject parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (MeasurementView.DataContext is DoTimesViewModel dotimes_settings &&
                 parameters["ntotal"] is JToken nTotalToken)
@@ -731,7 +786,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
             return new JObject();
         }
 
-        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject? parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (parameters is not null && MeasurementView.DataContext is StageLoopViewModel stageloop_settings)
             {
@@ -746,7 +801,8 @@ namespace ImagerAvalonia.Services.MeasurementControl
                         {
                             var xyz = JsonConvert.DeserializeObject<XYStagePosition>(xy_properties.ToString());
                             if (xyz != null)
-                            {         
+                            {
+                                xyz.Name = name.Value<string>();
                                 stageloop_settings.XYPositions.Add( xyz);
                                 experimentSerialization.TryAddStagePosition(xyz);                     
                             }
@@ -799,7 +855,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public string MeasurementType { get; }
         public UserControl MeasurementView { get; }
 
-        public void Deserialize(JObject parameters, IExperimentSerialization experimentSerialization)
+        public void Deserialize(JObject parameters, IExperimentSerialization experimentSerialization, SystemDefinedSettingsViewModel currentSettings)
         {
             if (MeasurementView.DataContext is not TimeLapseViewModel timelapse_settings)
                 return; 

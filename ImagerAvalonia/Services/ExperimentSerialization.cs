@@ -168,7 +168,7 @@ public class ExperimentSerialization : IExperimentSerialization
 
                 if (Activator.CreateInstance(elementType, args) is IMeasurementTypes measurementType)
                 {
-                    measurementType.Deserialize(NodeValue, this);
+                    measurementType.Deserialize(NodeValue, this, acquisitions);
 
                     switch (measurementType.NodeType)
                     {

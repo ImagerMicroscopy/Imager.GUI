@@ -9,7 +9,7 @@
     <PackageVersion Include="Autofac" Version="8.2.0" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageVersion Include="Avalonia" Version="11.3.0" />
-	<PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.0"/>
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.0" />
     <PackageVersion Include="Avalonia.AvaloniaEdit" Version="11.3.0" />
     <PackageVersion Include="Avalonia.Controls.DataGrid" Version="11.3.0" />
     <PackageVersion Include="Avalonia.ReactiveUI" Version="11.2.3" />
@@ -33,8 +33,8 @@
     <PackageVersion Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0"/>
-	<PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="RangeSlider.Avalonia" Version="2.1.0" />
     <PackageVersion Include="ScottPlot" Version="5.0.54" />
     <PackageVersion Include="ScottPlot.Avalonia" Version="5.0.54" />
@@ -42,6 +42,7 @@
     <PackageVersion Include="System.Drawing.Common" Version="9.0.0" />
     <PackageVersion Include="TiffLibrary" Version="0.6.65" />
     <PackageVersion Include="TiffLibrary.ImageSharpAdapter" Version="0.6.65" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.93.0" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="xunit" Version="2.5.3" />

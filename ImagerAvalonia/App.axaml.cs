@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using ImagerAvalonia.Data;
 using ImagerAvalonia.Exceptions;
@@ -131,6 +132,7 @@ public partial class App : Application
         registry.Register<StageLoop>("stageloop");
         registry.Register<TimeLapse>("timelapse");
         registry.Register<UpdateAcquisition>("updateacquisition");
+        registry.Register<Robot>("executerobotprogram");
 
         builder.RegisterInstance(registry).As<IMeasurementTypeRegistry>().SingleInstance();
 
@@ -250,6 +252,36 @@ public partial class App : Application
             desktop.Shutdown();
 
 
+        }
+    }
+    private void IncreaseValue(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.TemplatedParent is NumericUpDown numericUpDown)
+        {
+            if (numericUpDown.Value == null)
+            {
+                numericUpDown.Value = numericUpDown.Minimum;
+            }
+            else
+            {
+                numericUpDown.Value = Math.Min((decimal)numericUpDown.Value + (decimal)numericUpDown.Increment, (decimal)numericUpDown.Maximum);
+            }
+        }
+    }
+
+
+    private void DecreaseValue(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && button.TemplatedParent is NumericUpDown numericUpDown)
+        {
+            if (numericUpDown.Value == null)
+            {
+                numericUpDown.Value = numericUpDown.Minimum;
+            }
+            else
+            {
+                numericUpDown.Value = Math.Max((decimal)numericUpDown.Value - (decimal)numericUpDown.Increment, (decimal)numericUpDown.Minimum);
+            }
         }
     }
 

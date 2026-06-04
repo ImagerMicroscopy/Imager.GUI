@@ -151,7 +151,7 @@ namespace ImagerAvalonia.Services.MeasurementControl
         public MovableSettingPart(string componentname, string type, string increment, string desiredsetting)
         {
             Name = componentname;
-            if (!Enum.TryParse<MovableSettingType>(type, out var setting_type))
+            if (Enum.TryParse<MovableSettingType>(type, out var setting_type))
             {
 
                 switch (setting_type)

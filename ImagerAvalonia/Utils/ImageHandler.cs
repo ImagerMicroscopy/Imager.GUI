@@ -16,11 +16,11 @@ namespace ImagerAvalonia.Utils
 
         private readonly IStorageProvider   _storageProvider;
        
-        private readonly ILogger _logger; 
+        private readonly ILogger? _logger; 
 
-        private readonly MessagePackAcquisitionHandler _acquisitionHandler;
+        private readonly MessagePackAcquisitionHandler? _acquisitionHandler;
 
-        private readonly ComUtils _comUtils;
+        private readonly ComUtils? _comUtils;
 
         private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
 
@@ -29,6 +29,11 @@ namespace ImagerAvalonia.Utils
         private bool _canFire = true;
 
 
+        public ImageHandler(IStorageProvider storageProvider)
+        {
+            _storageProvider = storageProvider; 
+        }
+
         public ImageHandler(IStorageProvider storageProvider, ILogger logger, ComUtils comUtils )
         {
             _storageProvider = storageProvider;
@@ -36,7 +41,6 @@ namespace ImagerAvalonia.Utils
             _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, comUtils);
             _comUtils = comUtils;
             _throttleTimer.Elapsed += (_, _) => _canFire = true;
-
         }
 
         public event EventHandler<ImageData>? UpdateImageDisplay;
@@ -80,31 +84,48 @@ namespace ImagerAvalonia.Utils
         }
 
 
+        public ImageData RequestImageMetadata(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        {
+            ImageData imageData = new ImageData();
+            imageData.Metadata = new List<TiffPlaneMetadata>() { };
+            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            {
+                //WIP
+            }
+            return imageData;
+        }
+
+
+        public ImageData RequestImage(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        {
+            ImageData imageData = new ImageData();
+
+            imageData.Images = new List<byte[]> { };
+            imageData.Metadata = new List<TiffPlaneMetadata>() { };
+            imageData.Sizes = new List<List<uint>>() { };
+            int num_datasets = 0;
+            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            {
+                int image_idx = _storageProvider.GetImageIndex(acq_det_pair.acqName, acq_det_pair.detName, RequestedTime);
+                byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                if (image_data.Length > 0)
+                {
+                    num_datasets += 1;
+                    imageData.Images.Add(image_data);
+                    var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                    imageData.Metadata.Add(plane_metadata);
+                    imageData.Sizes.Add(_storageProvider.GetPlaneSize());
+                    imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
+                }
+            }
+            return imageData;
+
+        }
+
+
         public void LoadImage(object? sender,OnDetectionRequestedEventArgs e )
         {
-                ImageData imageData = new ImageData();
-
-
-
-
-                imageData.Images = new List<byte[]> { };
-                imageData.Metadata = new List<TiffPlaneMetadata>() { };
-                imageData.Sizes = new List<List<uint>>() { };
-                int num_datasets = 0;
-                foreach (AcqDetPair acq_det_pair in  e.AcqDetPairs)
-                {
-                    int image_idx = _storageProvider.GetImageIndex(acq_det_pair.acqName, acq_det_pair.detName, e.RequestedTime);
-                    byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
-                    if (image_data.Length > 0)
-                    {
-                        num_datasets += 1;
-                        imageData.Images.Add(image_data);
-                        var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
-                        imageData.Metadata.Add(plane_metadata);
-                        imageData.Sizes.Add(_storageProvider.GetPlaneSize());
-                        imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
-                    }
-                }
+                ImageData imageData = RequestImage(e.AcqDetPairs, e.RequestedTime);
             
                 NewLoadedImageDataAvailable(imageData);
         }
@@ -117,7 +138,7 @@ namespace ImagerAvalonia.Utils
                 {
                     return ;
                 }
-                while (_imageReader.Reader.TryRead(out ImageData acquiredData))
+                while (_imageReader.Reader.TryRead(out ImageData? acquiredData))
                 {                  
                     NewImageDataAvailable(acquiredData, ShowLiveView);
                 }         
@@ -130,28 +151,32 @@ namespace ImagerAvalonia.Utils
 
 
             CancellationTokenSource source = src;
-            //_ = Task.Run(() => ImageReader(src.Token),src.Token);
 
 
             Task _Enable_live_view = new Task(() =>
             {
-                _acquisitionHandler.StartAcquisition();
-
-
-                while (_acquisitionHandler.state == AcquisitionState.Running )
+                if (_acquisitionHandler is not null)
                 {
+                    _acquisitionHandler.StartAcquisition();
 
-                    var images = _acquisitionHandler.FetchData(src);
 
-                    if (_acquisitionHandler.IsNewDataAvailable)
+                    while (_acquisitionHandler.state == AcquisitionState.Running)
                     {
 
-                        Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                        var images = _acquisitionHandler.FetchData(src);
 
+                        if (_acquisitionHandler.IsNewDataAvailable)
+                        {
 
-                        _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { _logger.LogInformation(response_message); }, response_data => { });
+                            Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
 
-                        _acquisitionHandler.IsNewDataAvailable = false;
+                            if (_comUtils is not null)
+                            {
+                                _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { _logger?.LogInformation(response_message); }, response_data => { });
+                            }
+
+                            _acquisitionHandler.IsNewDataAvailable = false;
+                        }
                     }
                 }
             }

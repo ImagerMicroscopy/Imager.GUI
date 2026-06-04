@@ -49,7 +49,10 @@ namespace ImagerAvalonia.ViewModels
 
         [ObservableProperty]
         private ObservableCollection<RobotProgramViewModel> robotPrograms = new();
+
+        [ObservableProperty]
         private string _robotName = string.Empty;
+
         [ObservableProperty]
         private RobotProgramViewModel? selectedRobotProgram;
 

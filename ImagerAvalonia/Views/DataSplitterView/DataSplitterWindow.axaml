@@ -1,0 +1,55 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:ImagerAvalonia.ViewModels"
+        Background="#454545"
+        Width="400"
+        Height="400"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="ImagerAvalonia.Views.DataSplitterWindow"
+        x:DataType="vm:DataSplitterViewModel"
+        Title="Data Splitter">
+
+    <Grid Margin="10 10 0 0" RowDefinitions="40 40 40 40 40" ColumnDefinitions="150 100 100">
+		<TextBlock  VerticalAlignment="Center"  HorizontalAlignment="Left" Foreground="White" Grid.Row="0">
+			Split by channel
+        </TextBlock>
+        <CheckBox Grid.Row="0" Grid.Column="1" IsChecked="{Binding SplitDataByAcquisition}">
+			
+        </CheckBox>
+        <TextBlock VerticalAlignment="Center"  HorizontalAlignment="Left" Foreground="White" Grid.Row="1">
+			Split by camera
+        </TextBlock>
+         <CheckBox Grid.Row="1" Grid.Column="1"  IsChecked="{Binding SplitDataByCamera}">
+			
+        </CheckBox>
+        <TextBlock VerticalAlignment="Center" HorizontalAlignment="Left" Foreground="White" Grid.Row="2">
+			Split by position
+        </TextBlock>
+		<ComboBox Grid.Column="1" Grid.Row="2" BorderThickness="0.5" HorizontalAlignment="Center" FontSize="10" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="0 0 0 0" Width="110">
+				<ComboBox.Styles>
+					<Style Selector="ComboBox ContentPresenter">
+						<Setter Property="Margin" Value="5 0 0 0"/>
+					</Style>
+				</ComboBox.Styles>
+		</ComboBox>
+
+
+        <TextBlock Grid.Column="0" Grid.Row="3"  Margin="0,0,0,0"
+						VerticalAlignment="Center"
+						Text="Save directory"
+						Foreground="White"
+						TextTrimming="CharacterEllipsis" />
+					
+		<TextBox Grid.Row="3"  Grid.Column="1" Margin="0 1 0 0" HorizontalAlignment="Left"  VerticalAlignment="Center" Height="23" MinHeight="10" Width="110" Watermark="Split path" IsReadOnly="True" Text="{Binding OutputFolder}">
+		</TextBox>
+        <Button Grid.Row="3" Grid.Column="2" Width="50" Margin="10 0 0 0" Click="SelectOutputFolder">
+			Open
+        </Button>
+
+        <Button Grid.Row="4" Grid.Column="2" Width="50"  Margin="10 0 0 0" Command="{Binding SplitData}">
+			Split
+        </Button>
+    </Grid>
+</Window>

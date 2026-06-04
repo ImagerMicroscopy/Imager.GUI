@@ -4,12 +4,14 @@ using Avalonia.Controls.Shapes;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 
 namespace ImagerAvalonia.Views;
@@ -45,36 +47,6 @@ public partial class MainView : UserControl
     }
 
 
-    private void IncreaseValue(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button button && button.TemplatedParent is NumericUpDown numericUpDown)
-        {
-            if (numericUpDown.Value == null)
-            {
-                numericUpDown.Value = numericUpDown.Minimum;
-            }
-            else
-            {
-                numericUpDown.Value = Math.Min((decimal)numericUpDown.Value + (decimal)numericUpDown.Increment, (decimal)numericUpDown.Maximum);
-            }
-        }
-    }
-
-
-    private void DecreaseValue(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button button && button.TemplatedParent is NumericUpDown numericUpDown)
-        {
-            if (numericUpDown.Value == null)
-            {
-                numericUpDown.Value = numericUpDown.Minimum;
-            }
-            else
-            {
-                numericUpDown.Value = Math.Max((decimal)numericUpDown.Value - (decimal)numericUpDown.Increment, (decimal)numericUpDown.Minimum);
-            }
-        }
-    }
 
     private void OnLiveViewEnabledDisabled(object? sender, RoutedEventArgs e)
     {
@@ -112,7 +84,7 @@ public partial class MainView : UserControl
             var customImagerFileType = new FilePickerFileType("Only Imager programs")
             {
                 Patterns = new[] { "*.imag" },
-               
+
             };
             // Start async operation to open the dialog.
             var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
@@ -123,7 +95,7 @@ public partial class MainView : UserControl
             if (file != null)
             {
                 var localPath = file.TryGetLocalPath();
-                if (localPath!=null)
+                if (localPath != null)
                 {
                     if (!localPath.EndsWith(".imag", StringComparison.OrdinalIgnoreCase))
                         localPath += ".imag";
@@ -165,11 +137,53 @@ public partial class MainView : UserControl
             using var streamReader = new StreamReader(stream);
             // Reads all the content of file as a text.
             var fileContent = await streamReader.ReadToEndAsync();
-            if(DataContext is MainViewModel mainVM)
+            if (DataContext is MainViewModel mainVM)
             {
                 mainVM.ParseLoadedExperiment(fileContent);
             }
         }
 
+    }
+
+    private void OnExitRequested(object? sender, RoutedEventArgs e)
+    {
+
+    }
+
+    private async Task OnSplittingRequestedAsync(object? sender, RoutedEventArgs e, ImageControlPanelViewModel imageControlVM)
+    {
+
+
+        int openID = imageControlVM.SelectedView.StorageID;
+
+        var scope = App.Container.BeginLifetimeScope();
+        var storageProvider = scope.Resolve<Utils.IStorageProvider>();
+
+        var dataSplitterVM = new DataSplitterViewModel(storageProvider);
+
+        storageProvider.SetOpenID(openID);
+        await dataSplitterVM.GetMetaDataAsync();
+
+
+        Dispatcher.UIThread.Invoke(() =>
+        {
+            var dataSplitterWindow = new DataSplitterWindow();
+            dataSplitterWindow.DataContext = dataSplitterVM;
+            dataSplitterWindow.Activate();
+            dataSplitterWindow.Show();
+        });
+        
+        
+    }
+
+    private void OnSplittingRequested(object? sender, RoutedEventArgs e)
+    {
+        if (this.FindControl<ImageControlPanelView>("ImageControlView") is ImageControlPanelView imageControl)
+        {
+            if (imageControl.DataContext is ImageControlPanelViewModel imageControlVM)
+            {
+                Task.Run(() => OnSplittingRequestedAsync(sender, e, imageControlVM));
+            }
+        }
     }
 }

@@ -42,7 +42,6 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     public event EventHandler<XYStagePosition>? PinnedPositionChanged;
     public event EventHandler<ObservableCollection<XYStagePosition>> OnXYPositionsChanged;
 
-    // Observable Properties
     [ObservableProperty] private bool _multiViewEnabled = false;
     [ObservableProperty] private int _Min_disp_val = 10000;
     [ObservableProperty] private int _Max_disp_val = 50000;
@@ -60,21 +59,21 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     [ObservableProperty] private int _RequestedFrame = 0;
     [ObservableProperty] private XYStagePosition _PinnedPosition; 
 
-    // Regular Fields
     public bool IsDataStreaming = false;
     public bool process_field_view;
+    public int StorageID { get; set; } = -1;
+
     private bool _canFire = true;
     private System.Timers.Timer _throttleTimer = new System.Timers.Timer(10) { AutoReset = true } ;
     private IStageControl? _stageController;
     private IExperimentSerialization _experimentTraversal;
 
-    // Collections
     public ObservableCollection<string> Detectors = new();
     public ObservableCollection<string> Acquisitions = new();
     [ObservableProperty] ObservableCollection<XYStagePosition> _availableStagePositions  = new();
 
-    // Properties
     public CancellationTokenSource source { get; set; } = new();
+    public ImageHandler ImageHanlder { get; internal set; }
 
     public ImageDisplayViewModel()
     { 
@@ -256,20 +255,15 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
                     if (images.TraversedPositions[i].IsEqual(PinnedPosition))
                     {
                         UpdateImage?.Invoke(images.Metadata[i], images.Images[i], true);
-                        //UpdateImage?.Invoke(im_size_x, im_size_y, images.Metadata[i].AcquisitionName, images.Metadata[i].DetectorName, images.Images[i], images.TraversedPositions[i], true, images.Metadata[i].TimePoint);
                     }
                     else
                     {
                         UpdateImage?.Invoke(images.Metadata[i], images.Images[i], false);
-
-                        //UpdateImage?.Invoke(im_size_x, im_size_y, images.Metadata[i].AcquisitionName, images.Metadata[i].DetectorName, images.Images[i], images.TraversedPositions[i], false, images.Metadata[i].TimePoint);
                     }
                 }
                 else
                 {
                     UpdateImage?.Invoke(images.Metadata[i], images.Images[i], true);
-
-                    //UpdateImage?.Invoke(im_size_x, im_size_y, images.Metadata[i].AcquisitionName, images.Metadata[i].DetectorName, images.Images[i], images.TraversedPositions[i], true, images.Metadata[i].TimePoint);
                 }
             }
         }
@@ -296,10 +290,21 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
             {
                 Int32 im_size_x = Convert.ToInt32(images.Sizes[i][0]);
                 Int32 im_size_y = Convert.ToInt32(images.Sizes[i][1]);
-                UpdateRegionProperties?.Invoke(im_size_x, im_size_y, images.Metadata[i].AcquisitionName, images.Metadata[i].DetectorName, images.Images[i], images.TraversedPositions[i], false, images.Metadata[i].TimePoint);
+                UpdateRegionProperties?.Invoke(im_size_x, im_size_y, 
+                    images.Metadata[i].AcquisitionName, 
+                    images.Metadata[i].DetectorName, 
+                    images.Images[i], 
+                    images.TraversedPositions[i], 
+                    false, 
+                    images.Metadata[i].TimePoint);
             }
         }
 
+    }
+
+    internal void SetOpenID(int openID)
+    {
+        StorageID = openID;
     }
 
     public class RegionPropertiesEventArgs : EventArgs
