@@ -36,9 +36,9 @@ public partial class App : Application
 
     private Process _kestrelServer = new();
     public PythonSmartServerService SmartProgramService;
-    public static ConfigurationSettings Configuration = new ConfigurationSettings("Config.json");
-    private LogBookConfigurationSettings LogBookConfigurationStart = new LogBookConfigurationSettings("LogBookConfigStart.json");
-    private LogBookConfigurationSettings LogBookConfigurationEnd = new LogBookConfigurationSettings("LogBookConfigEnd.json");
+    public static ConfigurationSettings Configuration = new ConfigurationSettings(Path.Combine(AppContext.BaseDirectory, "Config.json"));
+    private LogBookConfigurationSettings LogBookConfigurationStart = new LogBookConfigurationSettings(Path.Combine(AppContext.BaseDirectory, "LogBookConfigStart.json"));
+    private LogBookConfigurationSettings LogBookConfigurationEnd = new LogBookConfigurationSettings(Path.Combine(AppContext.BaseDirectory, "LogBookConfigEnd.json"));
     private LogBookView logWindow;
 
     public static void SetTestContainer(IContainer container)
