@@ -43,7 +43,7 @@ public partial class ExperimentalPanelViewModel : ViewModelBase {
             Root = new RootNode();
         }
 
-        if (user_acq.Acquisitions.ToList().First().Sources.Count == 0) {
+        if (user_acq.Acquisitions.Any() && user_acq.Acquisitions.First().Sources.Count == 0) {
             AreSourcesAvailable = false;
         }
 
