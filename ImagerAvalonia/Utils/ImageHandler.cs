@@ -1,4 +1,4 @@
-﻿using DynamicData;
+using DynamicData;
 using ImagerAvalonia.Services.MeasurementControl;
 using Microsoft.Extensions.Logging;
 using ScottPlot;
@@ -149,56 +149,62 @@ namespace ImagerAvalonia.Utils
 
 
         public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src){
-            await Task.Run(async () => {
-                JObject program = _storageProvider._measurementProgram;
-                var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
-                if (parsed_program != null) {
-                    var innerProgram = parsed_program["program"];
-                    var definedDetections = parsed_program["defineddetections"];
-                    var smartProgramCode = parsed_program["smartprogramcode"];
-                    
-                    using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
-                    JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
-                    JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+            try {
+                await Task.Run(async () => {
+                    JObject program = _storageProvider._measurementProgram;
+                    var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
+                    if (parsed_program != null) {
+                        var innerProgram = parsed_program["program"];
+                        var definedDetections = parsed_program["defineddetections"];
+                        var smartProgramCode = parsed_program["smartprogramcode"];
+                        
+                        using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
+                        JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+                        JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
 
-                    var channel = Channel.CreateUnbounded<MeasurementEvent>();
-                    ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(
-                        docProgram.RootElement.Clone(), 
-                        docDefinedDetections?.Clone(), 
-                        docSmartProgramCode?.Clone(), 
-                        channel.Writer, 
-                        src.Token);
+                        var channel = Channel.CreateUnbounded<MeasurementEvent>();
+                        ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(
+                            docProgram.RootElement.Clone(), 
+                            docDefinedDetections?.Clone(), 
+                            docSmartProgramCode?.Clone(), 
+                            channel.Writer, 
+                            src.Token);
 
-                    _storageProvider.OpenWriteStream();
+                        _storageProvider.OpenWriteStream();
 
-                    await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
-                        switch (measurementEvent) {
-                            case MeasurementDataEvent dataEvent:
-                                var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
-                                if (images.Images.Count > 0) {
-                                    _storageProvider.SavePlanes(images.Images, images.Metadata);
-                                    var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
-                                }
-                                break;
+                        await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
+                            switch (measurementEvent) {
+                                case MeasurementDataEvent dataEvent:
+                                    var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
+                                    if (images.Images.Count > 0) {
+                                        _storageProvider.SavePlanes(images.Images, images.Metadata);
+                                        var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                                    }
+                                    break;
 
-                            case MeasurementStatusTextEvent statusEvent:
-                                foreach (var msg in statusEvent.Messages) {
-                                    _logger.LogInformation(msg);
-                                }
-                                break;
+                                case MeasurementStatusTextEvent statusEvent:
+                                    foreach (var msg in statusEvent.Messages) {
+                                        _logger.LogInformation(msg);
+                                    }
+                                    break;
 
-                            case MeasurementErrorEvent errorEvent:
-                                _logger.LogError($"Measurement Error: {errorEvent.Error}");
-                                break;
+                                case MeasurementErrorEvent errorEvent:
+                                    _logger.LogError($"Measurement Error: {errorEvent.Error}");
+                                    break;
 
-                            case MeasurementCompletedEvent _:
-                                return; // End of stream
+                                case MeasurementCompletedEvent _:
+                                    return; // End of stream
+                            }
                         }
                     }
-                }
-            }, src.Token);
+                }, src.Token);
 
-            return true;
+                return true;
+            } catch (OperationCanceledException) {
+                // Task was cancelled, this is expected when stopping live acquisition
+                _logger.LogInformation("Live acquisition was cancelled by user");
+                return false;
+            }
         }       
 
         
