@@ -10,8 +10,7 @@ namespace ImagerAvalonia.Services.Workspace;
 /// <summary>
 /// Represents the overall state of the application.
 /// </summary>
-public enum WorkspaceState
-{
+public enum WorkspaceState {
     Idle,           // User is configuring experiments or viewing idle data
     Acquiring,      // Hardware is actively running a measurement
     Processing,     // Data is being processed (post-measurement or smart-algo)
@@ -22,8 +21,7 @@ public enum WorkspaceState
 /// The central hub of the application. It owns the specialized managers and handles the 
 /// high-level state. ViewModels will bind to this (or interact with it) to trigger application-wide changes.
 /// </summary>
-public class ImagerWorkspace
-{
+public class ImagerWorkspace {
     // The three specialized sub-managers
     public ExperimentBuilder ExperimentBuilder { get; }
     public AcquisitionEngine AcquisitionEngine { get; }
@@ -36,8 +34,7 @@ public class ImagerWorkspace
     public ImagerWorkspace(
         ExperimentBuilder experimentBuilder, 
         AcquisitionEngine acquisitionEngine, 
-        DataWorkspace dataWorkspace)
-    {
+        DataWorkspace dataWorkspace) {
         ExperimentBuilder = experimentBuilder;
         AcquisitionEngine = acquisitionEngine;
         DataWorkspace = dataWorkspace;
@@ -51,28 +48,32 @@ public class ImagerWorkspace
     /// <summary>
     /// Called by the UI (e.g. MainViewModel) when the user clicks "Start Experiment".
     /// </summary>
-    public async Task StartExperimentAsync(CancellationToken cancellationToken = default)
-    {
+    public async Task StartExperimentAsync(CancellationToken cancellationToken = default) {
         if (CurrentState != WorkspaceState.Idle) 
             throw new InvalidOperationException("Workspace is not idle.");
 
-        // 1. Pull the finalized AST and parameters from the builder
-        var program = ExperimentBuilder.BuildMeasurementElement();
-        var detections = ExperimentBuilder.GetDefinedDetections();
-        var smartCode = ExperimentBuilder.GetSmartProgramCode();
+        // 1. Pull the complete measurement program payload from the builder
+        var measurementProgram = ExperimentBuilder.BuildMeasurementProgram();
 
         // 2. Prepare the data workspace for a new run (clear old visuals, etc.)
         DataWorkspace.ClearWorkspace();
 
         // 3. Delegate the actual hardware execution to the engine
-        await AcquisitionEngine.RunMeasurementAsync(program, detections, smartCode, cancellationToken);
+        // Convert from MeasurementProgramPayload format to what AcquisitionEngine expects
+        var detections = measurementProgram.DefinedDetections.ToDefinedDetectionList();
+        var smartCode = measurementProgram.SmartProgramCode.Programs;
+        
+        await AcquisitionEngine.RunMeasurementAsync(
+            measurementProgram.Program,
+            detections,
+            smartCode,
+            cancellationToken);
     }
 
     /// <summary>
     /// Called by the UI to load historical data from disk.
     /// </summary>
-    public async Task LoadHistoricalDataAsync(string directoryPath)
-    {
+    public async Task LoadHistoricalDataAsync(string directoryPath) {
         if (CurrentState == WorkspaceState.Acquiring)
             throw new InvalidOperationException("Cannot load data while acquiring.");
 
@@ -80,8 +81,7 @@ public class ImagerWorkspace
         // Load data from disk and populate DataWorkspace...
     }
 
-    private void SetState(WorkspaceState newState)
-    {
+    private void SetState(WorkspaceState newState) {
         CurrentState = newState;
         StateChanged?.Invoke(this, newState);
     }

@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DynamicData;
 
@@ -10,58 +10,68 @@ using System.Linq;
 
 namespace ImagerAvalonia.ViewModels;
 
-public class EnabledAcquisitionTracker
-{
+public class EnabledAcquisitionTracker {
     public List<EnabledAcquisition> EnabledAcquisitions = new();
 
     public EnabledAcquisitionTracker() { }
 
-    public void AddEnabledAcquisition(EnabledAcquisition enabledAcquisition)
-    {
+    public void AddEnabledAcquisition(EnabledAcquisition enabledAcquisition) {
         EnabledAcquisitions.Add(enabledAcquisition);
     }
 
-    public void RemoveEnabledAcquisition(EnabledAcquisition enabledAcquisition)
-    {
+    public void RemoveEnabledAcquisition(EnabledAcquisition enabledAcquisition) {
         EnabledAcquisitions.Remove(enabledAcquisition);
     }
 }
 
-public partial class AcquisitionPanelViewModel : MeasurementViewModel
-{
+public partial class AcquisitionPanelViewModel : MeasurementViewModel {
     [ObservableProperty]
     private ObservableCollection<EnabledAcquisition> _isAquisitionEnabled = new();
     public ObservableCollection<AcquisitionSettingsViewModel> AvailableAcquisitions => UserAcquisitionSettings.Acquisitions;
     public SystemDefinedSettingsViewModel UserAcquisitionSettings { get; set; }
     public EnabledAcquisitionTracker AcquisitionTracker = new();
 
-    public AcquisitionPanelViewModel(SystemDefinedSettingsViewModel availableAcquisitions) : base()
-    {
+    public AcquisitionPanelViewModel(SystemDefinedSettingsViewModel availableAcquisitions) : base() {
         UserAcquisitionSettings = availableAcquisitions;
         AvailableAcquisitions.CollectionChanged += AvailableAcquisitions_CollectionChanged;
 
-
-
-
         IsAquisitionEnabled = new ObservableCollection<EnabledAcquisition>(
-            AvailableAcquisitions.Select(x =>
-            {
+            AvailableAcquisitions.Select(x => {
                 var ea = new EnabledAcquisition(true, x);
                 ea.PropertyChanged += EnabledAcquisition_PropertyChanged;
                 return ea;
             })
         );
+        
+        // Subscribe to our own PropertyChanged for SelectedProgramId
+        this.PropertyChanged += AcquisitionPanelViewModel_PropertyChanged;
+    }
+
+    private void AcquisitionPanelViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(SelectedProgramId)) {
+            // Delegate smart program selection to ExperimentBuilder
+            if (ExperimentBuilder != null) {
+                var detectionNames = IsAquisitionEnabled
+                    .Where(ea => ea.IsEnabled && ea.acquisition?.Name != null)
+                    .Select(ea => ea.acquisition.Name)
+                    .ToList();
+                
+                var smartProgramIds = new List<string>();
+                if (SelectedProgramId != null) {
+                    smartProgramIds.Add(SelectedProgramId.SmartProgramID.ToString());
+                }
+                
+                ExperimentBuilder.UpdateDetection(Elementid, detectionNames, smartProgramIds);
+            }
+        }
     }
 
 
-    public void SetAcquisitionTracker(EnabledAcquisitionTracker acquisitionTracker)
-    {
+    public void SetAcquisitionTracker(EnabledAcquisitionTracker acquisitionTracker) {
         AcquisitionTracker = acquisitionTracker;
 
-        foreach (var item in IsAquisitionEnabled)
-        {
-            if (item.IsEnabled)
-            {
+        foreach (var item in IsAquisitionEnabled) {
+            if (item.IsEnabled) {
                 AcquisitionTracker.AddEnabledAcquisition(item);
             }
         }
@@ -70,27 +80,34 @@ public partial class AcquisitionPanelViewModel : MeasurementViewModel
     }
 
     [RelayCommand]
-    public void OnToggle(EnabledAcquisition item)
-    {
-        if (item.IsEnabled)
-        {
+    public void OnToggle(EnabledAcquisition item) {
+        if (item.IsEnabled) {
             AcquisitionTracker.AddEnabledAcquisition(item);
-        }
-        else
-        {
+        } else {
             AcquisitionTracker.RemoveEnabledAcquisition(item);
-
         }
 
         UpdateDisplayedInfo();
+        
+        // Delegate to ExperimentBuilder to update state
+        if (ExperimentBuilder != null) {
+            var detectionNames = IsAquisitionEnabled
+                .Where(ea => ea.IsEnabled && ea.acquisition?.Name != null)
+                .Select(ea => ea.acquisition.Name)
+                .ToList();
+            
+            var smartProgramIds = new List<string>();
+            if (SelectedProgramId != null) {
+                smartProgramIds.Add(SelectedProgramId.SmartProgramID.ToString());
+            }
+            
+            ExperimentBuilder.UpdateDetection(Elementid, detectionNames, smartProgramIds);
+        }
     }
 
-    private void AvailableAcquisitions_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        if (e.Action == NotifyCollectionChangedAction.Add)
-        {
-            foreach (var newItem in e.NewItems.OfType<AcquisitionSettingsViewModel>())
-            {
+    private void AvailableAcquisitions_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) {
+        if (e.Action == NotifyCollectionChangedAction.Add) {
+            foreach (var newItem in e.NewItems.OfType<AcquisitionSettingsViewModel>()) {
                 var newEnabledAcq = new EnabledAcquisition(true, newItem);
                 newEnabledAcq.PropertyChanged += EnabledAcquisition_PropertyChanged;
 
@@ -99,13 +116,10 @@ public partial class AcquisitionPanelViewModel : MeasurementViewModel
             }
         }
 
-        if (e.Action == NotifyCollectionChangedAction.Remove)
-        {
-            foreach (var removedItem in e.OldItems.OfType<AcquisitionSettingsViewModel>())
-            {
+        if (e.Action == NotifyCollectionChangedAction.Remove) {
+            foreach (var removedItem in e.OldItems.OfType<AcquisitionSettingsViewModel>()) {
                 var enabledAcq = IsAquisitionEnabled.FirstOrDefault(x => x.acquisition == removedItem);
-                if (enabledAcq != null)
-                {
+                if (enabledAcq != null) {
                     enabledAcq.PropertyChanged -= EnabledAcquisition_PropertyChanged;
 
                     IsAquisitionEnabled.Remove(enabledAcq);
@@ -117,23 +131,20 @@ public partial class AcquisitionPanelViewModel : MeasurementViewModel
         UpdateDisplayedInfo();
     }
 
-    private void EnabledAcquisition_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName == nameof(EnabledAcquisition.Name))
-        {
+    private void EnabledAcquisition_PropertyChanged(object? sender, PropertyChangedEventArgs e) {
+        if (e.PropertyName == nameof(EnabledAcquisition.Name)) {
             UpdateDisplayedInfo();
         }
     }
 
-    private void UpdateDisplayedInfo()
-    {
-        DisplayedInfo = $"({string.Join(',', IsAquisitionEnabled.Where(x=>x.IsEnabled).Select(x => x.Name).Distinct())})";
+    private void UpdateDisplayedInfo() {
+        DisplayedInfo = "(" + string.Join(',', IsAquisitionEnabled.Where(x=>x.IsEnabled).Select(x => x.Name).Distinct()) + ")";
     }
 
-    public override void Dispose()
-    {
-        foreach (var item in IsAquisitionEnabled)
-        {
+    public override void Dispose() {
+        this.PropertyChanged -= AcquisitionPanelViewModel_PropertyChanged;
+        
+        foreach (var item in IsAquisitionEnabled) {
             item.PropertyChanged -= EnabledAcquisition_PropertyChanged;
             AcquisitionTracker.RemoveEnabledAcquisition(item);
         }
@@ -142,11 +153,9 @@ public partial class AcquisitionPanelViewModel : MeasurementViewModel
     }
 }
 
-public class EnabledProcessID
-{
-   
-    public EnabledProcessID(DagProcessingViewModel process, bool isenabled)
-    {
+public class EnabledProcessID {
+    
+    public EnabledProcessID(DagProcessingViewModel process, bool isenabled) {
         this.Process = process;
         this.IsEnabled = isenabled;
     }
@@ -155,8 +164,8 @@ public class EnabledProcessID
     public bool IsEnabled { get; set; }
 }
 
-public partial class EnabledAcquisition : ObservableObject
-{
+public partial class EnabledAcquisition : ObservableObject {
+    
     [ObservableProperty] private bool _isEnabled;
     [ObservableProperty] AcquisitionSettingsViewModel? _acquisitionSettings;
 
@@ -164,21 +173,16 @@ public partial class EnabledAcquisition : ObservableObject
 
 
 
-
     public string Name => acquisition?.Name ?? string.Empty;
 
-    public EnabledAcquisition(bool isEnabled, AcquisitionSettingsViewModel acq)
-    {
+    public EnabledAcquisition(bool isEnabled, AcquisitionSettingsViewModel acq) {
         IsEnabled = isEnabled;
         acquisition = acq;
 
         // Forward PropertyChanged from Acquisition.Name to EnabledAcquisition.Name
-        if (acquisition != null)
-        {
-            acquisition.PropertyChanged += (_, e) =>
-            {
-                if (e.PropertyName == nameof(AcquisitionSettingsViewModel.Name))
-                {
+        if (acquisition != null) {
+            acquisition.PropertyChanged += (_, e) => {
+                if (e.PropertyName == nameof(AcquisitionSettingsViewModel.Name)) {
                     OnPropertyChanged(nameof(Name));
                 }
             };
