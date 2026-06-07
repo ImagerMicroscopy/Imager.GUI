@@ -47,6 +47,8 @@ public partial class FieldViewerViewModel : ViewModelBase, IImageDisplay
     {
         Acquisitions.Clear();
         Detectors.Clear();
+        if (acq_det_pairs == null) return;
+        if (acq_det_pairs == null) return;
         foreach (AcqDetPair acquisition in acq_det_pairs)
         {
             foreach (AcqDetPair detector in acq_det_pairs)

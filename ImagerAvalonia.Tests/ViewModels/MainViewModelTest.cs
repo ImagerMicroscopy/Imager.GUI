@@ -8,6 +8,7 @@ using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Tests.ViewModels;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Views;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -182,13 +183,27 @@ namespace Imager.Tests.ViewModels
             var fieldViewMock = new Mock<FieldViewerViewModel>();
             var imageVmFactoryMock = new Mock<IImageDisplayViewModelFactory>();
 
+            var workspaceData = new DataWorkspace();
+            var acquisitionEngine = new AcquisitionEngine(ImagerCommunicationManager.Instance);
+            var workspace = new ImagerWorkspace(
+                new ExperimentBuilder(userDefinedAcquisitions, stageControl.Object, new Mock<ImagerAvalonia.Services.INodeFactory>().Object),
+                acquisitionEngine,
+                workspaceData,
+                new Mock<Autofac.ILifetimeScope>().Object,
+                loggerFactoryMock.Object,
+                connectionHandler.Object,
+                ImagerCommunicationManager.Instance,
+                acquisitionState.Object
+            );
+
             imagePanel = new ImageControlPanelViewModel(
                 loggerFactoryMock.Object,
                 liveViewMock.Object,
                 fieldViewMock.Object,
                 connectionHandler.Object,
                 imageVmFactoryMock.Object,
-                acquisitionState.Object
+                acquisitionState.Object,
+                workspace
             );
 
             var builder = new ContainerBuilder();

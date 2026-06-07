@@ -10,6 +10,7 @@ using ImagerAvalonia.Data;
 using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Settings;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
@@ -91,6 +92,12 @@ public partial class App : Application
         builder.RegisterType<ObservableLoggerProvider>().SingleInstance().As<ILoggerProvider>();
         builder.RegisterType<LoggerService>().SingleInstance().As<ILogger>();
         builder.RegisterType<ImageDisplayViewModelFactory>().As<IImageDisplayViewModelFactory>().SingleInstance();
+        builder.RegisterType<NodeFactory>().As<INodeFactory>().SingleInstance();
+        builder.RegisterType<ExperimentBuilder>().SingleInstance();
+        builder.RegisterType<AcquisitionEngine>().SingleInstance();
+        builder.RegisterType<DataWorkspace>().SingleInstance();
+        builder.RegisterType<ImagerWorkspace>().SingleInstance();
+
         builder.RegisterType<SystemDefinedSettingsViewModel>().SingleInstance();
         builder.RegisterType<AcquisitionStateService>().SingleInstance();
         builder.RegisterType<EquipmentState>().SingleInstance();
