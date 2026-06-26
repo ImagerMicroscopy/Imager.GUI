@@ -65,7 +65,6 @@ namespace ImagerAvalonia.ViewModels
     public partial class RobotViewModel : ViewModelBase
     {
         public string EquipmentName { get; set; } = string.Empty;
-        public string RobotName { get; private set; } = string.Empty;
 
         [ObservableProperty]
         private string robotDisplayName = string.Empty;
