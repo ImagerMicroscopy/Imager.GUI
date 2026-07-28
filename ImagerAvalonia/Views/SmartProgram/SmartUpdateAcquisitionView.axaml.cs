@@ -52,10 +52,11 @@ public partial class SmartUpdateAcquisitionView : UserControl
         {
             return;
         }
-
-        vm.SelectedNode = draggedNode;
-        draggedNode.OnNodeDeleted += vm.DraggedNode_OnNodeDeleted; ;
-
+        if (draggedNode is UpdateAcquisitionViewModel update_acq)
+        {
+            vm.SelectedNode = draggedNode;
+            draggedNode.OnNodeDeleted += vm.DraggedNode_OnNodeDeleted; ;
+        }
         e.DragEffects = DragDropEffects.Move;
     }
 

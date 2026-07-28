@@ -42,7 +42,7 @@
             </Style>
         </Border.Styles>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-            <TextBlock Text="Drop an acquisition here"
+            <TextBlock Text="Drop an update acquisition here"
                        FontSize="13"
                        FontWeight="SemiBold"
                        Foreground="#3A3F4B"

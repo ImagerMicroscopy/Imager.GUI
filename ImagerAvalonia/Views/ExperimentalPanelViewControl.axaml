@@ -185,9 +185,23 @@
 								CornerRadius="3"
 								Width="210"
 								Background="Gray">
-							<StackPanel Width="200" Orientation="Horizontal">
-								<TextBlock Foreground="White" Margin="3 0 0 0" VerticalAlignment="Center" FontSize="10" Text="{Binding Header}" />
-								<TextBlock Margin="5 0 0 0" TextTrimming="CharacterEllipsis" Width="100" VerticalAlignment="Center" Foreground="White" FontSize="10" Text="{Binding DisplayedInfo, Mode=TwoWay}" />
+							<StackPanel Orientation="Horizontal">
+								<ItemsControl ItemsSource="{Binding SmartProgramBindings}">
+									<ItemsControl.ItemsPanel>
+										<ItemsPanelTemplate>
+											<StackPanel Orientation="Horizontal" />
+										</ItemsPanelTemplate>
+									</ItemsControl.ItemsPanel>
+									<ItemsControl.ItemTemplate>
+										<DataTemplate DataType="service_vm:SmartProgramInput">
+											<Rectangle Width="6" Margin="0 0 1 0" Fill="{Binding SmartProgramColor}" />
+										</DataTemplate>
+									</ItemsControl.ItemTemplate>
+								</ItemsControl>
+								<StackPanel Width="200" Orientation="Horizontal">
+									<TextBlock Foreground="White" Margin="3 0 0 0" VerticalAlignment="Center" FontSize="10" Text="{Binding Header}" />
+									<TextBlock Margin="5 0 0 0" TextTrimming="CharacterEllipsis" Width="100" VerticalAlignment="Center" Foreground="White" FontSize="10" Text="{Binding DisplayedInfo, Mode=TwoWay}" />
+								</StackPanel>
 							</StackPanel>
 						</Border>
 					</StackPanel>

@@ -63,11 +63,12 @@ public partial class InputFunctionView : UserControl
         {
             return;
         }
-
-        parameter.SelectedDetection = draggedNode;
-        parameter.SelectedNode = draggedNode;
-        draggedNode.OnNodeDeleted += parameter.NodeDeleted;
-
+        if (draggedNode is DetectionElementViewModel detectionNode)
+        {
+            parameter.SelectedDetection = draggedNode;
+            parameter.SelectedNode = draggedNode;
+            draggedNode.OnNodeDeleted += parameter.NodeDeleted;
+        }
         e.DragEffects = DragDropEffects.Move;
     }
 
@@ -80,7 +81,8 @@ public partial class InputFunctionView : UserControl
 
         if (parameter.SelectedNode is MeasurementElementViewModel node)
         {
-            node.OnNodeDeleted -= parameter.NodeDeleted;
+            node.OnNodeDeleted -= parameter.NodeDeleted;      
+            node.SmartProgramBindings.Remove(parameter.SmartProgramBinding);
         }
 
         parameter.SelectedDetection = null;

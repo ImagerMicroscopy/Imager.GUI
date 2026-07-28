@@ -6,7 +6,6 @@ namespace ImagerAvalonia.Services
 {
     public partial class SmartProgramBinding<T> : SmartProgramInput
     {
-        [ObservableProperty] Avalonia.Media.SolidColorBrush _smartProgramColor;
         [ObservableProperty] T _smartProgramInputVM;
         private static readonly Random _random = new Random();
 
@@ -16,9 +15,8 @@ namespace ImagerAvalonia.Services
             byte g = (byte)_random.Next(256);
             byte b = (byte)_random.Next(256);
 
-            base.SmartProgramColor = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(r, g, b));
+            SmartProgramColor = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(r, g, b));
             SmartProgramInputVM = smartProgramInputVM;
-
         }
     }
 
