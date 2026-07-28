@@ -4,8 +4,11 @@ using Avalonia.ReactiveUI;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services;
-using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
+using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Utils;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using ReactiveUI;
@@ -30,17 +33,19 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
     [ObservableProperty] private ObservableCollection<DetectorEquipmentViewModelProperties> _properties = new();
 
 
-    [ObservableProperty] private DetectorEquipment _detectorEquipmentProperties;
+    [ObservableProperty] private DetectorEquipmentModel _detectorEquipmentProperties;
     public event PropertyChangedEventHandler? WhenDetectorEnabled;
 
     private readonly IImagerCommunicationManager _communicationManager;
-    private readonly AcquisitionStateService _acquisitionState;
+    private readonly ImagerWorkspace _imagerWorkspace;
+    private readonly ExperimentManager _experimentManager;
     private CancellationTokenSource? _numericThrottleCts;
 
-    public DetectorEquipmentViewModel(DetectorEquipment detEquipment)
+    public DetectorEquipmentViewModel(DetectorEquipmentModel detEquipment, ImagerWorkspace imagerWorkspace, ExperimentManager experimentManager)
     {
         _communicationManager = ImagerCommunicationManager.Instance;
-        _acquisitionState = App.Container.Resolve<AcquisitionStateService>();
+        _imagerWorkspace = imagerWorkspace;
+        _experimentManager = experimentManager;
         Name = detEquipment.Detectorname;
         DetectorEquipmentProperties = detEquipment;
         IsEnabled = detEquipment.IsEnabled;
@@ -57,13 +62,13 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
             {
                 case NumericDetectorProperty numProp:
 
-                    var numeric_property_val = new NumericDetectorPropertyViewModel(numProp.value, numProp.descriptor);
+                    var numeric_property_val = new NumericDetectorPropertyViewModel(numProp);
                     numeric_property_val.PropertyChanged += SetChangedValueInModel;
                     Properties.Add(numeric_property_val);
                     break;
 
                 case CategoricDetectorProperty catProp:
-                    var cat_property_val = new CategoricDetectorPropertyViewModel(catProp.availableoptions, catProp.descriptor, catProp.current);
+                    var cat_property_val = new CategoricDetectorPropertyViewModel(catProp);
                     cat_property_val.PropertyChanged += SetChangedValueInModel;
                     Properties.Add(cat_property_val);
                     break;
@@ -78,20 +83,10 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         if (e.PropertyName == nameof(IsEnabled))
         {
             DetectorEquipmentProperties.IsEnabled = IsEnabled;
-            foreach (DetectorEquipmentViewModelProperties property in Properties)
-            {
-                if (property is NumericDetectorPropertyViewModel numeric_property)
-                {
-                    DetectorEquipmentProperties.SetValueByName(numeric_property.Label, string.Empty, numeric_property.Value);
-                }
-                if (property is CategoricDetectorPropertyViewModel categoric_property)
-                {
-                    DetectorEquipmentProperties.SetValueByName(categoric_property.Label, categoric_property.SelectedChoice, 0);
-                }
-            }
         }
         WhenDetectorEnabled?.Invoke(this, e);
     }
+
 
     public async void SetChangedValueInModel(object? sender, PropertyChangedEventArgs e)
     {
@@ -100,15 +95,9 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         if (e.PropertyName == nameof(NumericDetectorPropertyViewModel.ThrottledValue) &&
             sender is NumericDetectorPropertyViewModel numericDetectorPropertyViewModel)
         {
-            DetectorEquipmentProperties.SetValueByName(
-                numericDetectorPropertyViewModel.Label,
-                string.Empty,
-                numericDetectorPropertyViewModel.ThrottledValue
-            );
-
-            if (_acquisitionState.RunningAcquisitionState == RunningAcquisitionState.IsInLive)
+            if(_imagerWorkspace.CurrentState == WorkspaceState.Acquiring)
             {
-                _acquisitionState.InvokeLiveEnd();
+                await _imagerWorkspace.StopLiveAsync();
                 waslive = true;
             }
 
@@ -116,76 +105,93 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
 
             if (waslive)
             {
-                _acquisitionState.InvokeLiveStart();
+                await _imagerWorkspace.StartLiveAsync(_experimentManager.SelectedDetection);
             }
         }
 
         if (e.PropertyName == nameof(CategoricDetectorPropertyViewModel.SelectedChoice) &&
             sender is CategoricDetectorPropertyViewModel categoricDetectorPropertyViewModel)
         {
-            DetectorEquipmentProperties.SetValueByName(
-                categoricDetectorPropertyViewModel.Label,
-                categoricDetectorPropertyViewModel.SelectedChoice,
-                0
-            );
-            if (_acquisitionState.RunningAcquisitionState == RunningAcquisitionState.IsInLive)
+            if (_imagerWorkspace.CurrentState == WorkspaceState.Acquiring)
             {
-                _acquisitionState.InvokeLiveEnd();
+                await _imagerWorkspace.StopLiveAsync();
                 waslive = true;
             }
+
             await ValidateParameter(categoricDetectorPropertyViewModel);
+
             if (waslive)
             {
-                _acquisitionState.InvokeLiveStart();
+                await _imagerWorkspace.StartLiveAsync(_experimentManager.SelectedDetection);
             }
         }
     }
 
     private async Task ValidateParameter(DetectorEquipmentViewModelProperties property)
     {
-        bool waslive = false;
-        if (_acquisitionState.RunningAcquisitionState == RunningAcquisitionState.IsInLive)
-        {
-            _acquisitionState.InvokeLiveEnd();
-            waslive = true;
-        }
 
-        var catProperty = DetectorEquipmentProperties.GetPropertyByName(property.Label);
+        await _communicationManager.SetDetectorPropertyAsync(Name, property.Property);
 
-        string message = string.Empty;
-        await _acquisitionState.CheckIfAcquisitionFinished();
-
-        await _communicationManager.SetDetectorPropertyAsync(Name, catProperty);
-        
         var detectors = await _communicationManager.ListAvailableDetectorsAsync();
         var detProperties = detectors.FirstOrDefault(x => x.Detectorname == Name);
-        
+
         if (detProperties != null)
         {
-            foreach (var prop in Properties)
+            foreach (var newProperty in detProperties.DetectorProperties)
             {
-                prop.PropertyChanged -= SetChangedValueInModel;
+                var existingVm = Properties.FirstOrDefault(x =>
+                    x.Property.propertycode == newProperty.propertycode);
+
+                if (existingVm == null)
+                    continue;
+
+                switch (existingVm)
+                {
+                    case NumericDetectorPropertyViewModel numericVm
+                        when newProperty is NumericDetectorProperty newNum:
+
+                        var existingNum = (NumericDetectorProperty)numericVm.Property;
+
+                        existingNum.descriptor = newNum.descriptor;
+                        existingNum.propertycode = newNum.propertycode;
+                        existingNum.value = newNum.value;
+
+                        numericVm.RefreshFromModel();
+                        break;
+
+                    case CategoricDetectorPropertyViewModel categoricVm
+                        when newProperty is CategoricDetectorProperty newCat:
+
+                        var existingCat = (CategoricDetectorProperty)categoricVm.Property;
+
+                        existingCat.descriptor = newCat.descriptor;
+                        existingCat.propertycode = newCat.propertycode;
+                        existingCat.current = newCat.current;
+
+                        existingCat.availableoptions.Clear();
+                        existingCat.availableoptions.AddRange(newCat.availableoptions);
+
+                        categoricVm.RefreshFromModel();
+                        break;
+                }
             }
-            Properties.Clear();
-            AssignModelProperties(detProperties.DetectorProperties);
         }
 
-        if (waslive)
-        {
-            _acquisitionState.InvokeLiveStart();
-        }
+        //if (waslive)
+        //{
+        //    _acquisitionState.InvokeLiveStart();
+        //}
     }
-
 
     public override void Dispose()
     {
 
     }
 }
-
 public abstract partial class DetectorEquipmentViewModelProperties : ViewModelBase
 {
     [ObservableProperty] private string _label = string.Empty;
+    public virtual DetectorEquipmentProperties Property { get; set; }
     //[ObservableProperty] private bool _isEnabled;
     public override void Dispose()
     {
@@ -194,23 +200,20 @@ public abstract partial class DetectorEquipmentViewModelProperties : ViewModelBa
 }
 
 
-
 public partial class NumericDetectorPropertyViewModel : DetectorEquipmentViewModelProperties, IDisposable
 {
     [ObservableProperty] private double _value;
-    private double _throttledValue;
-    public double ThrottledValue
-    {
-        get => _throttledValue;
-        private set => SetProperty(ref _throttledValue, value);
-    }
+    [ObservableProperty] double _throttledValue;
 
     private IDisposable? _throttledSubscription;
+    public override DetectorEquipmentProperties Property { get; set; }
 
-    public NumericDetectorPropertyViewModel(double value, string label)
+    public NumericDetectorPropertyViewModel(NumericDetectorProperty numProp)
     {
-        Value = value;
-        Label = label;
+        this.Property = numProp;
+
+        Value = numProp.value;
+        Label = numProp.descriptor;
 
         IScheduler scheduler;
         if (Avalonia.Threading.Dispatcher.UIThread != null)
@@ -233,26 +236,72 @@ public partial class NumericDetectorPropertyViewModel : DetectorEquipmentViewMod
             .Subscribe(v => ThrottledValue = v);
     }
 
+    public void RefreshFromModel()
+    {
+        if (Property is NumericDetectorProperty num)
+        {
+            if (Label != num.descriptor)
+                Label = num.descriptor;
+
+            if (Value != num.value)
+                Value = num.value;
+        }
+    }
+
+    partial void OnThrottledValueChanged(double value)
+    {
+        if(Property is NumericDetectorProperty numProp)
+        {
+            numProp.value = value;
+        }
+    }
+
     public override void Dispose()
     {
         _throttledSubscription?.Dispose();
     }
 }
 
-
 public partial class CategoricDetectorPropertyViewModel : DetectorEquipmentViewModelProperties
 {
     [ObservableProperty] private ObservableCollection<string> _availableoptions;
     [ObservableProperty] private string _selectedChoice = string.Empty;
+    public override DetectorEquipmentProperties Property { get; set; }
 
-    public CategoricDetectorPropertyViewModel(List<string> options, string label, string current)
+    public CategoricDetectorPropertyViewModel(CategoricDetectorProperty catProp)
     {
-        Availableoptions = new ObservableCollection<string>(options);
+        this.Property = catProp;
 
-        Label = label;
+        Availableoptions = new ObservableCollection<string>(catProp.availableoptions);
+
+        Label = catProp.descriptor;
         if (Availableoptions.Count > 0)
         {
-            SelectedChoice = current;
+            SelectedChoice = catProp.current;
+        }
+    }
+
+    partial void OnSelectedChoiceChanged(string value)
+    {
+        if(Property is CategoricDetectorProperty catProp)
+        {
+            catProp.current = value;
+        }
+    }
+
+    public void RefreshFromModel()
+    {
+        if (Property is CategoricDetectorProperty cat)
+        {
+            if (Label != cat.descriptor)
+                Label = cat.descriptor;
+
+            Availableoptions.Clear();
+            foreach (var option in cat.availableoptions)
+                Availableoptions.Add(option);
+
+            if (SelectedChoice != cat.current)
+                SelectedChoice = cat.current;
         }
     }
 }

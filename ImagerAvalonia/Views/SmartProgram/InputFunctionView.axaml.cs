@@ -1,8 +1,12 @@
 
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.ViewUtils;
+using System;
 
 
 namespace ImagerAvalonia.Views;
@@ -13,10 +17,10 @@ namespace ImagerAvalonia.Views;
 
 
 
-public partial class InputFunctionView : ExperimentSelector
+public partial class InputFunctionView : UserControl
 {
 
-    private InputParameterViewModel _selectedParameter;
+    //private InputParameterViewModel _selectedParameter;
 
 
     public InputFunctionView()
@@ -30,19 +34,56 @@ public partial class InputFunctionView : ExperimentSelector
     }
 
 
-    protected override void ExpPanel_DetectionDoubleTapped(object? sender, Services.NodeBase e)
+    private void OnDragOver(object sender, DragEventArgs e)
     {
-        if (DataContextSender is InputParameterViewModel selectedParameter)
+        if (e.Data.Contains("ImagerAvalonia.MeasurementElementViewModel")
+            && e.Data.Get("ImagerAvalonia.MeasurementElementViewModel") is MeasurementElementViewModel)
         {
-            _selectedParameter = selectedParameter;
-            expPanel.DetectionDoubleTapped -= ExpPanel_DetectionDoubleTapped;
-            window.Close();
-            if (DataContext is InputFunctionViewModel vm && e is ActionNode actionNode)
-            {
-                _selectedParameter.SelectedDetection = actionNode.NodeViewModel;
-                _selectedParameter.SelectedNode = actionNode;
-                e.OnNodeDeleted += _selectedParameter.NodeDeleted;
-            }
+            e.DragEffects = DragDropEffects.Move; // must match source's offered effect
         }
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
+    }
+
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (!e.Data.Contains("ImagerAvalonia.MeasurementElementViewModel"))
+        {
+            return;
+        }
+
+        if (e.Data.Get("ImagerAvalonia.MeasurementElementViewModel") is not MeasurementElementViewModel draggedNode)
+        {
+            return;
+        }
+
+        if (sender is not Border border || border.DataContext is not InputParameterViewModel parameter)
+        {
+            return;
+        }
+
+        parameter.SelectedDetection = draggedNode;
+        parameter.SelectedNode = draggedNode;
+        draggedNode.OnNodeDeleted += parameter.NodeDeleted;
+
+        e.DragEffects = DragDropEffects.Move;
+    }
+
+    private void OnClearDropClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.DataContext is not InputParameterViewModel parameter)
+        {
+            return;
+        }
+
+        if (parameter.SelectedNode is MeasurementElementViewModel node)
+        {
+            node.OnNodeDeleted -= parameter.NodeDeleted;
+        }
+
+        parameter.SelectedDetection = null;
+        parameter.SelectedNode = null;
     }
 }

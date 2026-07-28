@@ -2,9 +2,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using ImagerAvalonia.Services.MeasurementControl;
 using System.ComponentModel;
 using System;
+using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
 
 
 namespace ImagerAvalonia.ViewModels;
@@ -13,27 +13,29 @@ public partial class MovableEquipmentViewModel : ViewModelBase
 {
     [ObservableProperty] private string _name;
     [ObservableProperty] private ObservableCollection<MovableEquipmentViewModelProperties> _properties = new();
-    [ObservableProperty] private MovableComponent _movableEquipmentProperties;
+    public MovableComponentModel MovableEquipmentProperties;
 
 
 
-    public MovableEquipmentViewModel(MovableComponent movableEquipment)
+    public MovableEquipmentViewModel(MovableComponentModel movableEquipment)
     {
         Name = movableEquipment.equipmentname;
         MovableEquipmentProperties = movableEquipment;
 
-        foreach (var filterEquipment in MovableEquipmentProperties.movablecomponents)
+        foreach (var filterEquipment in movableEquipment.movablecomponentsettings)
         {
-            switch (filterEquipment.movablecomponent)
+            switch (filterEquipment)
             {
                 case DiscreteMovableComponentPartProperties discreteComponent:
-                    var dis_mov_comp = new DiscreteMovableEquipmentViewModel(discreteComponent.ComponentName, discreteComponent.PossibleSettings, discreteComponent.desiredsetting);
-                    dis_mov_comp.PropertyChanged += SetChangedValueInModel;
+                    var dis_mov_comp = new DiscreteMovableEquipmentViewModel(discreteComponent.ComponentName,
+                        discreteComponent.PossibleSettings, discreteComponent.desiredsetting, discreteComponent);
+                    //dis_mov_comp.PropertyChanged += SetChangedValueInModel;
                     Properties.Add(dis_mov_comp);
                     break;
                 case ContinuousMovableComponentPartProperties continuousComponent:
-                    var con_mov_comp = new ContinuousMovableEquipmentViewModel(continuousComponent.ComponentName, continuousComponent.MinValue, continuousComponent.MaxValue, continuousComponent.increment, continuousComponent.desiredsetting);
-                    con_mov_comp.PropertyChanged += SetChangedValueInModel;
+                    var con_mov_comp = new ContinuousMovableEquipmentViewModel(continuousComponent.ComponentName,
+                        continuousComponent.MinValue, continuousComponent.MaxValue, continuousComponent.increment, continuousComponent.desiredsetting, continuousComponent);
+                    //con_mov_comp.PropertyChanged += SetChangedValueInModel;
                     Properties.Add(con_mov_comp);
                     break;
             }
@@ -41,20 +43,6 @@ public partial class MovableEquipmentViewModel : ViewModelBase
 
     }
 
-    private void SetChangedValueInModel(object? sender, PropertyChangedEventArgs e)
-    {
-        if(sender is ContinuousMovableEquipmentViewModel continuousComponentPropertyViewModel)
-        { 
-            string component_name = continuousComponentPropertyViewModel.ComponentName; 
-            MovableEquipmentProperties.SetValueByName(component_name, continuousComponentPropertyViewModel.SelectedValue.ToString());
-        }
-        if (sender is DiscreteMovableEquipmentViewModel categoricComponentPropertyViewModel)
-        {
-            string component_name = categoricComponentPropertyViewModel.ComponentName;
-            MovableEquipmentProperties.SetValueByName(component_name, categoricComponentPropertyViewModel.SelectedMovableComponent);
-
-        }
-    }
     public override void Dispose()
     {
 
@@ -72,17 +60,24 @@ public partial class DiscreteMovableEquipmentViewModel : MovableEquipmentViewMod
 {
     [ObservableProperty] private ObservableCollection<string> _possibleSettings;
     [ObservableProperty] private string _selectedMovableComponent;
+    private DiscreteMovableComponentPartProperties DiscreteMovableComponentPartProperties { get; set; }
 
-    public DiscreteMovableEquipmentViewModel(string name, List<string> possibleSettings, string desiredsetting)
+    public DiscreteMovableEquipmentViewModel(string name, List<string> possibleSettings, string desiredsetting, DiscreteMovableComponentPartProperties? movableComponent)
     {
+        DiscreteMovableComponentPartProperties = movableComponent;
         SelectedMovableComponent = desiredsetting;
         ComponentName = name;
         PossibleSettings = new ObservableCollection<string>(possibleSettings);
- 
+
+
     }
     public override void Dispose()
     {
 
+    }
+    partial void OnSelectedMovableComponentChanged(string value)
+    {
+        DiscreteMovableComponentPartProperties.desiredsetting = value; 
     }
 }
 
@@ -94,9 +89,12 @@ public partial class ContinuousMovableEquipmentViewModel : MovableEquipmentViewM
     [ObservableProperty] private double _incrementValue;
     [ObservableProperty] private string _minmaxVal;
 
+    private ContinuousMovableComponentPartProperties ContinuousMovableComponentPartProperties { get; set; }
 
-    public ContinuousMovableEquipmentViewModel(string name, double minValue, double maxValue, double incrementValue, double? desiredsetting)
+
+    public ContinuousMovableEquipmentViewModel(string name, double minValue, double maxValue, double incrementValue, double? desiredsetting, ContinuousMovableComponentPartProperties movableComponent)
     {
+        ContinuousMovableComponentPartProperties = movableComponent;
         MinValue = minValue;
         MaxValue = maxValue;
         ComponentName = name;
@@ -107,6 +105,11 @@ public partial class ContinuousMovableEquipmentViewModel : MovableEquipmentViewM
     public override void Dispose()
     {
 
+    }
+
+    partial void OnSelectedValueChanged(double? value)
+    {
+        ContinuousMovableComponentPartProperties.desiredsetting = value;
     }
 }
 

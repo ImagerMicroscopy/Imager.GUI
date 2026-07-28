@@ -6,7 +6,7 @@
 			 
              xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
              x:Class="ImagerAvalonia.Views.AcquisitionPanelView"
-			 x:DataType="vm:AcquisitionPanelViewModel">
+			 x:DataType="vm:DetectionElementViewModel">
 
 
 
@@ -74,7 +74,7 @@
 							<Grid ColumnDefinitions="190,100" Margin="0 0 0 0">
 								<TextBlock Width="190" FontSize="12" Text="{Binding Name}" VerticalAlignment="Center" Grid.Column="0" TextTrimming="CharacterEllipsis"/>
 								<ToggleSwitch   IsChecked="{Binding IsEnabled}" Grid.Column="1" VerticalAlignment="Center" 
-															Command="{Binding $parent[StackPanel].((vm:AcquisitionPanelViewModel)DataContext).OnToggle, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+															Command="{Binding $parent[StackPanel].((vm:DetectionElementViewModel)DataContext).OnToggle, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
 															CommandParameter="{Binding}" />							
 							</Grid>
 						</DataTemplate>

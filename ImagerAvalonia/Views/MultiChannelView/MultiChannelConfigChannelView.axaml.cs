@@ -20,12 +20,12 @@ public partial class MultiChannelConfigChannelView : ExperimentSelector
         AvaloniaXamlLoader.Load(this);
     }
 
-    protected override void ExpPanel_DetectionDoubleTapped(object? sender, Services.NodeBase e)
+    protected override void ExpPanel_DetectionDoubleTapped(object? sender, MeasurementElementViewModel e)
     {
         expPanel.DetectionDoubleTapped -= ExpPanel_DetectionDoubleTapped;
-        if (DataContext is MultiChannelConfigChannelViewModel vm && e is ActionNode actionNode)
+        if (DataContext is MultiChannelConfigChannelViewModel vm && e is MeasurementElementViewModel actionNode)
         {
-            vm.SelectedDetection = actionNode.NodeViewModel;
+            vm.SelectedDetection = actionNode;
             vm.SelectedNode = actionNode;
             e.OnNodeDeleted += vm.NodeDeleted;
         }

@@ -7,21 +7,7 @@
 			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
 			
              mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
-             x:Class="ImagerAvalonia.Views.SmartServerOutputView"
-             x:DataType="vm:SmartProgramOutputViewModel">
-    <ScrollViewer x:Name="ScrollViewer" VerticalScrollBarVisibility="Visible" 
-                  HorizontalScrollBarVisibility="Disabled">
-	<!--	<TextBlock FontSize="12" Text="{Binding SmartProgramOutput}" Background="#000a21">
-		
-        </TextBlock> -->
+             x:Class="ImagerAvalonia.Views.SmartServerOutputView">
 
-        <ItemsControl ItemsSource="{Binding RunList}" >
-          <ItemsControl.ItemTemplate>
-            <DataTemplate>
-              <TextBlock Text="{Binding Text}" Foreground="{Binding Color}"/>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-    </ScrollViewer>
     
 </UserControl>

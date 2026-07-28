@@ -1,6 +1,6 @@
 ﻿
 using CommunityToolkit.Mvvm.ComponentModel;
-using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.Logging;
 using System.Collections.ObjectModel;
 
 

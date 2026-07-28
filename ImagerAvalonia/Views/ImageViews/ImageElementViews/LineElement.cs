@@ -173,9 +173,9 @@ namespace ImagerAvalonia.Views.ImageViews
 
 
         public ElementPlotViewModel GenerateRegionPlotControl(List<IImageElement> image_elements, string acq, string det, string reg, 
-            ObservableCollection<XYStagePosition> xYStagePositions)
+            ObservableCollection<XYStagePosition> stagePositions)
         {
-                var circle_vm = new LineElementViewModel(image_elements, acq, det, reg, xYStagePositions);
+                var circle_vm = new LineElementViewModel(image_elements, acq, det, reg, stagePositions);
                 return circle_vm;
         }
     }

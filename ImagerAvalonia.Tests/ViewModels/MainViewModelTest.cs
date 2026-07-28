@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json.Linq;
 using Xunit;
+using ImagerAvalonia.Services.Storage;
 
 namespace Imager.Tests.ViewModels
 {
@@ -28,7 +29,7 @@ namespace Imager.Tests.ViewModels
         {
             ""responsetype"":""detectorproperties"",
             ""detectorproperties"":[
-                {""descriptor"":""Exposure time"",""kind"":""numeric"",""propertycode"":0,""value"":5.0e-3},
+                {""descriptor"":""Exure time"",""kind"":""numeric"",""propertycode"":0,""value"":5.0e-3},
                 {""availableoptions"":[""16"",""32"",""64"",""128"",""256"",""512"",""1024"",""1280"",""1536"",""2048""],
                     ""current"":""128"",""descriptor"":""Sensor cropping 1"",""kind"":""discrete"",""propertycode"":1},
                 {""availableoptions"":[""16"",""32"",""64"",""128"",""256"",""512"",""1024"",""1280"",""1536"",""2048""],
@@ -157,7 +158,7 @@ namespace Imager.Tests.ViewModels
             out Mock<IImagerConnectionHandler> connectionHandler,
             out Mock<IStageControl> stageControl,
             out ImageControlPanelViewModel imagePanel,
-            out SystemDefinedSettingsViewModel userDefinedAcquisitions,
+            out GlobalDefinedSettingsViewModel userDefinedAcquisitions,
             out Mock<SmartProcessingRegisterViewModel> processViewModel,
             out Mock<AcquisitionStateService> acquisitionState,
             out Mock<EquipmentState> equipmentState)
@@ -168,7 +169,7 @@ namespace Imager.Tests.ViewModels
             connectionHandler = new Mock<IImagerConnectionHandler>();
             var stageControlVM = new Mock<StageControlPanelViewModel>(stageControl.Object);
             messages = new Mock<ComUtils>();
-            userDefinedAcquisitions =  new SystemDefinedSettingsViewModel();
+            userDefinedAcquisitions =  new GlobalDefinedSettingsViewModel();
             processViewModel = new Mock<SmartProcessingRegisterViewModel>();
             equipmentState = new Mock<EquipmentState>();
             acquisitionState = new Mock<AcquisitionStateService>(stageControl.Object, processViewModel.Object, messages.Object, equipmentState.Object);

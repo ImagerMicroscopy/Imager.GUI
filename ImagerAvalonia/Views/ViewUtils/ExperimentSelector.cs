@@ -24,7 +24,7 @@ namespace ImagerAvalonia.Views.ViewUtils
 
         }
 
-        protected async void OnSelectButtonClick(object? sender, RoutedEventArgs e)
+        public async void OnSelectButtonClick(object? sender, RoutedEventArgs e)
         {
             MainViewModel mainVM = App.Container.Resolve<MainViewModel>();
             if (sender is Control control)
@@ -61,7 +61,7 @@ namespace ImagerAvalonia.Views.ViewUtils
         }
 
 
-        protected virtual void ExpPanel_DetectionDoubleTapped(object? sender, Services.NodeBase e) { }
+        protected virtual void ExpPanel_DetectionDoubleTapped(object? sender, MeasurementElementViewModel e) { }
 
 
     }

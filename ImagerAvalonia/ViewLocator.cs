@@ -1,7 +1,8 @@
-using System;
+using Autofac;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using ImagerAvalonia.ViewModels;
+using System;
 
 namespace ImagerAvalonia;
 
@@ -17,6 +18,9 @@ public class ViewLocator : IDataTemplate
 
         if (type != null)
         {
+            if (App.Container.IsRegistered(type))
+                return (Control)App.Container.Resolve(type);
+
             return (Control)Activator.CreateInstance(type)!;
         }
 

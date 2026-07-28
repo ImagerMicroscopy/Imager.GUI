@@ -1,12 +1,17 @@
+using Autofac;
+using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
+using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Services.Workspace.SmartProgramWorkspace;
+using ImagerAvalonia.Utils;
+
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Autofac;
-using ImagerAvalonia.Data;
-using ImagerAvalonia.Data.Measurements;
-using ImagerAvalonia.Services.MeasurementControl;
-using ImagerAvalonia.Utils;
-using Microsoft.Extensions.Logging;
 
 namespace ImagerAvalonia.Services.Workspace;
 
@@ -22,19 +27,14 @@ public class ImagerWorkspace : IDisposable {
     private readonly ILogger _logger;
     private readonly IImagerConnectionHandler _connectionHandler;
     private readonly IImagerCommunicationManager _communicationManager;
-    private readonly AcquisitionStateService _acquisitionState;
+    private readonly SmartProgramRegistry _smartProgramRegistry;
 
-    // The three specialized sub-managers
-    public ExperimentBuilder ExperimentBuilder { get; }
-    public AcquisitionEngine AcquisitionEngine { get; }
-    public DataWorkspace DataWorkspace { get; }
 
     public WorkspaceState CurrentState { get; private set; } = WorkspaceState.Idle;
     public event EventHandler<WorkspaceState>? StateChanged;
 
     public ImageHandler? ActiveImageHandler { get; private set; }
     public IStorageProvider? ActiveStorageProvider { get; private set; }
-    public IExperimentSerialization? ActiveExperimentSerializer { get; private set; }
 
     public event EventHandler<ILifetimeScope>? LiveScopeCreated;
     public event EventHandler<ILifetimeScope>? ExperimentScopeCreated;
@@ -48,58 +48,84 @@ public class ImagerWorkspace : IDisposable {
     private ILifetimeScope? _activeScope;
 
     public ImagerWorkspace(
-        ExperimentBuilder experimentBuilder, 
-        AcquisitionEngine acquisitionEngine, 
-        DataWorkspace dataWorkspace,
+
         ILifetimeScope lifetimeScope,
         ILoggerFactory loggerFactory,
         IImagerConnectionHandler connectionHandler,
         IImagerCommunicationManager communicationManager,
-        AcquisitionStateService acquisitionState) {
-        
-        ExperimentBuilder = experimentBuilder;
-        AcquisitionEngine = acquisitionEngine;
-        DataWorkspace = dataWorkspace;
+        SmartProgramRegistry smartProgramRegistry) {
+
         _lifetimeScope = lifetimeScope;
         _logger = loggerFactory.CreateLogger("ImagerWorkspace");
         _connectionHandler = connectionHandler;
         _communicationManager = communicationManager;
-        _acquisitionState = acquisitionState;
+        _smartProgramRegistry = smartProgramRegistry;   
 
-        AcquisitionEngine.MeasurementStarted += (s, e) => SetState(WorkspaceState.Acquiring);
-        AcquisitionEngine.MeasurementCompleted += (s, e) => SetState(WorkspaceState.Idle);
-        AcquisitionEngine.ImageReceived += (s, img) => DataWorkspace.AddImage(img);
+
     }
 
-    public async Task ToggleLiveAsync() {
+    public async Task ToggleLiveAsync(DefinedDetection detection) {
         if (IsLiveEnabled) await StopLiveAsync();
-        else await StartLiveAsync();
+        else await StartLiveAsync(detection);
     }
 
-    public async Task StartLiveAsync() {
+    private List<Tuple<string,string>> ResolveAcqDetPairs(DefinedDetection selectedDetection)
+    {
+        var acq_det_pairs = selectedDetection.Settings.Detectors
+            .Where(x => x.IsEnabled)
+            .Select(x => new Tuple<string, string>(
+                 selectedDetection.Name,
+                x.Detectorname
+            ))
+            .ToList();
+        return acq_det_pairs;
+    }
+
+    public async Task StartLiveAsync(DefinedDetection selectedDetection) {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsLiveEnabled = true;
-        _acquisitionState.SetLiveState();
-
+        //_acquisitionState.SetLiveState();
+        CurrentState = WorkspaceState.Acquiring;
         _activeScope = _lifetimeScope.BeginLifetimeScope();
         ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
-        ActiveExperimentSerializer = _activeScope.Resolve<IExperimentSerialization>();
 
+
+        var experiment =  new DoTimesElement() { ElementId = Guid.NewGuid().ToString(), NTotal = 10000000,
+            Elements = new List<MeasurementElementBase>() {
+                new DetectionElement() { ElementId = Guid.NewGuid().ToString(),DetectionNames =
+                new List<string>(){ selectedDetection.Name } }
+            }
+        };
+
+        var acq_det_pairs = ResolveAcqDetPairs(selectedDetection);
+        ActiveStorageProvider.SetAcqDetPairs(acq_det_pairs);
+        
+        var smartprograms =  new SmartProgramRegistry();
+        var detections =     new Dictionary<string,DetectionParams>() { { selectedDetection.Name, selectedDetection.Settings } };
         ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler);
-        _cancelToken = new CancellationTokenSource();
+        _cancelToken =       new CancellationTokenSource();
+
+
+        var program = new MeasurementProgram(experiment,
+            detections
+        );
 
         LiveScopeCreated?.Invoke(this, _activeScope);
 
         try {
-            await ActiveImageHandler.ParseProgramAndShowData(_cancelToken);
+            await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, smartprograms);
         } catch (Exception) {
+
+            CurrentState = WorkspaceState.Idle;
             await StopLiveInternalAsync();
             throw;
         }
     }
 
     public async Task StopLiveAsync() {
-        if (!IsLiveEnabled) return;
+
+        if (CurrentState!=WorkspaceState.Acquiring) return;
+        CurrentState = WorkspaceState.Idle;
         await StopLiveInternalAsync();
     }
 
@@ -114,48 +140,85 @@ public class ImagerWorkspace : IDisposable {
         HandlerDestroyed?.Invoke(this, EventArgs.Empty);
         
         CleanUpActiveSession();
-        _acquisitionState.SetIdleState();
     }
 
-    public async Task ToggleExperimentAsync() {
+    public async Task ToggleExperimentAsync(MeasurementElementBase experiment,
+        string storagepath,
+        bool isstorageenabeld,
+        List<DefinedDetection> detections) {
         if (IsExperimentEnabled) await StopExperimentAsync();
-        else await StartExperimentAsync();
+        else await StartExperimentAsync(experiment,
+            storagepath,
+            isstorageenabeld,
+            detections);
     }
 
-    public async Task StartExperimentAsync() {
+    public async Task StartExperimentAsync(
+        MeasurementElementBase experiment,
+        string storagepath,
+        bool isstorageenabeld, 
+        List<DefinedDetection> detections
+        ) {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsExperimentEnabled = true;
-        _acquisitionState.SetExperimentState();
 
         _activeScope = _lifetimeScope.BeginLifetimeScope();
         ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
-        ActiveExperimentSerializer = _activeScope.Resolve<IExperimentSerialization>();
-        
+        var acq_det_pairs = detections.Select(x => ResolveAcqDetPairs(x))
+            .SelectMany(list => list)
+            .Distinct()
+            .ToList();
+
+        var program = new MeasurementProgram(
+                experiment,
+                detections.ToDictionary(d => d.Name, 
+                d => d.Settings)            
+        );
+
+
+        ActiveStorageProvider.SetEnabledStorage(isstorageenabeld);
+        ActiveStorageProvider.SetMeasurementProgram(JObject.FromObject(program,
+            Newtonsoft.Json.JsonSerializer.Create(MeasurementSerializer.Settings)));
+        ActiveStorageProvider.SetMaxFrameNumber((int)experiment.CountTotalDetections());
+
+        ActiveStorageProvider.SetAcqDetPairs(acq_det_pairs);
+        ActiveStorageProvider.SetStoragePath(storagepath);
+        ActiveStorageProvider.OpenWriteStream();
+
         ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler);
         _cancelToken = new CancellationTokenSource();
 
         ExperimentScopeCreated?.Invoke(this, _activeScope);
+        CurrentState = WorkspaceState.Acquiring;
 
-        try {
-            bool success = await ActiveImageHandler.ParseProgramAndShowData(_cancelToken);
+        try
+        {
+            bool success = await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, _smartProgramRegistry);
             if (success) {
                 ExperimentFinished?.Invoke(this, EventArgs.Empty);
+                CurrentState = WorkspaceState.Idle;
             }
         } catch (Exception) {
+            CurrentState = WorkspaceState.Idle;
             IsExperimentEnabled = false;
-            try {
+            ExperimentFinished?.Invoke(this, EventArgs.Empty);
+            try
+            {
                 await _communicationManager.CancelMeasurementProgramAsync();
             } catch {}
-            _acquisitionState.SetIdleState();
             throw;
         } finally {
             IsExperimentEnabled = false;
+            CurrentState = WorkspaceState.Idle;
+            ExperimentFinished?.Invoke(this, EventArgs.Empty);
+
             if (ActiveStorageProvider != null) {
                 ActiveStorageProvider.CloseReadWriteStream();
                 await Task.Delay(2000);
-                ActiveStorageProvider.OpenReadStream();
+                if(isstorageenabeld) {
+                    ActiveStorageProvider.OpenReadStream();
+                }
             }
-            _acquisitionState.SetIdleState();
         }
     }
 
@@ -171,13 +234,11 @@ public class ImagerWorkspace : IDisposable {
         HandlerDestroyed?.Invoke(this, EventArgs.Empty);
         
         CleanUpActiveSession();
-        _acquisitionState.SetIdleState();
     }
 
     private void CleanUpActiveSession() {
         ActiveImageHandler = null;
         ActiveStorageProvider = null;
-        ActiveExperimentSerializer = null;
         _activeScope?.Dispose();
         _activeScope = null;
     }
@@ -185,13 +246,9 @@ public class ImagerWorkspace : IDisposable {
     public async Task LoadHistoricalDataAsync(string directoryPath) {
         if (CurrentState == WorkspaceState.Acquiring)
             throw new InvalidOperationException("Cannot load data while acquiring.");
-        DataWorkspace.ClearWorkspace();
     }
 
-    private void SetState(WorkspaceState newState) {
-        CurrentState = newState;
-        StateChanged?.Invoke(this, newState);
-    }
+
 
     public void Dispose() {
         _cancelToken?.Dispose();

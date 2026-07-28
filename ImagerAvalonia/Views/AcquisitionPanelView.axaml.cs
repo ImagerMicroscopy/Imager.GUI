@@ -14,11 +14,6 @@ public partial class AcquisitionPanelView : UserControl
         InitializeComponent();
     }
 
-    public AcquisitionPanelView(SystemDefinedSettingsViewModel availableAcquisitions)
-    {
-        InitializeComponent();
-        DataContext = new AcquisitionPanelViewModel(availableAcquisitions); 
-    }
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);

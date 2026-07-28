@@ -30,7 +30,7 @@
 
 
 		
-	<Grid >
+	<Grid IsEnabled="{Binding IsStageAvailable}">
 
 
 

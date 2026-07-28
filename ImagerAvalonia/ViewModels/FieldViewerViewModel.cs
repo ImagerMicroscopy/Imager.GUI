@@ -11,7 +11,7 @@ using System.Linq;
 
 namespace ImagerAvalonia.ViewModels;
 
-public partial class FieldViewerViewModel : ViewModelBase, IImageDisplay
+public partial class FieldViewerViewModel : ViewModelBase
 {
 
     IStageControl? _stageControl;
@@ -33,7 +33,7 @@ public partial class FieldViewerViewModel : ViewModelBase, IImageDisplay
 
     public void FindCurrentStagePosition()
     {
-        CurrentStagePosition = _stageControl != null ? _stageControl.ReadStagePosition() : new XYStagePosition(0, 0, 0, false, 0,"DefaultPosition");
+        CurrentStagePosition = _stageControl != null ? _stageControl.ReadStagePosition() : new XYStagePosition(0, 0, 0, 0, false,"DefaultPosition");
     }
 
     public void EngageFieldViewer()
@@ -43,25 +43,25 @@ public partial class FieldViewerViewModel : ViewModelBase, IImageDisplay
 
     }
 
-    public void SetGridData(List<AcqDetPair> acq_det_pairs)
+    public void SetGridData(List<Tuple<string,string>> acq_det_pairs)
     {
         Acquisitions.Clear();
         Detectors.Clear();
         if (acq_det_pairs == null) return;
         if (acq_det_pairs == null) return;
-        foreach (AcqDetPair acquisition in acq_det_pairs)
+        foreach (Tuple<string, string> acquisition in acq_det_pairs)
         {
-            foreach (AcqDetPair detector in acq_det_pairs)
+            foreach (Tuple<string, string> detector in acq_det_pairs)
             {
-                if (!Acquisitions.Contains(acquisition.acqName))
+                if (!Acquisitions.Contains(acquisition.Item1))
                 {
-                    Acquisitions.Add(acquisition.acqName);
+                    Acquisitions.Add(acquisition.Item1);
 
                 }
-                if (!Detectors.Contains(detector.detName))
+                if (!Detectors.Contains(detector.Item2))
                 {
 
-                    Detectors.Add(detector.detName);
+                    Detectors.Add(detector.Item2);
                 }
             }
         }

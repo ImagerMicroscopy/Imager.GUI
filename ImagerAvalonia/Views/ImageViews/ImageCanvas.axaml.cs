@@ -4,8 +4,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.Views.ViewUtils;
 using System;
 
 namespace ImagerAvalonia.Views;

@@ -12,8 +12,8 @@ namespace ImagerAvalonia.ViewModels
 {
     public partial class MultiChannelConfigChannelViewModel : ViewModelBase
     {
-        public MeasurementViewModel? SelectedDetection { get; set; }
-        private ActionNode? _selectedNode;
+        public MeasurementElementViewModel? SelectedDetection { get; set; }
+        private MeasurementElementViewModel? _selectedNode;
         public Guid? SelectedDetectionId { get; set; } = Guid.Empty;
         [ObservableProperty] DetectorEquipmentViewModel _detectorInput;
         [ObservableProperty] EnabledAcquisition _AcquisitionInput;
@@ -27,15 +27,15 @@ namespace ImagerAvalonia.ViewModels
         public MultiChannelConfigChannelViewModel() { }
 
 
-        public ActionNode? SelectedNode
+        public MeasurementElementViewModel? SelectedNode
         {
             get => _selectedNode;
             set
             {
-                if (value is ActionNode detectionNode)
+                if (value is MeasurementElementViewModel detectionNode)
                 {
 
-                    if (detectionNode.NodeViewModel is AcquisitionPanelViewModel acq_vm)
+                    if (detectionNode is DetectionElementViewModel acq_vm)
                     {
                         SelectedDetectionId = acq_vm.Elementid;
                         DefinedAcquisitions = acq_vm.IsAquisitionEnabled;
@@ -77,9 +77,9 @@ namespace ImagerAvalonia.ViewModels
             RefreshFilteredAcquisitions();
         }
 
-        internal void NodeDeleted(object? sender, ViewModelBase? e)
+        internal void NodeDeleted(object? sender, MeasurementElementViewModel? e)
         {
-            if (e is MeasurementViewModel node)
+            if (e is MeasurementElementViewModel node)
             {
                 if (SelectedDetection == node)
                 {
@@ -99,7 +99,7 @@ namespace ImagerAvalonia.ViewModels
         {
             if (AcquisitionInput != null)
             {
-                DefinedDetectors = acq_input.acquisition.Detector;
+                DefinedDetectors = acq_input.Acquisition.Detector;
             }
         }
 

@@ -1,20 +1,22 @@
+using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Utils;
 using System;
 using System.Collections.Generic;
-using System.Threading;
-using System.Buffers;
-using MessagePack;
-using Newtonsoft.Json.Linq;
-using ImagerAvalonia.Services.MeasurementControl;
-using System.Threading.Tasks;
-using System.Text.Json;
+
+public class ImagerData
+{
+    public PositionData positions = new();
+    public ImageData images = new();
+    public DetectionData acquisitions = new();
+}
+
+
 
 namespace ImagerAvalonia.Utils
 {
 
-    public interface IAcquisitionHandler
-    {
-        public void ProcessIncomingData(byte[] receivedData);
-    }
+
 
     // Stores X, Y, Z positional data
     public class PositionData
@@ -40,13 +42,7 @@ namespace ImagerAvalonia.Utils
         public Dictionary<string, string> ExperimentalVariables = new();
     }
 
-    // Main data structure combining positions, images, and detections
-    public class ImagerData
-    {
-        public PositionData positions = new();
-        public ImageData images = new();
-        public DetectionData acquisitions = new();
-    }
+
 
     // Handles acquisition using MessagePack formatting
     public class MessagePackAcquisitionHandler {
@@ -104,8 +100,7 @@ namespace ImagerAvalonia.Utils
                         PositionName = msg.MetaData.StagePositionName ?? string.Empty,
                         ElementID = msg.MetaData.DetectionElementId,
                         CurrentStagePosition = new XYStagePosition(
-                            (float)sp.X, (float)sp.Y, (float)sp.Z, sp.UsingHardwareAutofocus,
-                            (float)sp.HardwareAutofocusOffset, msg.MetaData.StagePositionName ?? string.Empty)
+                           sp.HardwareAutofocusOffset, sp.X,sp.Y,sp.Z, sp.UsingHardwareAutofocus , msg.MetaData.StagePositionName ?? string.Empty)
                     };
 
                     images_data.Metadata.Add(tiffMeta);

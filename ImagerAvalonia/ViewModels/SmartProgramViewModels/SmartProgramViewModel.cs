@@ -4,8 +4,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.ImagerModels.SmartProgramModels;
 using ImagerAvalonia.Services.MeasurementControl;
-using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -26,33 +26,121 @@ namespace ImagerAvalonia.ViewModels
         public event EventHandler? OnReloadRequested;
 
         public event EventHandler<string> OnSelectedProgramChangedEvent;
-        public string LoadedFolder = string.Empty;
+
         private readonly IPythonCom _nodeComService;
         private readonly EquipmentState _equipmentState;
-        private Dictionary<string, string> _programNameFolderPairs = new();
 
-        [ObservableProperty] Guid _smartProgramID = Guid.NewGuid();
+        public SmartProgramModel Model { get; } = new();
+
+        public Guid SmartProgramID => Model.SmartProgramID;
+
+        public string LoadedFolder
+        {
+            get => Model.LoadedFolder;
+            set => Model.LoadedFolder = value;
+        }
+
         [ObservableProperty] string _selectedProgram;
         [ObservableProperty] ObservableCollection<string> _programNames = new();
+
         [ObservableProperty] ObservableCollection<InputFunctionViewModel> _availableMethods = new();
         [ObservableProperty] ObservableCollection<InputParameterBase> _availableParameters = new();
         [ObservableProperty] ObservableCollection<SmartUpdateAcquisitionFunctionViewModel> _availableAcquisitionUpdates = new();
 
 
-        public SmartProgramViewModel( IPythonCom nodeComService , SmartProcessingRegisterViewModel smartProcessingRegister, EquipmentState eqState) 
+        public SmartProgramViewModel(IPythonCom nodeComService, SmartProcessingRegisterViewModel smartProcessingRegister, EquipmentState eqState)
         {
             _nodeComService = nodeComService;
             _equipmentState = eqState;
-            smartProcessingRegister.SmartProgramViewModels.Add(this);
+            smartProcessingRegister.AddSmartProgram(this, Model);
             this.PropertyChanged += SmartProgramEditorViewModel_PropertyChanged;
+            HookAvailableParametersCollectionChanged(AvailableParameters);
+            HookAvailableAcquisitionUpdatesCollectionChanged(AvailableAcquisitionUpdates);
         }
+
+        // Keeps Model.SelectedProgram in step whenever the bindable SelectedProgram changes.
+        partial void OnSelectedProgramChanged(string value)
+        {
+            Model.SmartProgramDefinition.programname = value ?? string.Empty;
+        }
+
+        #region Parameters <-> Model sync
+
+
+        partial void OnAvailableParametersChanged(ObservableCollection<InputParameterBase> value)
+        {
+            HookAvailableParametersCollectionChanged(value);
+            SyncParametersToModel();
+        }
+
+        private ObservableCollection<InputParameterBase>? _hookedParameterCollection;
+
+        private void HookAvailableParametersCollectionChanged(ObservableCollection<InputParameterBase> collection)
+        {
+            if (_hookedParameterCollection is not null)
+            {
+                _hookedParameterCollection.CollectionChanged -= AvailableParameters_CollectionChanged;
+            }
+            collection.CollectionChanged += AvailableParameters_CollectionChanged;
+            _hookedParameterCollection = collection;
+        }
+
+        private void AvailableParameters_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            SyncParametersToModel();
+        }
+
+        private void SyncParametersToModel()
+        {
+            // Model.Parameters has no setter, so mutate it in place.
+            Model.SmartProgramDefinition.parameters.Clear();
+            Model.SmartProgramDefinition.parameters.AddRange(AvailableParameters);
+        }
+        #endregion
+
+        #region Acquisition updates <-> Model sync
+
+
+        partial void OnAvailableAcquisitionUpdatesChanged(ObservableCollection<SmartUpdateAcquisitionFunctionViewModel> value)
+        {
+            HookAvailableAcquisitionUpdatesCollectionChanged(value);
+            SyncAcquisitionUpdatesToModel();
+        }
+
+        private ObservableCollection<SmartUpdateAcquisitionFunctionViewModel>? _hookedAcquisitionUpdateCollection;
+
+        private void HookAvailableAcquisitionUpdatesCollectionChanged(ObservableCollection<SmartUpdateAcquisitionFunctionViewModel> collection)
+        {
+            if (_hookedAcquisitionUpdateCollection is not null)
+            {
+                _hookedAcquisitionUpdateCollection.CollectionChanged -= AvailableAcquisitionUpdates_CollectionChanged;
+            }
+            collection.CollectionChanged += AvailableAcquisitionUpdates_CollectionChanged;
+            _hookedAcquisitionUpdateCollection = collection;
+        }
+
+        private void AvailableAcquisitionUpdates_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            SyncAcquisitionUpdatesToModel();
+        }
+
+        private void SyncAcquisitionUpdatesToModel()
+        {
+            // Each VM now owns its own Model instance (built up as the VM's bindable
+            // properties/child parameter VMs change), so this just projects them -
+            // same pattern as AvailableMethods.Select(x => x.Model) below.
+            Model.SmartProgramDefinition.acquisitionupdates.Clear();
+            Model.SmartProgramDefinition.acquisitionupdates.AddRange(AvailableAcquisitionUpdates.Select(x => x.Model));
+        }
+        #endregion
 
         private async void RequestMethodsAndParameters()
         {
 
             try
             {
-                if (_programNameFolderPairs.TryGetValue(SelectedProgram, out string? program_path))
+                var program_path = Model.GetProgramPath();
+                if (program_path is not null)
                 {
                     OnSelectedProgramChangedEvent?.Invoke(this, program_path);
                     var methods =
@@ -67,18 +155,20 @@ namespace ImagerAvalonia.ViewModels
                     var methods_json = JArray.Parse(methods);
                     var update_acq_json = JArray.Parse(update_acq_parameters);
 
-                    var update_acq_params = update_acq_json.ToObject<List<InputFunction>>();
-                    var newvals = methods_json.ToObject<List<InputFunction>>();
+                    var update_acq_params = update_acq_json.ToObject<List<ImportedInputFunctionModel>>();
+                    var newvals = methods_json.ToObject<List<ImportedInputFunctionModel>>();
+                    Model.SmartProgramDefinition.methods.Clear();
 
 
                     var acquisitionUpdatesVals = JsonConvert.DeserializeObject<List<SmartUpdateAcquisitionFunctionViewModel>>(acquisitionUpdates,
                         new UpdateAcquisitionFunctionConverter());
 
 
-                    foreach(var acqUpdate in acquisitionUpdatesVals)
+                    foreach (var acqUpdate in acquisitionUpdatesVals)
                     {
                         acqUpdate.SmartProgramViewModel = this;
-                        acqUpdate.EquipmentState = _equipmentState;  
+                        acqUpdate.EquipmentState = _equipmentState;
+                        acqUpdate.Model.SmartProgramId = SmartProgramID;
                         acqUpdate.UpdateParameters = update_acq_params.Find(x => x.method_name == acqUpdate.AcquisitionUpdate);
                     }
 
@@ -115,7 +205,7 @@ namespace ImagerAvalonia.ViewModels
 
         private void SmartProgramEditorViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if(e.PropertyName== nameof(SelectedProgram))
+            if (e.PropertyName == nameof(SelectedProgram))
             {
                 RequestMethodsAndParameters();
             }
@@ -138,6 +228,7 @@ namespace ImagerAvalonia.ViewModels
 
         }
 
+
         public void LoadFolder()
         {
             OnOpenFolderRequested?.Invoke(this, new EventArgs());
@@ -150,7 +241,7 @@ namespace ImagerAvalonia.ViewModels
 
 
 
-        public async Task SubmitFolderToSmartProgramServer(string path,bool toload)
+        public async Task SubmitFolderToSmartProgramServer(string path, bool toload)
         {
             LoadedFolder = path;
             var response = await _nodeComService.SubmitFolder(path);
@@ -162,7 +253,11 @@ namespace ImagerAvalonia.ViewModels
                 {
                     if (f.name != null && f.path != null)
                     {
-                        _programNameFolderPairs.TryAdd(f.name, f.path);
+                        // NOTE: Model.RegisterProgram overwrites an existing entry for the
+                        // same name, whereas the previous _programNameFolderPairs.TryAdd
+                        // left the first-registered path in place. Flagging in case that
+                        // distinction matters for repeated folder submissions.
+                        Model.RegisterProgram(f.name, f.path);
                         if (toload)
                         {
                             if (!ProgramNames.Contains(f.name))
@@ -174,14 +269,17 @@ namespace ImagerAvalonia.ViewModels
                 }
             }
         }
+
+
+
         public void SubstituteMethods(ObservableCollection<InputFunctionViewModel> newMethods,
           ObservableCollection<SmartUpdateAcquisitionFunctionViewModel> newAcquisitionUpdates)
         {
 
             foreach (var method in AvailableMethods)
             {
-                if(!newMethods.Select(x => x.MethodName).Contains(method.MethodName))
-                { 
+                if (!newMethods.Select(x => x.MethodName).Contains(method.MethodName))
+                {
                     foreach (var methodparam in method.MethodParams)
                     {
                         methodparam.RemoveExperimentBindings();
@@ -189,7 +287,7 @@ namespace ImagerAvalonia.ViewModels
                     continue;
                 }
                 var new_method = newMethods.Where(x => x.MethodName == method.MethodName).FirstOrDefault();
-                if(new_method.MethodParams.Count!= method.MethodParams.Count)
+                if (new_method.MethodParams.Count != method.MethodParams.Count)
                 {
                     foreach (var methodparam in method.MethodParams)
                     {
@@ -205,8 +303,10 @@ namespace ImagerAvalonia.ViewModels
             }
 
             AvailableMethods = newMethods;
+            Model.SmartProgramDefinition.methods = AvailableMethods.Select(x => x.Model).ToList();
+
             var to_remove_acquisition_updates = new List<SmartUpdateAcquisitionFunctionViewModel>();
-            foreach(var currentUpdateAcq in AvailableAcquisitionUpdates)
+            foreach (var currentUpdateAcq in AvailableAcquisitionUpdates)
             {
 
                 currentUpdateAcq.RemoveExperimentBindings();
@@ -230,91 +330,25 @@ namespace ImagerAvalonia.ViewModels
             foreach (var updateAcq in AvailableAcquisitionUpdates)
             {
                 updateAcq.RemoveExperimentBindings();
-                
+
             }
             AvailableAcquisitionUpdates.Clear();
+            AvailableParameters.Clear();
+            Model.Clear();
         }
 
-        public JObject SerializeProgram()
+
+
+        internal class FolderResponse
         {
-            JObject serializedProgram = new JObject();
-            JArray serializedMethods = new JArray();
-            JArray serializedAcquisitionUpdates = new JArray();
-
-            serializedProgram.TryAdd("programname", JToken.FromObject(SelectedProgram)); 
-           
-
-            foreach (var method in AvailableMethods)
-            {
-
-                JArray methodparams_array = new JArray();
-                var methodvals = new JObject();
-                methodvals.TryAdd("methodname", JToken.FromObject(method.MethodName));
-                foreach (var methodparam in method.MethodParams)
-                {
-                    JObject methodparams = new JObject();
-
-
-                    if (methodparam.SelectedDetection == null)
-                    {
-                        throw new Exception($"Unable to serialize smart program: " +
-                        $"No Detector selected for parameter {methodparam.InputParameterName}");
-                    }
-
-
-                    if (methodparam.AcquisitionInput.Name == string.Empty)
-                    { throw new Exception($"Unable to serialize smart program: " +
-                        $"No Acquisition selected for parameter {methodparam.InputParameterName}"); 
-                    }
-
-
-                    if (methodparam.AcquisitionInput.Name == string.Empty)
-                    {
-                        throw new Exception($"Unable to serialize smart program: " +
-                        $"No Detector selected for parameter {methodparam.InputParameterName}"); 
-                    }
-
-                    methodparams.TryAdd("acquisition", JToken.FromObject(methodparam.AcquisitionInput.Name));
-                    methodparams.TryAdd("detection", JToken.FromObject(methodparam.DetectorInput.Name));
-                    methodparams.TryAdd("elementid", JToken.FromObject(methodparam.SelectedDetection.Elementid));
-                    methodparams_array.Add(methodparams);
-
-
-                }
-                methodvals.TryAdd("inputparams", methodparams_array);
-                serializedMethods.Add(methodvals);
-            }
-            JArray serializedParameters = new JArray();
-
-            foreach (var parameter in AvailableParameters)
-            {
-                serializedParameters.Add(JToken.Parse(JsonConvert.SerializeObject(parameter, new InputParameterConverter())));
-            }
-            foreach (var parameter in AvailableAcquisitionUpdates)
-            {
-                serializedAcquisitionUpdates.Add(JToken.Parse(JsonConvert.SerializeObject(parameter, new UpdateAcquisitionFunctionConverter())));
-            }
-
-            serializedProgram.TryAdd("methods", serializedMethods);
-            serializedProgram.TryAdd("parameters", serializedParameters);
-            serializedProgram.TryAdd("acquisitionupdates", serializedAcquisitionUpdates);
-
-
-            return serializedProgram;
+            public string? status;
+            public List<FolderResponsePaths> programs = new();
         }
-    }
 
-    internal class FolderResponse
-    {
-        public string? status;
-        public List<FolderResponsePaths> programs = new();
-    }
-
-    internal class FolderResponsePaths
-    {
-        public string? name;
-        public string? path;
+        internal class FolderResponsePaths
+        {
+            public string? name;
+            public string? path;
+        }
     }
 }
-
-

@@ -14,7 +14,7 @@ public partial class TimeLapseView : UserControl
     {
         InitializeComponent();
     }
-    public TimeLapseView(SystemDefinedSettingsViewModel availableAcquisitions)
+    public TimeLapseView(GlobalDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = new ViewModels.TimeLapseViewModel();

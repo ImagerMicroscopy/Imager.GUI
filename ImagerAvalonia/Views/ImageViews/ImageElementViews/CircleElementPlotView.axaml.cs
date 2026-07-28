@@ -175,7 +175,7 @@ public partial class CircleElementPlotView : UserControl
                     for (int i = 0; i < stage_positions[element].Count; i++)
                     {
                         var position = stage_positions[element][i];
-                        if (pinned_position != IStageControl.DefaultXYStagePosition)
+                        if (pinned_position != IStageControl.DefaultStagePosition)
                         {
                             if (position.IsEqual(pinned_position))
                             {
@@ -248,7 +248,7 @@ public partial class CircleElementPlotView : UserControl
                         stage_positions[element].Clear();
 
                     }
-                    if (_circleElementViewModel.PinnedPosition != IStageControl.DefaultXYStagePosition)
+                    if (_circleElementViewModel.PinnedPosition != IStageControl.DefaultStagePosition)
                     {
                         if (_circleElementViewModel.PinnedPosition.IsEqual(pos))
                         {

@@ -1,13 +1,13 @@
+using ImagerAvalonia.Services.MeasurementControl;
+using MessagePack;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using MessagePack;
 
 namespace ImagerAvalonia.Utils;
 
@@ -15,99 +15,186 @@ namespace ImagerAvalonia.Utils;
 
 public abstract record ImagerRequest
 {
-    [JsonPropertyName("action")]
+    [JsonProperty("action")]
     public string Action { get; protected set; } = string.Empty;
 
     public string ToJson()
     {
-        return JsonSerializer.Serialize(this, GetType(), new JsonSerializerOptions 
-        { 
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull 
-        });
+        return JsonConvert.SerializeObject(this, GetType(),
+            new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
     }
 }
 
 public record AcquireDataRequest : ImagerRequest
 {
-    [JsonPropertyName("params")] public object Params { get; init; }
-    public AcquireDataRequest(object parameters) { Params = parameters; Action = "acquiredata"; }
+    [JsonProperty("params")]
+    public object Params { get; init; }
+
+    public AcquireDataRequest(object parameters)
+    {
+        Params = parameters;
+        Action = "acquiredata";
+    }
 }
 
-public record ListWavelengthsRequest : ImagerRequest { public ListWavelengthsRequest() { Action = "listwavelengths"; } }
-public record ListAvailableEquipmentRequest : ImagerRequest { public ListAvailableEquipmentRequest() { Action = "listavailableequipment"; } }
+public record ListWavelengthsRequest : ImagerRequest
+{
+    public ListWavelengthsRequest() => Action = "listwavelengths";
+}
+
+public record ListAvailableEquipmentRequest : ImagerRequest
+{
+    public ListAvailableEquipmentRequest() => Action = "listavailableequipment";
+}
 
 public record GetMotorizedStagePositionRequest : ImagerRequest
 {
-    [JsonPropertyName("name")] public string StageName { get; init; }
-    public GetMotorizedStagePositionRequest(string stageName) { StageName = stageName; Action = "getmotorizedstageposition"; }
+    [JsonProperty("name")]
+    public string StageName { get; init; }
+
+    public GetMotorizedStagePositionRequest(string stageName)
+    {
+        StageName = stageName;
+        Action = "getmotorizedstageposition";
+    }
 }
 
 public record SetMotorizedStagePositionRequest : ImagerRequest
 {
-    [JsonPropertyName("name")] public string StageName { get; init; }
-    [JsonPropertyName("position")] public StagePosition Position { get; init; }
-    public SetMotorizedStagePositionRequest(string stageName, StagePosition position) { StageName = stageName; Position = position; Action = "setmotorizedstageposition"; }
+    [JsonProperty("name")]
+    public string StageName { get; init; }
+
+    [JsonProperty("position")]
+    public StageCoordinates Position { get; init; }
+
+    public SetMotorizedStagePositionRequest(string stageName, StageCoordinates position)
+    {
+        StageName = stageName;
+        Position = position;
+        Action = "setmotorizedstageposition";
+    }
 }
 
-public record ListAvailableDetectorsRequest : ImagerRequest { public ListAvailableDetectorsRequest() { Action = "listavailabledetectors"; } }
+public record ListAvailableDetectorsRequest : ImagerRequest
+{
+    public ListAvailableDetectorsRequest() => Action = "listavailabledetectors";
+}
 
 public record GetDetectorPropertiesRequest : ImagerRequest
 {
-    [JsonPropertyName("detectorname")] public string DetectorName { get; init; }
-    public GetDetectorPropertiesRequest(string detectorName) { DetectorName = detectorName; Action = "getdetectorproperties"; }
+    [JsonProperty("detectorname")]
+    public string DetectorName { get; init; }
+
+    public GetDetectorPropertiesRequest(string detectorName)
+    {
+        DetectorName = detectorName;
+        Action = "getdetectorproperties";
+    }
 }
 
 public record SetDetectorPropertyRequest : ImagerRequest
 {
-    [JsonPropertyName("detectorname")] public string DetectorName { get; init; }
-    [JsonPropertyName("property")] public object PropertyValue { get; init; }
-    public SetDetectorPropertyRequest(string detectorName, object propertyValue) { DetectorName = detectorName; PropertyValue = propertyValue; Action = "setdetectorproperty"; }
-}
+    [JsonProperty("detectorname")]
+    public string DetectorName { get; init; }
 
-public record PingRequest : ImagerRequest { public PingRequest() { Action = "ping"; } }
+    [JsonProperty("property")]
+    public object PropertyValue { get; init; }
 
-public record ExecuteMeasurementProgramRequest : ImagerRequest
-{
-    [JsonPropertyName("program")] public JsonElement Program { get; init; }
-    [JsonPropertyName("defineddetections")] public JsonElement? DefinedDetections { get; init; }
-    [JsonPropertyName("smartprogramcode")] public JsonElement? SmartProgramCode { get; init; }
-    public ExecuteMeasurementProgramRequest(JsonElement program, JsonElement? definedDetections, JsonElement? smartProgramCode) 
-    { 
-        Program = program; DefinedDetections = definedDetections; SmartProgramCode = smartProgramCode; Action = "executemeasurementprogram"; 
+    public SetDetectorPropertyRequest(string detectorName, object propertyValue)
+    {
+        DetectorName = detectorName;
+        PropertyValue = propertyValue;
+        Action = "setdetectorproperty";
     }
 }
 
-public record FetchAsyncDataRequest : ImagerRequest { public FetchAsyncDataRequest() { Action = "fetchasyncspectra"; } }
+public record PingRequest : ImagerRequest
+{
+    public PingRequest() => Action = "ping";
+}
+
+public record ExecuteMeasurementProgramRequest : ImagerRequest
+{
+    [JsonProperty("program")]
+    public JObject Program { get; init; }
+
+    [JsonProperty("defineddetections")]
+    public JObject DefinedDetections { get; init; }
+
+    [JsonProperty("smartprogramcode")]
+    public JObject SmartProgramCode { get; init; }
+
+    public ExecuteMeasurementProgramRequest(
+        JObject program,
+        JObject definedDetections,
+        JObject smartProgramCode)
+    {
+        Program = program;
+        DefinedDetections = definedDetections;
+        SmartProgramCode = smartProgramCode;
+        Action = "executemeasurementprogram";
+    }
+}
+
+public record FetchAsyncDataRequest : ImagerRequest
+{
+    public FetchAsyncDataRequest() => Action = "fetchasyncspectra";
+}
 
 public record UseSharedMemoryForTransferRequest : ImagerRequest
 {
-    [JsonPropertyName("usesharedmemory")] public bool UseSharedMemory { get; init; }
-    public UseSharedMemoryForTransferRequest(bool useSharedMemory) { UseSharedMemory = useSharedMemory; Action = "usesharedmemoryfortransfer"; }
+    [JsonProperty("usesharedmemory")]
+    public bool UseSharedMemory { get; init; }
+
+    public UseSharedMemoryForTransferRequest(bool useSharedMemory)
+    {
+        UseSharedMemory = useSharedMemory;
+        Action = "usesharedmemoryfortransfer";
+    }
 }
 
 public record AcknowledgeDataReceiptRequest : ImagerRequest
 {
-    [JsonPropertyName("uptoandincluding")] public ulong UpToAndIncluding { get; init; }
-    public AcknowledgeDataReceiptRequest(ulong upToAndIncluding) { UpToAndIncluding = upToAndIncluding; Action = "acknowledgedatareceipt"; }
+    [JsonProperty("uptoandincluding")]
+    public ulong UpToAndIncluding { get; init; }
+
+    public AcknowledgeDataReceiptRequest(ulong upToAndIncluding)
+    {
+        UpToAndIncluding = upToAndIncluding;
+        Action = "acknowledgedatareceipt";
+    }
 }
 
+public record FetchAsyncStatusMessagesRequest : ImagerRequest
+{
+    public FetchAsyncStatusMessagesRequest() => Action = "fetchasyncstatusmessages";
+}
 
-public record FetchAsyncStatusMessagesRequest : ImagerRequest { public FetchAsyncStatusMessagesRequest() { Action = "fetchasyncstatusmessages"; } }
-public record CancelAsyncAcquisitionRequest : ImagerRequest { public CancelAsyncAcquisitionRequest() { Action = "cancelasyncacquisition"; } }
-public record IsAsyncAcquisitionRunningRequest : ImagerRequest { public IsAsyncAcquisitionRunningRequest() { Action = "isasyncacquisitionrunning"; } }
+public record CancelAsyncAcquisitionRequest : ImagerRequest
+{
+    public CancelAsyncAcquisitionRequest() => Action = "cancelasyncacquisition";
+}
+
+public record IsAsyncAcquisitionRunningRequest : ImagerRequest
+{
+    public IsAsyncAcquisitionRunningRequest() => Action = "isasyncacquisitionrunning";
+}
 
 [MessagePackObject]
 public record StagePosition(
-    [property: Key("hardwareautofocusoffset"), JsonPropertyName("hardwareautofocusoffset")] double HardwareAutofocusOffset,
-    [property: Key("usinghardwareautofocus"), JsonPropertyName("usinghardwareautofocus")] bool UsingHardwareAutofocus,
-    [property: Key("x"), JsonPropertyName("x")] double X,
-    [property: Key("y"), JsonPropertyName("y")] double Y,
-    [property: Key("z"), JsonPropertyName("z")] double Z
+    [property: Key("hardwareautofocusoffset")] double HardwareAutofocusOffset,
+    [property: Key("usinghardwareautofocus")] bool UsingHardwareAutofocus,
+    [property: Key("x")] double X,
+    [property: Key("y")] double Y,
+    [property: Key("z")] double Z
 );
 
 #endregion
 
-#region Binary Data Models (MessagePack)
+#region Binary Data Models
 
 [MessagePackObject]
 public record ChannelMessage(
@@ -118,9 +205,9 @@ public record ChannelMessage(
 [MessagePackObject]
 public record AsyncMeasurementMessage(
     [property: Key("type")] string Type,
-    [property: Key("data")] AcquiredData? Data,
-    [property: Key("metadata")] AcquisitionMetaData? MetaData,
-    [property: Key("payload")] string? Decision
+    [property: Key("data")] AcquiredData Data,
+    [property: Key("metadata")] AcquisitionMetaData MetaData,
+    [property: Key("payload")] string Decision
 );
 
 [MessagePackObject]
@@ -140,7 +227,7 @@ public record AcquisitionMetaData(
     [property: Key("detectionelementid")] string DetectionElementId,
     [property: Key("nimageswithdetectionindex")] int NImagesWithDetectionIndex,
     [property: Key("stageposition")] StagePosition StagePosition,
-    [property: Key("stagepositionname")] string? StagePositionName
+    [property: Key("stagepositionname")] string StagePositionName
 );
 
 #endregion
@@ -154,14 +241,19 @@ public record StatusErrorResponse(string Error) : ImagerResponse;
 public record StatusNoNewAsyncDataResponse() : ImagerResponse;
 public record StatusNoNewAsyncDataComingResponse() : ImagerResponse;
 public record StatusAcquiredDataCopiedToSharedMemoryResponse(string SharedMemoryName) : ImagerResponse;
-public record AcquiredDataResponse(JsonElement Data) : ImagerResponse;
-public record WavelengthsResponse(JsonElement Wavelengths) : ImagerResponse;
-public record AvailableEquipmentResponse(JsonElement Equipment) : ImagerResponse;
-public record MotorizedStagePositionResponse(StagePosition Position) : ImagerResponse;
+
+public record AcquiredDataResponse(JToken Data) : ImagerResponse;
+public record WavelengthsResponse(JToken Wavelengths) : ImagerResponse;
+public record AvailableEquipmentResponse(JToken Equipment) : ImagerResponse;
+
+public record MotorizedStagePositionResponse(XYStagePosition Position) : ImagerResponse;
 public record AvailableDetectorsResponse(string[] DetectorNames) : ImagerResponse;
-public record DetectorPropertiesResponse(JsonElement DetectorProperties, double FrameRate) : ImagerResponse;
+
+public record DetectorPropertiesResponse(JToken DetectorProperties, double FrameRate) : ImagerResponse;
+
 public record PongResponse() : ImagerResponse;
-public record AsyncAcquiredDataResponse(JsonElement Data) : ImagerResponse;
+public record AsyncAcquiredDataResponse(JToken Data) : ImagerResponse;
+
 public record SharedMemoryNameResponse(string Name) : ImagerResponse;
 public record AsyncStatusMessagesResponse(string[] Messages) : ImagerResponse;
 public record AsyncAcquisitionIsRunningResponse(bool Running) : ImagerResponse;
@@ -199,9 +291,10 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
         await using var stream = client.GetStream();
 
         string jsonPayload = request.ToJson();
+
         if (request is ExecuteMeasurementProgramRequest)
         {
-            Console.WriteLine($"[ImagerConnectionHandler] Starting measurement. Sent JSON payload:\n{jsonPayload}");
+            Console.WriteLine($"[ImagerConnectionHandler] Sending:\n{jsonPayload}");
         }
 
         byte[] payloadBytes = Encoding.UTF8.GetBytes(jsonPayload);
@@ -209,10 +302,12 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
 
         byte[] sizeBuffer = new byte[sizeof(int)];
         await stream.ReadExactlyAsync(sizeBuffer, 0, sizeof(int), linkedCts.Token);
+
         int totalBytes = BitConverter.ToInt32(sizeBuffer, 0);
         int payloadSize = totalBytes - sizeof(int);
 
-        if (payloadSize <= 0) return new UnknownJsonResponse("");
+        if (payloadSize <= 0)
+            return new UnknownJsonResponse("");
 
         byte[] responseBuffer = new byte[payloadSize];
         await stream.ReadExactlyAsync(responseBuffer, 0, payloadSize, linkedCts.Token);
@@ -227,11 +322,11 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
             try
             {
                 var messages = new List<ChannelMessage>();
-                var reader = new MessagePackReader(data);
-                
+                var reader = new MessagePack.MessagePackReader(data);
+
                 while (!reader.End)
                 {
-                    var msg = MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
+                    var msg = MessagePack.MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
                     messages.Add(msg);
                 }
 
@@ -239,64 +334,84 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
             }
             catch (Exception ex)
             {
-                return new StatusErrorResponse($"Failed to decode binary message pack data: {ex.Message}");
+                return new StatusErrorResponse(
+                    $"Failed to decode binary MessagePack data: {ex.Message}");
             }
         }
 
-        string jsonString = Encoding.UTF8.GetString(data).TrimEnd('\0', ' ', '\r', '\n', '\t');
+        string jsonString = Encoding.UTF8.GetString(data)
+            .TrimEnd('\0', ' ', '\r', '\n', '\t');
 
         try
         {
-            using var jsonDoc = JsonDocument.Parse(jsonString);
-            var root = jsonDoc.RootElement;
+            var root = JObject.Parse(jsonString);
 
-            if (root.TryGetProperty("responsetype", out var responseTypeProp))
+            string respType = root["responsetype"]?.ToString() ?? string.Empty;
+
+            return respType switch
             {
-                string respType = responseTypeProp.GetString() ?? string.Empty;
+                "status" =>
+                    root["status"]?.ToString() == "ok"
+                        ? new StatusOkResponse()
+                        : new StatusErrorResponse(root["error"]?.ToString() ?? "Unknown Error"),
 
-                return respType switch
-                {
-                    "status" => root.TryGetProperty("status", out var status) && status.GetString() == "ok" 
-                        ? new StatusOkResponse() 
-                        : new StatusErrorResponse(root.TryGetProperty("error", out var err) ? err.GetString() ?? "" : "Unknown Error"),
-                    
-                    "asyncacquisitionspectrastatus" => root.TryGetProperty("status", out var asyncStatus) && asyncStatus.GetString() == "nonewspectra"
+                "asyncacquisitionspectrastatus" =>
+                    root["status"]?.ToString() == "nonewspectra"
                         ? new StatusNoNewAsyncDataResponse()
                         : new StatusNoNewAsyncDataComingResponse(),
 
-                    "acquireddatacopiedtosharedmemory" => new StatusAcquiredDataCopiedToSharedMemoryResponse(
-                        root.TryGetProperty("sharedmemoryname", out var smName) ? smName.GetString() ?? "" : ""),
-                    
-                    "acquireddata" => new AcquiredDataResponse(root.GetProperty("data").Clone()),
-                    "wavelengths" => new WavelengthsResponse(root.GetProperty("wavelengths").Clone()),
-                    "availableequipment" => new AvailableEquipmentResponse(root.GetProperty("equipment").Clone()),
-                      
-                    "motorizedstageposition" => new MotorizedStagePositionResponse(
-                          JsonSerializer.Deserialize<StagePosition>(root.GetProperty("position").GetRawText())!),
-                      
-                    "availabledetectors" => new AvailableDetectorsResponse(
-                          JsonSerializer.Deserialize<string[]>(root.GetProperty("detectornames").GetRawText()) ?? Array.Empty<string>()),
-                      
-                    "detectorproperties" => new DetectorPropertiesResponse(
-                          root.GetProperty("detectorproperties").Clone(), root.TryGetProperty("framerate", out var fr) ? fr.GetDouble() : 0.0),
-                      
-                    "pong" => new PongResponse(),
-                    "asyncdata" => new AsyncAcquiredDataResponse(root.GetProperty("data").Clone()),
-                    
-                    "sharedmemoryname" => new SharedMemoryNameResponse(
-                        root.TryGetProperty("name", out var name) ? name.GetString() ?? "" : ""),
-                    
-                    "asyncstatusmessages" => new AsyncStatusMessagesResponse(
-                        JsonSerializer.Deserialize<string[]>(root.GetProperty("messages").GetRawText()) ?? Array.Empty<string>()),
-                    
-                    "asyncacquisitionstatus" => new AsyncAcquisitionIsRunningResponse(
-                        root.TryGetProperty("running", out var run) && run.GetBoolean()),
-                    
-                    _ => new UnknownJsonResponse(jsonString)
-                };
-            }
+                "acquireddatacopiedtosharedmemory" =>
+                    new StatusAcquiredDataCopiedToSharedMemoryResponse(
+                        root["sharedmemoryname"]?.ToString() ?? ""),
 
-            return new UnknownJsonResponse(jsonString);
+                "acquireddata" =>
+                    new AcquiredDataResponse(root["data"]),
+
+                "wavelengths" =>
+                    new WavelengthsResponse(root["wavelengths"]),
+
+                "availableequipment" =>
+                    new AvailableEquipmentResponse(root["equipment"]),
+
+                "motorizedstageposition" =>
+                    new MotorizedStagePositionResponse(
+                        new XYStagePosition(
+                            JsonConvert.DeserializeObject<StageCoordinates>(
+                                root["position"].ToString())!,
+                            "")),
+
+                "availabledetectors" =>
+                    new AvailableDetectorsResponse(
+                        JsonConvert.DeserializeObject<string[]>(
+                            root["detectornames"]?.ToString() ?? "")
+                        ?? Array.Empty<string>()),
+
+                "detectorproperties" =>
+                    new DetectorPropertiesResponse(
+                        root["detectorproperties"],
+                        root["framerate"]?.Value<double>() ?? 0.0),
+
+                "pong" => new PongResponse(),
+
+                "asyncdata" =>
+                    new AsyncAcquiredDataResponse(root["data"]),
+
+                "sharedmemoryname" =>
+                    new SharedMemoryNameResponse(
+                        root["name"]?.ToString() ?? ""),
+
+                "asyncstatusmessages" =>
+                    new AsyncStatusMessagesResponse(
+                        JsonConvert.DeserializeObject<string[]>(
+                            root["messages"]?.ToString() ?? "")
+                        ?? Array.Empty<string>()),
+
+                "asyncacquisitionstatus" =>
+                    new AsyncAcquisitionIsRunningResponse(
+                        root["running"]?.Value<bool>() ?? false),
+
+                _ => new UnknownJsonResponse(jsonString)
+            };
         }
         catch (JsonException)
         {
@@ -308,12 +423,10 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
     {
         if (data.Length < 2) return false;
 
-        int startObj = 0;
-        while (startObj < data.Length && (data[startObj] == '\0' || char.IsWhiteSpace((char)data[startObj])))
-        {
-            startObj++;
-        }
+        int i = 0;
+        while (i < data.Length && (data[i] == 0 || char.IsWhiteSpace((char)data[i])))
+            i++;
 
-        return startObj < data.Length && data[startObj] == '{';
+        return i < data.Length && data[i] == '{';
     }
 }

@@ -15,9 +15,6 @@ public partial class SmartServerOutputView : UserControl
     {
         
         InitializeComponent();
-        var viewModel = App.Container.Resolve<SmartProgramOutputViewModel>();
-        viewModel.RunList.CollectionChanged += RunList_CollectionChanged; 
-        DataContext = viewModel;
 
         _scrollViewer = this.FindControl<ScrollViewer>("ScrollViewer");
     }

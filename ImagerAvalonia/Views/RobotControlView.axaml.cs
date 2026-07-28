@@ -14,11 +14,7 @@ public partial class RobotControlView : UserControl
     {
         InitializeComponent();
     }
-    public RobotControlView(SystemDefinedSettingsViewModel availableAcquisitions)
-    {
-        InitializeComponent();
-        DataContext = new RobotControlViewModel(availableAcquisitions.Robots);
-    }
+
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);

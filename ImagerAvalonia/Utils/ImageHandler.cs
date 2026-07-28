@@ -1,14 +1,15 @@
-using DynamicData;
+using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Services.Workspace.SmartProgramWorkspace;
 using Microsoft.Extensions.Logging;
-using ScottPlot;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
-using System.Text.Json;
 
 namespace ImagerAvalonia.Utils
 {
@@ -86,11 +87,11 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public ImageData RequestImageMetadata(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        public ImageData RequestImageMetadata(List<Tuple<string, string>> AcqDetPairs, int RequestedTime)
         {
             ImageData imageData = new ImageData();
             imageData.Metadata = new List<TiffPlaneMetadata>() { };
-            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            foreach (var acq_det_pair in AcqDetPairs)
             {
                 //WIP
             }
@@ -98,7 +99,7 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public ImageData RequestImage(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        public ImageData RequestImage(List<Tuple<string, string>> AcqDetPairs, int RequestedTime)
         {
             ImageData imageData = new ImageData();
 
@@ -106,15 +107,15 @@ namespace ImagerAvalonia.Utils
             imageData.Metadata = new List<TiffPlaneMetadata>() { };
             imageData.Sizes = new List<List<uint>>() { };
             int num_datasets = 0;
-            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            foreach (var acq_det_pair in AcqDetPairs)
             {
-                int image_idx = _storageProvider.GetImageIndex(acq_det_pair.acqName, acq_det_pair.detName, RequestedTime);
-                byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                int image_idx = _storageProvider.GetImageIndex(acq_det_pair.Item1, acq_det_pair.Item2, RequestedTime);
+                byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.Item1, acq_det_pair.Item2, image_idx);
                 if (image_data.Length > 0)
                 {
                     num_datasets += 1;
                     imageData.Images.Add(image_data);
-                    var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                    var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.Item1, acq_det_pair.Item2, image_idx);
                     imageData.Metadata.Add(plane_metadata);
                     imageData.Sizes.Add(_storageProvider.GetPlaneSize());
                     imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
@@ -148,27 +149,26 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src){
+        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src, 
+            MeasurementProgram program,
+            SmartProgramRegistry smartPrograms){
             try {
+                
+
                 await Task.Run(async () => {
-                    JObject program = _storageProvider._measurementProgram;
-                    var parsed_program = program?["program"]; // This is the 'measurement_program' containing action, program, defineddetections, etc.
-                    if (parsed_program != null) {
-                        var innerProgram = parsed_program["program"];
-                        var definedDetections = parsed_program["defineddetections"];
-                        var smartProgramCode = parsed_program["smartprogramcode"];
-                        
-                        using var docProgram = JsonDocument.Parse(innerProgram.ToString(Newtonsoft.Json.Formatting.None));
-                        JsonElement? docDefinedDetections = definedDetections != null ? JsonDocument.Parse(definedDetections.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
-                        JsonElement? docSmartProgramCode = smartProgramCode != null ? JsonDocument.Parse(smartProgramCode.ToString(Newtonsoft.Json.Formatting.None)).RootElement : null;
+
+                    var request = new ExecuteMeasurementProgramRequest(
+                        JObject.FromObject(program.Program, Newtonsoft.Json.JsonSerializer.Create(MeasurementSerializer.Settings)),
+                        JObject.FromObject(program.Detections , Newtonsoft.Json.JsonSerializer.Create(DetectionEquipmentSerializer.Settings)),
+                        smartPrograms.SerializeAllDags()
+                    );
+
+                    if (request != null) {
+                      
 
                         var channel = Channel.CreateUnbounded<MeasurementEvent>();
-                        ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(
-                            docProgram.RootElement.Clone(), 
-                            docDefinedDetections?.Clone(), 
-                            docSmartProgramCode?.Clone(), 
-                            channel.Writer, 
-                            src.Token);
+                        ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(request, channel.Writer, src.Token);
+  
 
                         _storageProvider.OpenWriteStream();
 
@@ -211,13 +211,13 @@ namespace ImagerAvalonia.Utils
     }
     public class OnDetectionRequestedEventArgs : EventArgs
     {
-        public List<AcqDetPair> AcqDetPairs  { get; private set; }
-        //public Dictionary<AcqDetPair, XYStagePosition> DetectionPositions { get; }
+        public List<Tuple<string, string>> AcqDetPairs  { get; private set; }
+        //public Dictionary<AcqDetPair, StagePosition> DetectionPositions { get; }
 
         public int RequestedTime { get; }
 
 
-        public OnDetectionRequestedEventArgs(List<AcqDetPair> acqDetPairs , int requestedTime)
+        public OnDetectionRequestedEventArgs(List<Tuple<string, string>> acqDetPairs , int requestedTime)
         {
             AcqDetPairs = acqDetPairs;
             //DetectionPositions = detectionPositions ?? throw new ArgumentNullException(nameof(detectionPositions));
@@ -225,3 +225,5 @@ namespace ImagerAvalonia.Utils
         }
     }
 }
+
+
