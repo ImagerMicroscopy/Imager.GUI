@@ -268,15 +268,20 @@ public interface IImagerConnectionHandler
     Task<ImagerResponse> SendRequestAsync(ImagerRequest request, CancellationToken cancellationToken = default);
 }
 
-public class ImagerConnectionHandler : IImagerConnectionHandler
+public class ImagerConnectionHandler : IImagerConnectionHandler, IDisposable
 {
     private readonly string _host;
     private readonly int _port;
+    private SharedMemoryReader? _sharedMemoryReader;
 
     public ImagerConnectionHandler(string host = "localhost", int port = 3200)
     {
         _host = host;
         _port = port;
+    }
+
+    public void Dispose() {
+        _sharedMemoryReader?.Dispose();
     }
 
     public async Task<ImagerResponse> SendRequestAsync(ImagerRequest request, CancellationToken cancellationToken = default)
@@ -315,25 +320,22 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
         return ParseResponse(responseBuffer);
     }
 
-    private ImagerResponse ParseResponse(byte[] data)
-    {
-        if (!IsJsonPayload(data))
-        {
-            try
-            {
+    private ImagerResponse ParseResponse(byte[] data) {
+
+        // check if binary data containing images or other messages
+        if (!IsJsonPayload(data)) {
+            try {
                 var messages = new List<ChannelMessage>();
                 var reader = new MessagePack.MessagePackReader(data);
 
-                while (!reader.End)
-                {
+                while (!reader.End) {
                     var msg = MessagePack.MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
                     messages.Add(msg);
                 }
 
                 return new AsyncAcquiredImagesResponse(messages.ToArray());
             }
-            catch (Exception ex)
-            {
+            catch (Exception ex) {
                 return new StatusErrorResponse(
                     $"Failed to decode binary MessagePack data: {ex.Message}");
             }
@@ -342,14 +344,38 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
         string jsonString = Encoding.UTF8.GetString(data)
             .TrimEnd('\0', ' ', '\r', '\n', '\t');
 
-        try
-        {
+        try {
             var root = JObject.Parse(jsonString);
 
             string respType = root["responsetype"]?.ToString() ?? string.Empty;
 
-            return respType switch
-            {
+            if (respType == "acquireddatacopiedtosharedmemory") {
+                string shmName = root["sharedmemoryname"]?.ToString();
+                
+                if (string.IsNullOrEmpty(shmName)) {
+                    throw new InvalidOperationException("Shared memory name cannot be null or empty.");
+                }
+
+                if (_sharedMemoryReader == null) {
+                    _sharedMemoryReader = new SharedMemoryReader();
+                }
+
+                if (_sharedMemoryReader.GetMapName() != shmName) {
+                    _sharedMemoryReader.Connect(shmName);
+                }
+
+                // The first 8 bytes contain the data length
+                byte[] lengthPrefix = _sharedMemoryReader.ReadData(0, 8);
+                long dataLength = BitConverter.ToInt64(lengthPrefix, 0);
+
+                // Read the payload (excluding the 8-byte prefix)
+                byte[] payload = _sharedMemoryReader.ReadData(8, (int)(dataLength - 8));
+                
+                // Route this binary data back into the existing ParseResponse flow since this is now binary data
+                return ParseResponse(payload);
+            }
+
+            return respType switch {
                 "status" =>
                     root["status"]?.ToString() == "ok"
                         ? new StatusOkResponse()
@@ -359,10 +385,6 @@ public class ImagerConnectionHandler : IImagerConnectionHandler
                     root["status"]?.ToString() == "nonewspectra"
                         ? new StatusNoNewAsyncDataResponse()
                         : new StatusNoNewAsyncDataComingResponse(),
-
-                "acquireddatacopiedtosharedmemory" =>
-                    new StatusAcquiredDataCopiedToSharedMemoryResponse(
-                        root["sharedmemoryname"]?.ToString() ?? ""),
 
                 "acquireddata" =>
                     new AcquiredDataResponse(root["data"]),

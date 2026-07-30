@@ -219,22 +219,21 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
             throw new InvalidOperationException(error.Error);
     }
 
-
-
     public void ExecuteMeasurementProgram(ExecuteMeasurementProgramRequest request,
         System.Threading.Channels.ChannelWriter<MeasurementEvent> channelWriter,
         CancellationToken cancellationToken = default)
     {
-        _ = Task.Run(async () =>
-        {
-            try
-            {
+        _ = Task.Run(async () => {
+            try {
+                // Request the server to use shared memory for data transfer
+                await SendAndValidateAsync<SharedMemoryNameResponse>(
+                    new UseSharedMemoryForTransferRequest(true),
+                    cancellationToken);
 
                 var startResponse =
                     await ConnectionHandler.SendRequestAsync(request, cancellationToken);
 
-                if (startResponse is StatusErrorResponse err)
-                {
+                if (startResponse is StatusErrorResponse err) {
                     await channelWriter.WriteAsync(
                         new MeasurementErrorEvent($"Failed to start: {err.Error}"),
                         cancellationToken);
@@ -242,8 +241,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                     return;
                 }
 
-                if (startResponse is not StatusOkResponse)
-                {
+                if (startResponse is not StatusOkResponse) {
                     await channelWriter.WriteAsync(
                         new MeasurementErrorEvent($"Unexpected start response: {startResponse.GetType().Name}"),
                         cancellationToken);
@@ -255,15 +253,12 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
                 bool keepPolling = true;
 
-                while (keepPolling && !cancellationToken.IsCancellationRequested)
-                {
+                while (keepPolling && !cancellationToken.IsCancellationRequested) {
                     var dataResponse =
                         await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
 
-                    if (dataResponse is AsyncAcquiredImagesResponse imgs)
-                    {
-                        if (imgs.Messages.Length > 0)
-                        {
+                    if (dataResponse is AsyncAcquiredImagesResponse imgs) {
+                        if (imgs.Messages.Length > 0) {
                             await channelWriter.WriteAsync(
                                 new MeasurementDataEvent(imgs.Messages),
                                 cancellationToken);
@@ -274,13 +269,9 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                                 new AcknowledgeDataReceiptRequest(lastIndex),
                                 cancellationToken);
                         }
-                    }
-                    else if (dataResponse is StatusNoNewAsyncDataComingResponse)
-                    {
+                    } else if (dataResponse is StatusNoNewAsyncDataComingResponse) {
                         keepPolling = false;
-                    }
-                    else if (dataResponse is StatusErrorResponse dataErr)
-                    {
+                    } else if (dataResponse is StatusErrorResponse dataErr) {
                         await channelWriter.WriteAsync(
                             new MeasurementErrorEvent($"Polling error: {dataErr.Error}"),
                             cancellationToken);
@@ -288,15 +279,13 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                         keepPolling = false;
                     }
 
-                    if (keepPolling)
-                    {
+                    if (keepPolling) {
                         var msgResponse =
                             await ConnectionHandler.SendRequestAsync(
                                 new FetchAsyncStatusMessagesRequest(),
                                 cancellationToken);
 
-                        if (msgResponse is AsyncStatusMessagesResponse msgs && msgs.Messages.Length > 0)
-                        {
+                        if (msgResponse is AsyncStatusMessagesResponse msgs && msgs.Messages.Length > 0) {
                             await channelWriter.WriteAsync(
                                 new MeasurementStatusTextEvent(msgs.Messages),
                                 cancellationToken);
@@ -309,14 +298,12 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 await channelWriter.WriteAsync(new MeasurementCompletedEvent(), cancellationToken);
             }
             catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
+            catch (Exception ex) {
                 await channelWriter.WriteAsync(
                     new MeasurementErrorEvent($"Critical failure: {ex.Message}"),
                     CancellationToken.None);
             }
-            finally
-            {
+            finally {
                 channelWriter.TryComplete();
             }
         }, cancellationToken);
