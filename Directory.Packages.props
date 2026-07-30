@@ -9,14 +9,14 @@
     <PackageVersion Include="Autofac" Version="8.2.0" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageVersion Include="Avalonia" Version="11.3.3" />
-    <PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.0" />
-    <PackageVersion Include="Avalonia.AvaloniaEdit" Version="11.3.0" />
-    <PackageVersion Include="Avalonia.Controls.DataGrid" Version="11.3.0" />
-    <PackageVersion Include="Avalonia.ReactiveUI" Version="11.2.3" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.2.3" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.2.3" />
-    <PackageVersion Include="Avalonia.Diagnostics" Version="11.2.3" />
-    <PackageVersion Include="Avalonia.Desktop" Version="11.3.0" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.AvaloniaEdit" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.Controls.DataGrid" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.ReactiveUI" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.3" />
+    <PackageVersion Include="Avalonia.Desktop" Version="11.3.3" />
     <PackageVersion Include="Avalonia.iOS" Version="11.2.1" />
     <PackageVersion Include="Avalonia.Browser" Version="11.2.1" />
     <PackageVersion Include="Avalonia.Android" Version="11.2.1" />
@@ -42,7 +42,7 @@
     <PackageVersion Include="System.Drawing.Common" Version="9.0.0" />
     <PackageVersion Include="TiffLibrary" Version="0.6.65" />
     <PackageVersion Include="TiffLibrary.ImageSharpAdapter" Version="0.6.65" />
-    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.93.0" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.21.2" />
     <PackageVersion Include="Xamarin.AndroidX.Core.SplashScreen" Version="1.0.1.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageVersion Include="xunit" Version="2.5.3" />
