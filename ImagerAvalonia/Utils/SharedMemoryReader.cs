@@ -1,4 +1,6 @@
 using System;
+using System.Buffers;
+using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
@@ -100,6 +102,29 @@ public class SharedMemoryReader : IDisposable
         }
     }
 
+    public unsafe TResult WithPayloadMemory<TResult>(Func<ReadOnlyMemory<byte>, TResult> consume)
+    {
+
+        if (_accessor == null) throw new InvalidOperationException("Not connected to shared memory.");
+
+        byte* pointer = null;
+        _accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref pointer);
+        try
+        {
+            long dataLength = *(long*)pointer;
+            int totalLen = (int)dataLength;
+            EnsureBounds(0, totalLen);
+
+            using var manager = new UnmanagedMemoryManager(pointer, totalLen);
+            ReadOnlyMemory<byte> payload = manager.Memory.Slice(8); // skip 8-byte length prefix
+            return consume(payload); // must run synchronously — memory is invalid after ReleasePointer
+        }
+        finally
+        {
+            _accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+        }
+    }
+
     public void Dispose() {
         _accessor?.Dispose();
         _mmf?.Dispose();
@@ -107,4 +132,30 @@ public class SharedMemoryReader : IDisposable
         _mmf = null;
         _mapName = null;
     }
+}
+
+
+public sealed unsafe class UnmanagedMemoryManager : MemoryManager<byte>
+{
+    private readonly byte* _pointer;
+    private readonly int _length;
+
+    public UnmanagedMemoryManager(byte* pointer, int length)
+    {
+        _pointer = pointer;
+        _length = length;
+    }
+
+    public override Span<byte> GetSpan() => new(_pointer, _length);
+
+    public override MemoryHandle Pin(int elementIndex = 0)
+    {
+        if ((uint)elementIndex >= (uint)_length)
+            throw new ArgumentOutOfRangeException(nameof(elementIndex));
+        return new MemoryHandle(_pointer + elementIndex);
+    }
+
+    public override void Unpin() { } // pointer lifetime is owned by the caller's AcquirePointer/ReleasePointer scope
+
+    protected override void Dispose(bool disposing) { }
 }

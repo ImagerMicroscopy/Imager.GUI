@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Avalonia;
 using Avalonia.ReactiveUI;
+using ImagerAvalonia.Utils;
+using ImagerAvalonia;
 using System;
 using System.Threading.Tasks;
 
@@ -23,18 +25,15 @@ sealed class Program
 
             App.Container = CompositionRoot.BuildContainer();
 
-            // Fire-and-forget-for-now: starts equipment communication on a
-            // threadpool thread immediately. Nothing here blocks the STA
-            // thread, so it doesn't interfere with StartWithClassicDesktopLifetime
-            // below. App awaits this Task later, once its dispatcher is running.
-
-
-
             BuildAvaloniaApp()
                 .StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
         {
+            if(ImagerStartup.ImagerProcess is not null)
+            {
+                ImagerStartup.ImagerProcess.Kill();
+            }
             Console.WriteLine($"{ex.Message}{ex.StackTrace}");
         }
     }

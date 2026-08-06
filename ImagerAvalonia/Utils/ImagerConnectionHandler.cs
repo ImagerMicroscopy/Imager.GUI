@@ -1,13 +1,16 @@
 using ImagerAvalonia.Services.MeasurementControl;
 using MessagePack;
+using MessagePack.Resolvers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace ImagerAvalonia.Utils;
 
@@ -274,24 +277,30 @@ public class ImagerConnectionHandler : IImagerConnectionHandler, IDisposable
     private readonly int _port;
     private SharedMemoryReader? _sharedMemoryReader;
 
+    // Reuse a single resolver/options instance for the process lifetime. Falls back to
+    // StandardResolver for any type not covered by the generated resolver.
+
+
     public ImagerConnectionHandler(string host = "localhost", int port = 3200)
     {
         _host = host;
         _port = port;
     }
 
-    public void Dispose() {
+    public void Dispose()
+    {
         _sharedMemoryReader?.Dispose();
     }
 
     public async Task<ImagerResponse> SendRequestAsync(ImagerRequest request, CancellationToken cancellationToken = default)
     {
+
         using var client = new TcpClient();
         client.LingerState = new LingerOption(true, 0);
-
+        client.NoDelay = true;
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linkedCts.CancelAfter(TimeSpan.FromSeconds(20));
-
+   
         await client.ConnectAsync(_host, _port, linkedCts.Token);
         await using var stream = client.GetStream();
 
@@ -317,25 +326,36 @@ public class ImagerConnectionHandler : IImagerConnectionHandler, IDisposable
         byte[] responseBuffer = new byte[payloadSize];
         await stream.ReadExactlyAsync(responseBuffer, 0, payloadSize, linkedCts.Token);
 
-        return ParseResponse(responseBuffer);
+
+        var response = ParseResponse(responseBuffer);
+
+        return response;
     }
 
-    private ImagerResponse ParseResponse(byte[] data) {
-
-        // check if binary data containing images or other messages
-        if (!IsJsonPayload(data)) {
-            try {
+    /// <summary>
+    /// Entry point for data received directly over the TCP socket (small JSON acks/status
+    /// messages, or raw MessagePack binary blocks not routed through shared memory).
+    /// </summary>
+    private ImagerResponse ParseResponse(byte[] data)
+    {
+        if (!IsJsonPayload(data))
+        {
+            try
+            {
                 var messages = new List<ChannelMessage>();
                 var reader = new MessagePack.MessagePackReader(data);
 
-                while (!reader.End) {
-                    var msg = MessagePack.MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
+                while (!reader.End)
+                {
+                    var msg = MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
                     messages.Add(msg);
                 }
 
+
                 return new AsyncAcquiredImagesResponse(messages.ToArray());
             }
-            catch (Exception ex) {
+            catch (Exception ex)
+            {
                 return new StatusErrorResponse(
                     $"Failed to decode binary MessagePack data: {ex.Message}");
             }
@@ -344,38 +364,51 @@ public class ImagerConnectionHandler : IImagerConnectionHandler, IDisposable
         string jsonString = Encoding.UTF8.GetString(data)
             .TrimEnd('\0', ' ', '\r', '\n', '\t');
 
-        try {
-            var root = JObject.Parse(jsonString);
+        return ParseJsonResponse(jsonString);
+    }
 
+    /// <summary>
+    /// Parses a payload that has already been sliced/copied to a plain byte[] (JSON-only path).
+    /// Handles the "acquireddatacopiedtosharedmemory" indirection by reading the referenced
+    /// shared memory region with zero managed-array copies.
+    /// </summary>
+    private ImagerResponse ParseJsonResponse(string jsonString)
+    {
+        try
+        {
+            var root = JObject.Parse(jsonString);
             string respType = root["responsetype"]?.ToString() ?? string.Empty;
 
-            if (respType == "acquireddatacopiedtosharedmemory") {
+            if (respType == "acquireddatacopiedtosharedmemory")
+            {
+
                 string shmName = root["sharedmemoryname"]?.ToString();
-                
-                if (string.IsNullOrEmpty(shmName)) {
+                if (string.IsNullOrEmpty(shmName))
+                {
                     throw new InvalidOperationException("Shared memory name cannot be null or empty.");
                 }
 
-                if (_sharedMemoryReader == null) {
+                if (_sharedMemoryReader == null)
+                {
                     _sharedMemoryReader = new SharedMemoryReader();
                 }
 
-                if (_sharedMemoryReader.GetMapName() != shmName) {
+                if (_sharedMemoryReader.GetMapName() != shmName)
+                {
                     _sharedMemoryReader.Connect(shmName);
                 }
 
-                // The first 8 bytes contain the data length
-                byte[] lengthPrefix = _sharedMemoryReader.ReadData(0, 8);
-                long dataLength = BitConverter.ToInt64(lengthPrefix, 0);
+                // Zero-copy: reads the length prefix and hands back a ReadOnlyMemory<byte>
+                // backed directly by the mapped pointer, valid only for the duration of the call.
+                var result = _sharedMemoryReader.WithPayloadMemory(ParseFramedPayload);
 
-                // Read the payload (excluding the 8-byte prefix)
-                byte[] payload = _sharedMemoryReader.ReadData(8, (int)(dataLength - 8));
-                
-                // Route this binary data back into the existing ParseResponse flow since this is now binary data
-                return ParseResponse(payload);
+               
+
+                return result;
             }
 
-            return respType switch {
+            return respType switch
+            {
                 "status" =>
                     root["status"]?.ToString() == "ok"
                         ? new StatusOkResponse()
@@ -441,7 +474,47 @@ public class ImagerConnectionHandler : IImagerConnectionHandler, IDisposable
         }
     }
 
-    private bool IsJsonPayload(byte[] data)
+    /// <summary>
+    /// Parses a framed payload (JSON or MessagePack) from a ReadOnlyMemory&lt;byte&gt; without
+    /// copying it into a byte[] first. Used for the zero-copy shared-memory path.
+    /// NOTE: the passed-in memory is only valid for the duration of this call — do not let
+    /// it, or any Span derived from it, escape.
+    /// </summary>
+    private ImagerResponse ParseFramedPayload(ReadOnlyMemory<byte> data)
+    {
+        if (!IsJsonPayload(data.Span))
+        {
+            try
+            {
+                var messages = new List<ChannelMessage>();
+                var reader = new MessagePack.MessagePackReader(data);
+
+                while (!reader.End)
+                {
+                    var msg = MessagePackSerializer.Deserialize<ChannelMessage>(ref reader);
+                    messages.Add(msg);
+                }
+
+
+                return new AsyncAcquiredImagesResponse(messages.ToArray());
+            }
+            catch (Exception ex)
+            {
+                return new StatusErrorResponse(
+                    $"Failed to decode binary MessagePack data: {ex.Message}");
+            }
+        }
+
+        // JSON responses arriving via shared memory should be rare/small — fine to materialize.
+        string jsonString = Encoding.UTF8.GetString(data.Span)
+            .TrimEnd('\0', ' ', '\r', '\n', '\t');
+
+        return ParseJsonResponse(jsonString);
+    }
+
+    private bool IsJsonPayload(byte[] data) => IsJsonPayload((ReadOnlySpan<byte>)data);
+
+    private bool IsJsonPayload(ReadOnlySpan<byte> data)
     {
         if (data.Length < 2) return false;
 

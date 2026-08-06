@@ -225,6 +225,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
     {
         _ = Task.Run(async () => {
             try {
+
                 // Request the server to use shared memory for data transfer
                 await SendAndValidateAsync<SharedMemoryNameResponse>(
                     new UseSharedMemoryForTransferRequest(true),
@@ -254,8 +255,12 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 bool keepPolling = true;
 
                 while (keepPolling && !cancellationToken.IsCancellationRequested) {
+
+                   
                     var dataResponse =
                         await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
+
+
 
                     if (dataResponse is AsyncAcquiredImagesResponse imgs) {
                         if (imgs.Messages.Length > 0) {
@@ -263,11 +268,12 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                                 new MeasurementDataEvent(imgs.Messages),
                                 cancellationToken);
 
-                            ulong lastIndex = imgs.Messages[^1].Index;
 
-                            _ = await SendAndValidateAsync<StatusOkResponse>(
+                            ulong lastIndex = imgs.Messages[^1].Index;
+                            await SendAndValidateAsync<StatusOkResponse>(
                                 new AcknowledgeDataReceiptRequest(lastIndex),
                                 cancellationToken);
+
                         }
                     } else if (dataResponse is StatusNoNewAsyncDataComingResponse) {
                         keepPolling = false;
@@ -279,20 +285,22 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                         keepPolling = false;
                     }
 
-                    if (keepPolling) {
+                    if (keepPolling)
+                    {
                         var msgResponse =
                             await ConnectionHandler.SendRequestAsync(
                                 new FetchAsyncStatusMessagesRequest(),
                                 cancellationToken);
 
-                        if (msgResponse is AsyncStatusMessagesResponse msgs && msgs.Messages.Length > 0) {
+                        if (msgResponse is AsyncStatusMessagesResponse msgs && msgs.Messages.Length > 0)
+                        {
                             await channelWriter.WriteAsync(
                                 new MeasurementStatusTextEvent(msgs.Messages),
                                 cancellationToken);
                         }
                     }
 
-                    await Task.Delay(50, cancellationToken);
+                    await Task.Delay(1, cancellationToken);
                 }
 
                 await channelWriter.WriteAsync(new MeasurementCompletedEvent(), cancellationToken);

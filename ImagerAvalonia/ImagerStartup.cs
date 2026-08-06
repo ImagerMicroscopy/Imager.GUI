@@ -6,8 +6,9 @@ using System.Threading.Tasks;
 
 namespace ImagerAvalonia
 {
-    internal class ImagerStartup
+    public class ImagerStartup
     {
+        public static Process? ImagerProcess;
 
         public static async Task WaitForImagerStartup(
             string executable,
@@ -30,33 +31,63 @@ namespace ImagerAvalonia
                 CreateNoWindow = false
             };
 
-            using var process = new Process
+            var process = new Process
             {
                 StartInfo = processStartInfo
             };
-
             process.Start();
+            ImagerProcess = process;
+
+            var startupSignal = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // Register cancellation so a caller-supplied token can still abort the wait.
+            using var ctr = cancellationToken.Register(() =>
+                startupSignal.TrySetCanceled(cancellationToken));
+
+            // stderr: unchanged, already a fire-and-forget background task.
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    while (await process.StandardError.ReadLineAsync() is { } errorLine)
+                    {
+                        Console.Error.WriteLine(errorLine);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"stderr reader stopped: {ex.Message}");
+                }
+            });
 
             _ = Task.Run(async () =>
             {
-                while (await process.StandardError.ReadLineAsync() is { } errorLine)
+                try
                 {
-                    Console.Error.WriteLine(errorLine);
+                    while (await process.StandardOutput.ReadLineAsync() is { } line)
+                    {
+                        Console.WriteLine(line);
+
+                        if (!startupSignal.Task.IsCompleted &&
+                            line.Contains(expectedText, StringComparison.Ordinal))
+                        {
+                            startupSignal.TrySetResult();
+                        }
+                    }
+
+                    startupSignal.TrySetException(
+                        new InvalidOperationException(
+                            $"Process exited before output '{expectedText}' was received."));
                 }
-            }, cancellationToken);
-
-            while (await process.StandardOutput.ReadLineAsync(cancellationToken) is { } line)
-            {
-                Console.WriteLine(line);
-
-                if (line.Contains(expectedText, StringComparison.Ordinal))
+                catch (Exception ex)
                 {
-                    return;
+                    startupSignal.TrySetException(ex);
                 }
-            }
+            });
 
-            throw new InvalidOperationException(
-                $"Process exited before output '{expectedText}' was received.");
+       
+            await startupSignal.Task;
         }
     }
 }

@@ -4,5 +4,6 @@
   "isrunfromimager": true,
   "pythonadress": "localhost:5100",
   "islogbookenabled" : false,
-  "fromexternal": true
+  "fromexternal": true,
+  "imagerpath": ""
 }

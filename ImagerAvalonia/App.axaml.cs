@@ -18,6 +18,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ImagerAvalonia;
@@ -49,78 +50,90 @@ public partial class App : Application
     public async override void OnFrameworkInitializationCompleted()
     {
 
-        //await ImagerStartup.WaitForImagerStartup(
-        //    "Imager.exe",
-        //    "ready to measure!",
-        //    @"C:\Documents\ImagerReleaseNewAPI"
-        //    );
+        try
+        {
+            await ImagerStartup.WaitForImagerStartup(
+            "Imager.exe",
+            "Ready to measure!",
+            Configuration.ImagerPath
+            );
+
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error during Imager startup: {ex.Message}. \n You can change the imager folder " +
+                $"in the configuration file (Config.json) at key 'imagerpath'");
+
+        }
+
 
 
         Container ??= CompositionRoot.BuildContainer();
 
 
-        using (var scope = Container.BeginLifetimeScope())
-        {
-            var logbook_context = scope.Resolve<LogBookContext>();
-            logbook_context.Database.EnsureCreated();
-        }
-
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
-            // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
-            DisableAvaloniaDataAnnotationValidation();
-            var commanager = ImagerCommunicationManager.Instance;
-            EquipmentInitResult equipment = new EquipmentInitResult();
-
-            try
+            using (var scope = Container.BeginLifetimeScope())
             {
-                var coordinator = Container.Resolve<EquipmentCoordinator>();
-                equipment = await coordinator.FetchEquipment();
-            }
-            catch (SocketException socketEx)
-            {
-                await ExceptionWindowHandler.ShowDialogAsync("A socket error occurred", socketEx.Message, socketEx.StackTrace, null);
-                commanager.IsInteractionEnabled = false;
-
-            }
-            catch (Exception ex)
-            {
-                await ExceptionWindowHandler.ShowDialogAsync("Connection Error", ex.Message, ex.StackTrace, null);
-                commanager.IsInteractionEnabled = false;
-
+                var logbook_context = scope.Resolve<LogBookContext>();
+                logbook_context.Database.EnsureCreated();
             }
 
-            var mainWindow = Container.Resolve<MainWindow>();
-            mainWindow.ApplyEquipment(equipment);
-            
-            desktop.Exit += OnAppExit;
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-
-
-            desktop.MainWindow = mainWindow;
-            mainWindow.Show();
-            if (Configuration.IsLogBookEnabled)
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                using (var scope = Container.BeginLifetimeScope())
+                // Avoid duplicate validations from both Avalonia and the CommunityToolkit. 
+                // More info: https://docs.avaloniaui.net/docs/guides/development-guides/data-validation#manage-validationplugins
+                DisableAvaloniaDataAnnotationValidation();
+                var commanager = ImagerCommunicationManager.Instance;
+                EquipmentInitResult equipment = new EquipmentInitResult();
+
+                try
                 {
-                    var db = scope.Resolve<LogBookContext>();
-                    logWindow = new LogBookView(LogBookConfigurationStart.LogSettings, LogBookConfigurationEnd.LogSettings, false);
-                    logWindow.SetDBContext(db);
-                    await logWindow.ShowDialog(mainWindow);
+                    var coordinator = Container.Resolve<EquipmentCoordinator>();
+                    equipment = await coordinator.FetchEquipment();
                 }
+                catch (SocketException socketEx)
+                {
+                    await ExceptionWindowHandler.ShowDialogAsync("A socket error occurred", socketEx.Message, socketEx.StackTrace, null);
+                    commanager.IsInteractionEnabled = false;
+
+                }
+                catch (Exception ex)
+                {
+                    await ExceptionWindowHandler.ShowDialogAsync("Connection Error", ex.Message, ex.StackTrace, null);
+                    commanager.IsInteractionEnabled = false;
+
+                }
+
+                var mainWindow = Container.Resolve<MainWindow>();
+                mainWindow.ApplyEquipment(equipment);
+
+                desktop.Exit += OnAppExit;
+                desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+
+                desktop.MainWindow = mainWindow;
+                mainWindow.Show();
+                if (Configuration.IsLogBookEnabled)
+                {
+                    using (var scope = Container.BeginLifetimeScope())
+                    {
+                        var db = scope.Resolve<LogBookContext>();
+                        logWindow = new LogBookView(LogBookConfigurationStart.LogSettings, LogBookConfigurationEnd.LogSettings, false);
+                        logWindow.SetDBContext(db);
+                        await logWindow.ShowDialog(mainWindow);
+                    }
+                }
+
+
+
+                mainWindow.InitializeImageControlPanel();
+                mainWindow.Closing += MainWindow_Closing;
+            }
+            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
+            {
+                var mainView = Container.Resolve<MainView>();
+                singleViewPlatform.MainView = mainView;
             }
 
-          
-
-            mainWindow.InitializeImageControlPanel();
-            mainWindow.Closing += MainWindow_Closing;
-        }
-        else if (ApplicationLifetime is ISingleViewApplicationLifetime singleViewPlatform)
-        {
-            var mainView = Container.Resolve<MainView>();
-            singleViewPlatform.MainView = mainView;
-        }
 
         base.OnFrameworkInitializationCompleted();
     }
@@ -191,6 +204,13 @@ public partial class App : Application
 
     private async void OnAppExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)
     {
+                OpenStorageIDS.CloseAllImageIDS();
+
+        if(ImagerStartup.ImagerProcess is not null)
+        {
+            ImagerStartup.ImagerProcess.Kill(entireProcessTree: true );           
+        }
+
         if (Application.Current.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
         {
             foreach (var window in lifetime.Windows)
@@ -199,6 +219,5 @@ public partial class App : Application
                 lifetime.Shutdown();
             }
         }
-        OpenStorageIDS.CloseAllImageIDS();
     }
 }
