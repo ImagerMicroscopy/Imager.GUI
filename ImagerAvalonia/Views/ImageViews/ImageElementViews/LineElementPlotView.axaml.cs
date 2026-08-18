@@ -129,7 +129,7 @@ public partial class LineElementPlotView : UserControl
                 lock (_lockObj)
                 {
 
-                    if (_lineElementViewModel.PinnedPosition != IStageControl.DefaultXYStagePosition)
+                    if (_lineElementViewModel.PinnedPosition != IStageControl.DefaultStagePosition)
                     {
                         if (_lineElementViewModel.PinnedPosition.IsEqual( pos ))
                         {

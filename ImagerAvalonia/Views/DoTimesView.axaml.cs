@@ -14,11 +14,11 @@ public partial class DoTimesView : UserControl
     {
         InitializeComponent();
     }
-    public DoTimesView(SystemDefinedSettingsViewModel availableAcquisitions)
-    {
-        InitializeComponent();
-        DataContext = new ViewModels.DoTimesViewModel();
-    }
+    //public DoTimesView(SystemDefinedSettingsViewModel availableAcquisitions)
+    //{
+    //    InitializeComponent();
+    //    DataContext = new ViewModels.DoTimesViewModel();
+    //}
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);

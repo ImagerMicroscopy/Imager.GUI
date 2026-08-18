@@ -33,6 +33,6 @@ namespace ImagerAvalonia.Views
 
         List<IPlottable> RetrievePlotControls();
         Control GenerateRegionControl();
-        ElementPlotViewModel GenerateRegionPlotControl(List<IImageElement> image_elements, string acq, string det, string reg, ObservableCollection<XYStagePosition> xYStagePositions);
+        ElementPlotViewModel GenerateRegionPlotControl(List<IImageElement> image_elements, string acq, string det, string reg, ObservableCollection<XYStagePosition> stagePositions);
     }
 }

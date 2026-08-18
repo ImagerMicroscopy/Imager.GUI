@@ -8,11 +8,13 @@ using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Tests.ViewModels;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Views;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Newtonsoft.Json.Linq;
 using Xunit;
+using ImagerAvalonia.Services.Storage;
 
 namespace Imager.Tests.ViewModels
 {
@@ -27,7 +29,7 @@ namespace Imager.Tests.ViewModels
         {
             ""responsetype"":""detectorproperties"",
             ""detectorproperties"":[
-                {""descriptor"":""Exposure time"",""kind"":""numeric"",""propertycode"":0,""value"":5.0e-3},
+                {""descriptor"":""Exure time"",""kind"":""numeric"",""propertycode"":0,""value"":5.0e-3},
                 {""availableoptions"":[""16"",""32"",""64"",""128"",""256"",""512"",""1024"",""1280"",""1536"",""2048""],
                     ""current"":""128"",""descriptor"":""Sensor cropping 1"",""kind"":""discrete"",""propertycode"":1},
                 {""availableoptions"":[""16"",""32"",""64"",""128"",""256"",""512"",""1024"",""1280"",""1536"",""2048""],
@@ -153,9 +155,10 @@ namespace Imager.Tests.ViewModels
 
         private MainViewModel CreateViewModel(
             out Mock<ComUtils> messages,
+            out Mock<IImagerConnectionHandler> connectionHandler,
             out Mock<IStageControl> stageControl,
             out ImageControlPanelViewModel imagePanel,
-            out SystemDefinedSettingsViewModel userDefinedAcquisitions,
+            out GlobalDefinedSettingsViewModel userDefinedAcquisitions,
             out Mock<SmartProcessingRegisterViewModel> processViewModel,
             out Mock<AcquisitionStateService> acquisitionState,
             out Mock<EquipmentState> equipmentState)
@@ -163,9 +166,10 @@ namespace Imager.Tests.ViewModels
 
 
             stageControl = new Mock<IStageControl>();
+            connectionHandler = new Mock<IImagerConnectionHandler>();
             var stageControlVM = new Mock<StageControlPanelViewModel>(stageControl.Object);
             messages = new Mock<ComUtils>();
-            userDefinedAcquisitions =  new SystemDefinedSettingsViewModel();
+            userDefinedAcquisitions =  new GlobalDefinedSettingsViewModel();
             processViewModel = new Mock<SmartProcessingRegisterViewModel>();
             equipmentState = new Mock<EquipmentState>();
             acquisitionState = new Mock<AcquisitionStateService>(stageControl.Object, processViewModel.Object, messages.Object, equipmentState.Object);
@@ -180,13 +184,27 @@ namespace Imager.Tests.ViewModels
             var fieldViewMock = new Mock<FieldViewerViewModel>();
             var imageVmFactoryMock = new Mock<IImageDisplayViewModelFactory>();
 
+            var workspaceData = new DataWorkspace();
+            var acquisitionEngine = new AcquisitionEngine(ImagerCommunicationManager.Instance);
+            var workspace = new ImagerWorkspace(
+                new ExperimentBuilder(userDefinedAcquisitions, stageControl.Object, new Mock<ImagerAvalonia.Services.INodeFactory>().Object),
+                acquisitionEngine,
+                workspaceData,
+                new Mock<Autofac.ILifetimeScope>().Object,
+                loggerFactoryMock.Object,
+                connectionHandler.Object,
+                ImagerCommunicationManager.Instance,
+                acquisitionState.Object
+            );
+
             imagePanel = new ImageControlPanelViewModel(
                 loggerFactoryMock.Object,
                 liveViewMock.Object,
                 fieldViewMock.Object,
-                messages.Object,
+                connectionHandler.Object,
                 imageVmFactoryMock.Object,
-                acquisitionState.Object
+                acquisitionState.Object,
+                workspace
             );
 
             var builder = new ContainerBuilder();
@@ -215,7 +233,6 @@ namespace Imager.Tests.ViewModels
 
 
             var vm = new MainViewModel(
-               messages.Object,
                stageControl.Object,
                imagePanel,
                userDefinedAcquisitions,
@@ -228,7 +245,6 @@ namespace Imager.Tests.ViewModels
             vm.InitializeEquipment();
 
             return new MainViewModel(
-                messages.Object,
                 stageControl.Object,
                 imagePanel,
                 userDefinedAcquisitions,
@@ -244,7 +260,7 @@ namespace Imager.Tests.ViewModels
         public void Get_Parameters()
         {
             // Tests the getting of the parameters and their assignment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -264,7 +280,7 @@ namespace Imager.Tests.ViewModels
         public void Add_and_RemoveAcquisition()
         {
             // Tests if single acquisition can be removed (at least one acquisition must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             var acq_service = App.Container.Resolve<AcquisitionStateService>();
 
@@ -280,7 +296,7 @@ namespace Imager.Tests.ViewModels
         {
 
             // Tests if an experiment can be added (at least one experiment must remain)
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
             vm.AddExperiment();
             Assert.Single(vm.Experiments);
@@ -292,13 +308,14 @@ namespace Imager.Tests.ViewModels
         public void Select_Experiment()
         {
             // Tests if selection changes properly when user selects an experiment
-            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _);
+            var vm = CreateViewModel(out var messagesMock, out _, out _, out _, out _, out _, out _, out _);
 
 
             var mockVM = new Mock<MainViewModel>(MockBehavior.Strict, null!); // if ctor needs deps
             var view = new MainView();
             vm.AddExperiment();
             var control = view.FindControl<ListBox>("AvailableExperiments");
+            Assert.NotNull(control);
             control.SelectedItem = vm.Experiments[0];
 
             Assert.NotNull(vm.SelectedExperiment);

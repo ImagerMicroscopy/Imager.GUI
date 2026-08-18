@@ -5,82 +5,103 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Avalonia.Collections;
 using ImagerAvalonia.Services.MeasurementControl;
-
+using ImagerAvalonia.Services.ImagerModels.SmartProgramModels;
 
 namespace ImagerAvalonia.ViewModels
 {
-    public partial class InputFunctionViewModel :ViewModelBase
+    public partial class InputFunctionViewModel : ViewModelBase
     {
         [ObservableProperty] string _methodName;
         public Guid ProgramID;
         [ObservableProperty] ObservableCollection<InputParameterViewModel> _methodParams;
 
-        public InputFunctionViewModel(InputFunction inputFunction, Guid programID)
+        [ObservableProperty] InputFunctionModel _model;
+
+        public InputFunctionViewModel(ImportedInputFunctionModel inputFunction, Guid programID)
         {
             MethodName = inputFunction.method_name;
             ProgramID = programID;
+
+            Model = new InputFunctionModel { methodname = MethodName };
+
             MethodParams = new ObservableCollection<InputParameterViewModel>(inputFunction.method_params.Select(x =>
             new InputParameterViewModel(x, this)));
 
+
+            foreach (var param in MethodParams)
+            {
+                Model.inputparams.Add(param.ParamModel);
+            }
+        }
+
+        internal void ClearBinding()
+        {
+            foreach(var param in MethodParams)
+            {
+                param.RemoveExperimentBindings();
+            }
         }
     }
 
     public partial class InputParameterViewModel : ViewModelBase
     {
-        public MeasurementViewModel? SelectedDetection { get; set; }
-        private ActionNode? _selectedNode;
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSelectedDetection))]
+        private MeasurementElementViewModel? _selectedDetection;
+        private MeasurementElementViewModel? _selectedNode;
         private InputFunctionViewModel _inputFunction;
         public Guid SmartProgramID { get; set; }
+        public bool HasSelectedDetection => SelectedDetection is not null;
         public string InputParameterName;
         [ObservableProperty] SmartProgramInput? _smartProgramBinding;
         [ObservableProperty] DetectorEquipmentViewModel _detectorInput;
-        [ObservableProperty] EnabledAcquisition _AcquisitionInput;
+        [ObservableProperty] EnabledAcquisition _acquisitionInput;
 
-        [ObservableProperty] ObservableCollection<DetectorEquipmentViewModel> _DefinedDetectors = new();
+        [ObservableProperty] ObservableCollection<DetectorEquipmentViewModel> _definedDetectors = new();
+
         [ObservableProperty] ObservableCollection<EnabledAcquisition> _definedAcquisitions = new();
         [ObservableProperty] ObservableCollection<EnabledAcquisition> _filteredAcquisitions = new();
 
+        // Serializable state for this single parameter (acquisition / detection / elementid).
+        [ObservableProperty] InputParameterModel _paramModel = new();
 
         public InputParameterViewModel(string input_parameter_name, InputFunctionViewModel vm)
         {
-            InputParameterName = input_parameter_name;  
+            InputParameterName = input_parameter_name;
             _inputFunction = vm;
             SmartProgramID = vm.ProgramID;
         }
 
-        public ActionNode? SelectedNode
+        public MeasurementElementViewModel? SelectedNode
         {
             get => _selectedNode;
             set
             {
-                if (value is ActionNode detectionNode)
+                if (value is MeasurementElementViewModel detectionNode)
                 {
                     if (_selectedNode is not null)
                     {
                         if (_selectedNode.SmartProgramBindings.Contains(SmartProgramBinding))
                         {
                             _selectedNode.SmartProgramBindings.Remove(SmartProgramBinding);
-                            if (_selectedNode.MeasurementType is Detection acq)
-                            {
-
-                                acq.SmartProgramIDS.Remove(SmartProgramID);
-                            }
                         }
                     }
 
-                    if (detectionNode.NodeViewModel is AcquisitionPanelViewModel acq_vm)
+                    if (detectionNode is DetectionElementViewModel acq_vm)
                     {
                         DefinedAcquisitions = acq_vm.IsAquisitionEnabled;
                         acq_vm.IsAquisitionEnabled.CollectionChanged += IsAquisitionEnabled_CollectionChanged;
                         acq_vm.AvailableAcquisitions.CollectionChanged += AvailableAcquisitions_CollectionChanged;
+                       
+
                         foreach (var enabled_acq in acq_vm.IsAquisitionEnabled)
                         {
                             enabled_acq.PropertyChanged += IsEnabled_PropertyChanged;
                         }
                         RefreshFilteredAcquisitions();
-                        if(SmartProgramBinding!=null)
+                        if (SmartProgramBinding != null)
                         {
-                            if(detectionNode.SmartProgramBindings.Contains(SmartProgramBinding))
+                            if (detectionNode.SmartProgramBindings.Contains(SmartProgramBinding))
                             {
                                 detectionNode.SmartProgramBindings.Remove(SmartProgramBinding);
                             }
@@ -91,15 +112,30 @@ namespace ImagerAvalonia.ViewModels
                         SmartProgramBinding = smBinding;
                         SmartProgramBinding.SmartProgramID = SmartProgramID;
 
-                        if (detectionNode.MeasurementType is Detection acq)
+                        if (detectionNode is DetectionElementViewModel acq)
                         {
-
-                            detectionNode.SmartProgramBindings.Add(smBinding);
-                            acq.SmartProgramIDS.Add(SmartProgramID);
+                            acq.SmartProgramBindings.Add(smBinding);
+                            ParamModel.elementid = detectionNode.Elementid;
+                            acq.OnNodeDeleted += ReferenceDetectionDeleted;
                         }
+
                     }
                 }
             }
+        }
+
+        private void ReferenceDetectionDeleted(object? sender, MeasurementElementViewModel? e)
+        {
+            SelectedDetection = null;
+            DefinedAcquisitions.Clear();
+            FilteredAcquisitions.Clear();
+
+            AcquisitionInput = null;
+            DetectorInput = null;
+
+
+            ParamModel.Clear();
+
         }
 
         private void AvailableAcquisitions_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -109,6 +145,7 @@ namespace ImagerAvalonia.ViewModels
             {
                 enabled_acq.PropertyChanged += IsEnabled_PropertyChanged;
             }
+
             RefreshFilteredAcquisitions();
 
         }
@@ -126,9 +163,9 @@ namespace ImagerAvalonia.ViewModels
             RefreshFilteredAcquisitions();
         }
 
-        internal void NodeDeleted(object? sender, ViewModelBase e)
+        internal void NodeDeleted(object? sender, MeasurementElementViewModel e)
         {
-            if (e is MeasurementViewModel node)
+            if (e is MeasurementElementViewModel node)
             {
                 if (SelectedDetection == node)
                 {
@@ -140,21 +177,62 @@ namespace ImagerAvalonia.ViewModels
                     SmartProgramBinding = null;
                     SelectedNode = null;
                     RefreshFilteredAcquisitions();
+
+                    ParamModel.Clear();
                 }
+            }
+        }
+
+
+        partial void OnDetectorInputChanged(DetectorEquipmentViewModel acq_input)
+        {
+            if (acq_input is not null)
+            {
+                ParamModel.detection = acq_input.Name;
+            }
+            else
+            {
+                ParamModel.detection = null;
             }
         }
 
         partial void OnAcquisitionInputChanged(EnabledAcquisition acq_input)
         {
+            if (DefinedDetectors.Count != 0)
+            {
+                foreach(var detector in DefinedDetectors)
+                {
+                    detector.WhenDetectorEnabled -= Detector_WhenDetectorEnabled;
+                }
+            }
+
             if (AcquisitionInput != null)
             {
-                DefinedDetectors = acq_input.acquisition.Detector;
+                DefinedDetectors = acq_input.Acquisition.Detector;
+                ParamModel.acquisition = acq_input.Acquisition.Name;
+            }
+
+            if (DefinedDetectors.Count != 0)
+            {
+                foreach (var detector in DefinedDetectors)
+                {
+                    detector.WhenDetectorEnabled += Detector_WhenDetectorEnabled;
+                }
+            }
+        }
+
+        private void Detector_WhenDetectorEnabled(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if(sender is DetectorEquipmentViewModel detector &&
+                detector == DetectorInput)
+            {
+                DetectorInput = null;
             }
         }
 
         private void RefreshFilteredAcquisitions()
         {
-
+            AcquisitionInput = null;
             FilteredAcquisitions = new ObservableCollection<EnabledAcquisition>(
                 DefinedAcquisitions.Where(a => a.IsEnabled));
 
@@ -165,10 +243,7 @@ namespace ImagerAvalonia.ViewModels
             if (SmartProgramBinding != null && SelectedNode != null)
             {
                 SelectedNode.SmartProgramBindings.Remove(SmartProgramBinding);
-                if (SelectedNode.MeasurementType is Detection acq)
-                {
-                    acq.SmartProgramIDS.Remove(SmartProgramID);
-                }
+
                 SmartProgramBinding = null;
             }
         }

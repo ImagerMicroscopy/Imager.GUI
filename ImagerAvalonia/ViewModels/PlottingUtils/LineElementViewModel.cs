@@ -40,7 +40,7 @@ namespace ImagerAvalonia.ViewModels
         [ObservableProperty] private XYStagePosition _PinnedPosition;
         public ObservableCollection<XYStagePosition> AvailableStagePositions { get; }
 
-        public LineElementViewModel(List<IImageElement> element, string det, string acq, string reg, ObservableCollection<XYStagePosition> xYStagePositions) 
+        public LineElementViewModel(List<IImageElement> element, string det, string acq, string reg, ObservableCollection<XYStagePosition> stagePositions) 
         { 
             PlotColor = element.First().Color;
             LineRegions = element;
@@ -52,7 +52,7 @@ namespace ImagerAvalonia.ViewModels
             DetName = DetectorName;
             AcqDetDisplay = $"{AcqName}/{DetName}";
 
-            AvailableStagePositions = xYStagePositions;
+            AvailableStagePositions = stagePositions;
             PinnedPosition = AvailableStagePositions[0];
         }
 

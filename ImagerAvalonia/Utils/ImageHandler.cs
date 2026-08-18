@@ -1,7 +1,10 @@
-﻿using DynamicData;
+using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Services.Workspace.SmartProgramWorkspace;
 using Microsoft.Extensions.Logging;
-using ScottPlot;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -20,7 +23,7 @@ namespace ImagerAvalonia.Utils
 
         private readonly MessagePackAcquisitionHandler? _acquisitionHandler;
 
-        private readonly ComUtils? _comUtils;
+        private readonly IImagerConnectionHandler _connectionHandler;
 
         private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
 
@@ -34,12 +37,12 @@ namespace ImagerAvalonia.Utils
             _storageProvider = storageProvider; 
         }
 
-        public ImageHandler(IStorageProvider storageProvider, ILogger logger, ComUtils comUtils )
+        public ImageHandler(IStorageProvider storageProvider, ILogger logger, IImagerConnectionHandler connectionHandler )
         {
             _storageProvider = storageProvider;
             _logger = logger;
-            _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, comUtils);
-            _comUtils = comUtils;
+            _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, connectionHandler);
+            _connectionHandler = connectionHandler;
             _throttleTimer.Elapsed += (_, _) => _canFire = true;
         }
 
@@ -84,11 +87,11 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public ImageData RequestImageMetadata(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        public ImageData RequestImageMetadata(List<Tuple<string, string>> AcqDetPairs, int RequestedTime)
         {
             ImageData imageData = new ImageData();
             imageData.Metadata = new List<TiffPlaneMetadata>() { };
-            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            foreach (var acq_det_pair in AcqDetPairs)
             {
                 //WIP
             }
@@ -96,7 +99,7 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public ImageData RequestImage(List<AcqDetPair> AcqDetPairs, int RequestedTime)
+        public ImageData RequestImage(List<Tuple<string, string>> AcqDetPairs, int RequestedTime)
         {
             ImageData imageData = new ImageData();
 
@@ -104,15 +107,15 @@ namespace ImagerAvalonia.Utils
             imageData.Metadata = new List<TiffPlaneMetadata>() { };
             imageData.Sizes = new List<List<uint>>() { };
             int num_datasets = 0;
-            foreach (AcqDetPair acq_det_pair in AcqDetPairs)
+            foreach (var acq_det_pair in AcqDetPairs)
             {
-                int image_idx = _storageProvider.GetImageIndex(acq_det_pair.acqName, acq_det_pair.detName, RequestedTime);
-                byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                int image_idx = _storageProvider.GetImageIndex(acq_det_pair.Item1, acq_det_pair.Item2, RequestedTime);
+                byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.Item1, acq_det_pair.Item2, image_idx);
                 if (image_data.Length > 0)
                 {
                     num_datasets += 1;
                     imageData.Images.Add(image_data);
-                    var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.acqName, acq_det_pair.detName, image_idx);
+                    var plane_metadata = _storageProvider.GetPlaneMetadata(acq_det_pair.Item1, acq_det_pair.Item2, image_idx);
                     imageData.Metadata.Add(plane_metadata);
                     imageData.Sizes.Add(_storageProvider.GetPlaneSize());
                     imageData.TraversedPositions.Add(plane_metadata.CurrentStagePosition);
@@ -146,63 +149,75 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src)
-        {
+        public async Task<bool> ParseProgramAndShowData( CancellationTokenSource src, 
+            MeasurementProgram program,
+            SmartProgramRegistry smartPrograms){
+            try {
+                
 
+                await Task.Run(async () => {
 
-            CancellationTokenSource source = src;
+                    var request = new ExecuteMeasurementProgramRequest(
+                        JObject.FromObject(program.Program, Newtonsoft.Json.JsonSerializer.Create(MeasurementSerializer.Settings)),
+                        JObject.FromObject(program.Detections , Newtonsoft.Json.JsonSerializer.Create(DetectionEquipmentSerializer.Settings)),
+                        smartPrograms.SerializeAllDags()
+                    );
 
+                    if (request != null) {
+                      
 
-            Task _Enable_live_view = new Task(() =>
-            {
-                if (_acquisitionHandler is not null)
-                {
-                    _acquisitionHandler.StartAcquisition();
+                        var channel = Channel.CreateUnbounded<MeasurementEvent>();
+                        ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(request, channel.Writer, src.Token);
+  
 
+                        _storageProvider.OpenWriteStream();
 
-                    while (_acquisitionHandler.state == AcquisitionState.Running)
-                    {
+                        await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
+                            switch (measurementEvent) {
+                                case MeasurementDataEvent dataEvent:
+                                    var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
+                                    if (images.Images.Count > 0) {
+                                        _storageProvider.SavePlanes(images.Images, images.Metadata);
+                                        var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                                    }
+                                    break;
 
-                        var images = _acquisitionHandler.FetchData(src);
+                                case MeasurementStatusTextEvent statusEvent:
+                                    foreach (var msg in statusEvent.Messages) {
+                                        _logger.LogInformation(msg);
+                                    }
+                                    break;
 
-                        if (_acquisitionHandler.IsNewDataAvailable)
-                        {
+                                case MeasurementErrorEvent errorEvent:
+                                    _logger.LogError($"Measurement Error: {errorEvent.Error}");
+                                    break;
 
-                            Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
-
-                            if (_comUtils is not null)
-                            {
-                                _comUtils.SendDataRequest(ComUtils.fetchasyncstatus, "", response_message => { _logger?.LogInformation(response_message); }, response_data => { });
+                                case MeasurementCompletedEvent _:
+                                    return; // End of stream
                             }
-
-                            _acquisitionHandler.IsNewDataAvailable = false;
                         }
                     }
-                }
+                }, src.Token);
+
+                return true;
+            } catch (OperationCanceledException) {
+                // Task was cancelled, this is expected when stopping live acquisition
+                _logger.LogInformation("Live acquisition was cancelled by user");
+                return false;
             }
-            , source.Token);
-
-
-            _Enable_live_view.Start();
-            await _Enable_live_view;
-
-            
-
-            return _Enable_live_view.IsCompleted;
-            
         }       
 
         
     }
     public class OnDetectionRequestedEventArgs : EventArgs
     {
-        public List<AcqDetPair> AcqDetPairs  { get; private set; }
-        //public Dictionary<AcqDetPair, XYStagePosition> DetectionPositions { get; }
+        public List<Tuple<string, string>> AcqDetPairs  { get; private set; }
+        //public Dictionary<AcqDetPair, StagePosition> DetectionPositions { get; }
 
         public int RequestedTime { get; }
 
 
-        public OnDetectionRequestedEventArgs(List<AcqDetPair> acqDetPairs , int requestedTime)
+        public OnDetectionRequestedEventArgs(List<Tuple<string, string>> acqDetPairs , int requestedTime)
         {
             AcqDetPairs = acqDetPairs;
             //DetectionPositions = detectionPositions ?? throw new ArgumentNullException(nameof(detectionPositions));
@@ -210,3 +225,5 @@ namespace ImagerAvalonia.Utils
         }
     }
 }
+
+

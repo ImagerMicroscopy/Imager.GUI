@@ -105,7 +105,7 @@ public partial class ImageRegionDisplayViewModel : ViewModelBase
         }
     }
 
-    internal void SetXYStagePositions(List<XYStagePosition> experimentPositions)
+    internal void SetStagePositions(List<XYStagePosition> experimentPositions)
     {
         _stagePositions = new ObservableCollection<XYStagePosition>(experimentPositions);
     }

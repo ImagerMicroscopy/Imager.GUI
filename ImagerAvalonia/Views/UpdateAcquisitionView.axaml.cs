@@ -15,7 +15,7 @@ public partial class UpdateAcquisitionView : UserControl
         InitializeComponent();
 
     }
-    public UpdateAcquisitionView(SystemDefinedSettingsViewModel availableAcquisitions)
+    public UpdateAcquisitionView(GlobalDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = new UpdateAcquisitionViewModel(availableAcquisitions);

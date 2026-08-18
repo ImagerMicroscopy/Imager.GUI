@@ -53,7 +53,7 @@ namespace ImagerAvalonia.Tests.ViewModels
                         "DummyCam1" => @"{
                                 ""responsetype"": ""detectorproperties"",
                                 ""detectorproperties"": [
-                                    { ""descriptor"": ""Exposure time"", ""kind"": ""numeric"", ""propertycode"": 0, ""value"": 0.1 },
+                                    { ""descriptor"": ""Exure time"", ""kind"": ""numeric"", ""propertycode"": 0, ""value"": 0.1 },
                                     { ""availableoptions"": [""16x16"", ""32x32"", ""64x64"", ""128x128"", ""256x256"", ""512x512"", ""1024x1024"", ""1280x1280"", ""1536x1536"", ""2048x2048""], ""current"": ""64x64"", ""descriptor"": ""Sensor cropping"", ""kind"": ""discrete"", ""propertycode"": 1 },
                                     { ""availableoptions"": [""1"", ""2"", ""4""], ""current"": ""1"", ""descriptor"": ""Binning"", ""kind"": ""discrete"", ""propertycode"": 2 }
                                 ],
@@ -62,7 +62,7 @@ namespace ImagerAvalonia.Tests.ViewModels
                                         "DummyCam2" => @"{
                                 ""responsetype"": ""detectorproperties"",
                                 ""detectorproperties"": [
-                                    { ""descriptor"": ""Exposure time"", ""kind"": ""numeric"", ""propertycode"": 0, ""value"": 0.05 },
+                                    { ""descriptor"": ""Exure time"", ""kind"": ""numeric"", ""propertycode"": 0, ""value"": 0.05 },
                                     { ""availableoptions"": [""16x16"", ""32x32"", ""64x64"", ""128x128"", ""256x256"", ""512x512"", ""1024x1024"", ""1280x1280"", ""1536x1536"", ""2048x2048""], ""current"": ""1024x1024"", ""descriptor"": ""Sensor cropping"", ""kind"": ""discrete"", ""propertycode"": 1 },
                                     { ""availableoptions"": [""1"", ""2"", ""4""], ""current"": ""1"", ""descriptor"": ""Binning"", ""kind"": ""discrete"", ""propertycode"": 2 }
                                 ],

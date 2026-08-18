@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.ImagerModels.SmartProgramModels;
 using ImagerAvalonia.Services.MeasurementControl;
-using ImagerAvalonia.Utils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -16,77 +16,66 @@ namespace ImagerAvalonia.ViewModels
 {
     public partial class SmartUpdateAcquisitionFunctionViewModel : ViewModelBase
     {
-        [ObservableProperty] Guid _elementID =  Guid.Empty;
+        [ObservableProperty] Guid _elementID = Guid.Empty;
         [ObservableProperty] string _acquisitionUpdate;
         [ObservableProperty] SmartProgramInput? _smartProgramBinding;
         [ObservableProperty] ObservableCollection<UpdateAcquisitionFunctionParameterViewModel> _acquisitionUpdateParameters = new();
 
+        // Source of truth for serialization - mirrors InputFunctionViewModel.Model.
+        [ObservableProperty] SmartAcquisitionUpdateModel _model = new();
+
         public SmartProgramViewModel SmartProgramViewModel { get; set; }
 
         public Guid SmartProgramID { get; set; }
-        private ActionNode? _selectedNode;
-        public ActionNode? SelectedNode
+        private MeasurementElementViewModel? _selectedNode;
+        public MeasurementElementViewModel? SelectedNode
         {
             get => _selectedNode;
             set
             {
-                if(value is null)
+                if (value is null)
                 {
                     _selectedNode = null;
                 }
-   
-                if (value is ActionNode detectionNode)
+
+                if (value is MeasurementElementViewModel detectionNode)
                 {
                     if (_selectedNode is not null)
                     {
-
-                        if (_selectedNode.MeasurementType is UpdateAcquisition updateAcq &&
-                            updateAcq.MeasurementView.DataContext is UpdateAcquisitionViewModel updateAcqVM)
-                        {
-
-                            updateAcqVM.SelectedProgramId = null;
-
-                        }
                         ClearUpdateAcquisitionNodeBindings(_selectedNode);
                     }
                     _selectedNode = detectionNode;
-                    if (detectionNode.MeasurementType is UpdateAcquisition updateAcqNew &&
-                        updateAcqNew.MeasurementView.DataContext is UpdateAcquisitionViewModel updateAcqVMNew)
-                    {
-
-                        updateAcqVMNew.SelectedProgramId = SmartProgramViewModel;
-                        ClearUpdateAcquisitionNodeBindings(detectionNode);
-                    }
 
                     SmartProgramBinding<SmartUpdateAcquisitionFunctionViewModel> smBinding =
                         new SmartProgramBinding<SmartUpdateAcquisitionFunctionViewModel>(this);
                     SmartProgramBinding = smBinding;
-                    SmartProgramBinding.SmartProgramID = SmartProgramID;
-                    ElementID = detectionNode.NodeViewModel.Elementid;
+                    SmartProgramBinding.SmartProgramID = SmartProgramViewModel.SmartProgramID;
+                    ElementID = detectionNode.Elementid; // syncs into Model via OnElementIDChanged
                     detectionNode.SmartProgramBindings = new ObservableCollection<SmartProgramInput> { smBinding };
                 }
+
+                OnPropertyChanged(nameof(SelectedNode));
+                OnPropertyChanged(nameof(HasSelectedNode));
             }
         }
 
+        public bool HasSelectedNode => SelectedNode is not null;
+
         public EquipmentState EquipmentState { get; set; }
-        public InputFunction? UpdateParameters { get;
+        public ImportedInputFunctionModel? UpdateParameters
+        {
+            get;
             set
             {
                 AcquisitionUpdateParameters.Clear();
-                foreach (var param in  value.method_params)
+                Model.acquisitionupdateparameters.Clear();
+                foreach (var param in value.method_params)
                 {
-                    AcquisitionUpdateParameters.Add(
-                        new UpdateAcquisitionFunctionParameterViewModel()
-                        {
-                            ParameterName = param,
-                            EquipmentPaths = new ObservableCollection<string>(
-                                EquipmentState.EquipmentProperties.Select(x => string.Join('/', x.EquipmentPath))),
-                            SelectedEquipmentPaths = EquipmentState.EquipmentProperties.Select(x => x.EquipmentPath).ToList(),
-                            EquipmentProperties = EquipmentState.EquipmentProperties
-                        }
-                        );
+                    var paramVM = new UpdateAcquisitionFunctionParameterViewModel(param, EquipmentState);
+                    AcquisitionUpdateParameters.Add(paramVM);
+                    Model.acquisitionupdateparameters.Add(paramVM.Model);
                 }
-            } 
+            }
         }
 
         public SmartUpdateAcquisitionFunctionViewModel()
@@ -94,7 +83,19 @@ namespace ImagerAvalonia.ViewModels
 
         }
 
-        private void ClearUpdateAcquisitionNodeBindings(ActionNode node)
+        // Keep Model in step with the bindable properties, same role as
+        // InputFunctionViewModel setting Model.methodname from MethodName.
+        partial void OnElementIDChanged(Guid value)
+        {
+            Model.elementid = value;
+        }
+
+        partial void OnAcquisitionUpdateChanged(string value)
+        {
+            Model.acquisitionupdatefunction = value ?? string.Empty;
+        }
+
+        private void ClearUpdateAcquisitionNodeBindings(MeasurementElementViewModel node)
         {
             foreach (var binding in node.SmartProgramBindings)
             {
@@ -102,7 +103,6 @@ namespace ImagerAvalonia.ViewModels
                 {
                     vm.SmartProgramInputVM.SelectedNode = null;
                     vm.SmartProgramInputVM.SmartProgramBinding = null;
-                    
                 }
             }
             node.SmartProgramBindings.Clear();
@@ -121,22 +121,16 @@ namespace ImagerAvalonia.ViewModels
                 }
                 SelectedNode.SmartProgramBindings?.Clear();
                 SmartProgramBinding = null;
-
-                if (SelectedNode.MeasurementType is UpdateAcquisition updateAcqNew &&
-                    updateAcqNew.MeasurementView.DataContext is UpdateAcquisitionViewModel updateAcqVMNew)
-                {
-
-                    updateAcqVMNew.SelectedProgramId = null;
-
-                }
+                SelectedNode = null; // <-- added so HasSelectedNode flips back to false
             }
-
         }
 
-        internal void NodeDeleted(object? sender, ViewModelBase? e)
+        public void DraggedNode_OnNodeDeleted(object? sender, MeasurementElementViewModel? e)
         {
             RemoveExperimentBindings();
+
         }
+
     }
 
 
@@ -147,28 +141,21 @@ namespace ImagerAvalonia.ViewModels
         {
             var obj = JObject.Load(reader);
             var viewModel = new SmartUpdateAcquisitionFunctionViewModel();
-            viewModel.AcquisitionUpdate = obj["acquisition_updates"]?.ToString() ?? string.Empty; 
+            viewModel.AcquisitionUpdate = obj["acquisition_updates"]?.ToString() ?? string.Empty;
 
             return viewModel;
         }
 
         public override void WriteJson(JsonWriter writer, SmartUpdateAcquisitionFunctionViewModel value, JsonSerializer serializer)
         {
-           
             writer.WriteStartObject();
             writer.WritePropertyName("elementid");
-            writer.WriteValue(value.ElementID);
+            writer.WriteValue(value.Model.elementid);
             writer.WritePropertyName("acquisitionupdatefunction");
-            writer.WriteValue(value.AcquisitionUpdate);
+            writer.WriteValue(value.Model.acquisitionupdatefunction);
             writer.WritePropertyName("acquisitionupdateparameters");
-            writer.WriteStartArray();
-
-            foreach (var param in value.AcquisitionUpdateParameters)
-            {
-                serializer.Serialize(writer, param);
-            }
-
-            writer.WriteEndArray();
+            serializer.Serialize(writer, value.Model.acquisitionupdateparameters);
+            writer.WriteEndObject(); // was missing before - left the JSON object unclosed
         }
     }
 
@@ -183,13 +170,47 @@ namespace ImagerAvalonia.ViewModels
         public List<List<string>> SelectedEquipmentPaths = new();
 
         [JsonConverter(typeof(StringEnumConverter))] public EquipmentPropertyType PropertyType;
-        [JsonIgnoreAttribute] public  List<EquipmentProperty> EquipmentProperties;
+        [JsonIgnoreAttribute] public List<EquipmentProperty> EquipmentProperties;
+
+        // Serializable state for this single parameter - mirrors InputParameterViewModel.ParamModel.
+        public UpdateAcquisitionParameterModel Model { get; } = new();
+
+        public UpdateAcquisitionFunctionParameterViewModel(string parameterName, EquipmentState equipmentState)
+        {
+            EquipmentProperties = equipmentState.EquipmentProperties;
+            EquipmentPaths = new ObservableCollection<string>(
+                equipmentState.EquipmentProperties.Select(x => string.Join('/', x.EquipmentPath)));
+            SelectedEquipmentPaths = equipmentState.EquipmentProperties.Select(x => x.EquipmentPath).ToList();
+
+            Model.SelectedEquipmentPaths = SelectedEquipmentPaths;
+            Model.EquipmentPaths = EquipmentPaths.ToList();
+
+            ParameterName = parameterName; // triggers OnParameterNameChanged -> Model.ParameterName
+        }
+
+        partial void OnParameterNameChanged(string value)
+        {
+            Model.ParameterName = value ?? string.Empty;
+        }
+
+        partial void OnSelectedPathChanged(string value)
+        {
+            Model.SelectedPath = value ?? string.Empty;
+        }
 
         partial void OnSelectedPathIndexChanged(int value)
         {
+            if (EquipmentProperties is null || value < 0 || value >= EquipmentProperties.Count)
+            {
+                return;
+            }
             PropertyType = EquipmentProperties[value].EquipmentType;
+            Model.PropertyType = PropertyType;
+            Model.SelectedPathIndex = value;
+            SelectedPath = EquipmentPaths[value]; // triggers OnSelectedPathChanged too
         }
 
     }
+
 
 }

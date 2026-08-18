@@ -2,7 +2,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Utils;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using ImagerAvalonia.Views;
 using System;
 using System.Collections.Generic;
@@ -14,21 +16,9 @@ using System.Threading;
 
 namespace ImagerAvalonia.ViewModels;
 
-public interface IImageDisplay
-{
-    void SetGridData(List<AcqDetPair> acq_det_pairs);
-
-    void ProcessImages(object sender, ImageData images);
 
 
-
-}
-
-
-
-
-
-public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
+public partial class ImageDisplayViewModel : ViewModelBase
 {
 
 
@@ -40,7 +30,7 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     public event EventHandler<OnDetectionRequestedEventArgs>? OnDetectionRequested;
     public event EventHandler? LiveViewDisabled;
     public event EventHandler<XYStagePosition>? PinnedPositionChanged;
-    public event EventHandler<ObservableCollection<XYStagePosition>> OnXYPositionsChanged;
+    public event EventHandler<ObservableCollection<XYStagePosition>> OnXYitionsChanged;
 
     [ObservableProperty] private bool _multiViewEnabled = false;
     [ObservableProperty] private int _Min_disp_val = 10000;
@@ -63,10 +53,12 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     public bool process_field_view;
     public int StorageID { get; set; } = -1;
 
+    private List<Tuple<string, string>> AcqDetPairs = new();
     private bool _canFire = true;
     private System.Timers.Timer _throttleTimer = new System.Timers.Timer(10) { AutoReset = true } ;
-    private IStageControl? _stageController;
-    private IExperimentSerialization _experimentTraversal;
+
+
+    //private IExperimentSerialization _experimentTraversal;
 
     public ObservableCollection<string> Detectors = new();
     public ObservableCollection<string> Acquisitions = new();
@@ -75,16 +67,11 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     public CancellationTokenSource source { get; set; } = new();
     public ImageHandler ImageHanlder { get; internal set; }
 
-    public ImageDisplayViewModel()
-    { 
-        
-    }
 
-    public ImageDisplayViewModel(IExperimentSerialization experimentTraversal, IStageControl stageControl)
+
+    public ImageDisplayViewModel()
     {
-        //_stageController = stageController;
-        _experimentTraversal = experimentTraversal;
-        //_throttleTimer = new System.Timers.Timer(50) { AutoReset = true };
+        
         _throttleTimer.Elapsed += (_, _) => _canFire = true;
 
         SliderPropertyChanged += (s, e) =>
@@ -93,27 +80,26 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
             {
                 _canFire = false;
                 _throttleTimer.Start();
-                OnDetectionRequested?.Invoke(this, new OnDetectionRequestedEventArgs(_experimentTraversal.GetAcqDetPairs(),e));
 
 
             }
         };
         this.PropertyChanged += OnSliderPropertyChanged;
-        _stageController = stageControl;
-
-        AvailableStagePositions = new ObservableCollection<XYStagePosition>(experimentTraversal.ExperimentPositions);   
-        PinnedPosition = AvailableStagePositions[0];
         
     }
 
 
 
 
-    public void SetAvailableXYPositions(IEnumerable<XYStagePosition> stagePositions)
+    public void SetAvailableXYPositions(List<XYStagePosition> positions)
     {
-        AvailableStagePositions = new ObservableCollection<XYStagePosition>(stagePositions);
-        PinnedPosition = AvailableStagePositions[0];
-        OnXYPositionsChanged?.Invoke(this, AvailableStagePositions);
+        AvailableStagePositions = new ObservableCollection<XYStagePosition>(
+            positions);
+
+        AvailableStagePositions.Add(IStageControl.DefaultStagePosition);
+        PinnedPosition = AvailableStagePositions[AvailableStagePositions.Count - 1];
+        
+        OnXYitionsChanged?.Invoke(this, AvailableStagePositions);       
     }
 
 
@@ -146,15 +132,10 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
                 MaxFrameCount = frame + 1;
             }
 
-            if (_experimentTraversal != null)
-            {
-               
-
-                AcquisitionProgress = $"{frame + 1}/{MaxFrameCount}";
+            AcquisitionProgress = $"{frame + 1}/{MaxFrameCount}";
                 
-                MaxSliderValue = MaxFrameCount;
-                RequestedFrame = frame;
-            }
+            MaxSliderValue = MaxFrameCount;
+            RequestedFrame = frame;
         }
     }
 
@@ -164,9 +145,11 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
         {
             AcquisitionProgress = $"{RequestedFrame}/{MaxFrameCount}";
             SliderPropertyChanged?.Invoke(this, RequestedFrame);
+            OnDetectionRequested?.Invoke(this,
+                new OnDetectionRequestedEventArgs(AcqDetPairs,RequestedFrame
+                ));
         }
     }
-
 
 
     protected virtual void OnGridValueInitialized(EventArgs e)
@@ -175,27 +158,26 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     }
 
 
-
-
-
-    public void SetGridData(List<AcqDetPair> acq_det_pairs)
+    public void SetGridData(List<Tuple<string,string>> acq_det_pairs)
     {
         RequestedFrame = 1;
         Acquisitions.Clear();
         Detectors.Clear();
-        foreach (AcqDetPair acquisition in acq_det_pairs)
+        if (acq_det_pairs == null) return;
+        AcqDetPairs = new List<Tuple<string, string>>(acq_det_pairs);
+
+
+        foreach (Tuple<string, string> acquisition in acq_det_pairs)
         {
-            foreach (AcqDetPair detector in acq_det_pairs)
+            foreach (Tuple<string, string> detector in acq_det_pairs)
             {
-                if (!Acquisitions.Contains(acquisition.acqName))
+                if (!Acquisitions.Contains(acquisition.Item1))
                 {
-                    Acquisitions.Add(acquisition.acqName);
-
+                    Acquisitions.Add(acquisition.Item1);
                 }
-                if (!Detectors.Contains(detector.detName))
+                if (!Detectors.Contains(detector.Item2))
                 {
-
-                    Detectors.Add(detector.detName);
+                    Detectors.Add(detector.Item2);
                 }
             }
         }
@@ -223,15 +205,15 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
 
         for (int i = 0; i < images.Images.Count; i++)
         {
-            var imageXYStagePosition = images.Metadata[i].CurrentStagePosition;
+            var imageStagePosition = images.Metadata[i].CurrentStagePosition;
 
-            if(imageXYStagePosition.Name!=string.Empty)
+            if(imageStagePosition.Name!=string.Empty)
             {
-                images.TraversedPositions.Add(imageXYStagePosition);
+                images.TraversedPositions.Add(imageStagePosition);
             }
             else
             {
-                images.TraversedPositions.Add(IStageControl.DefaultXYStagePosition);
+                images.TraversedPositions.Add(IStageControl.DefaultStagePosition);
             }
         }
     }
@@ -250,15 +232,11 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
 
             if (i >= Math.Max(0, images.Images.Count - Acquisitions.Count * Detectors.Count))
             {
-                if (PinnedPosition != IStageControl.DefaultXYStagePosition)
+                if (PinnedPosition != IStageControl.DefaultStagePosition)
                 {
-                    if (images.TraversedPositions[i].IsEqual(PinnedPosition))
+                    if (images.Metadata[i].PositionName == PinnedPosition.Name)
                     {
                         UpdateImage?.Invoke(images.Metadata[i], images.Images[i], true);
-                    }
-                    else
-                    {
-                        UpdateImage?.Invoke(images.Metadata[i], images.Images[i], false);
                     }
                 }
                 else
@@ -275,11 +253,6 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
         {
             PinnedPositionChanged?.Invoke(this, newValue);
         }
-    }
-
-    internal void SetExperimentSerializer(IExperimentSerialization experimentSerializer)
-    {
-        _experimentTraversal = experimentSerializer;
     }
 
     internal void ProcessImageElements(object? sender, ImageData images)
@@ -310,12 +283,12 @@ public partial class ImageDisplayViewModel : ViewModelBase, IImageDisplay
     public class RegionPropertiesEventArgs : EventArgs
     {
         public ImageData ImageData { get; }
-        public XYStagePosition XYStagePosition { get; }
+        public XYStagePosition StagePosition { get; }
 
-        public RegionPropertiesEventArgs(ImageData imageData, XYStagePosition xyStagePosition)
+        public RegionPropertiesEventArgs(ImageData imageData, XYStagePosition stagePosition)
         {
             ImageData = imageData;
-            XYStagePosition = xyStagePosition;
+            StagePosition = stagePosition;
         }
     }
 }

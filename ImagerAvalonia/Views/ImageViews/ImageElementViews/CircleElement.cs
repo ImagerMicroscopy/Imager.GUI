@@ -88,8 +88,8 @@ namespace ImagerAvalonia.Views.ImageViews
                         int y0 = Convert.ToInt32(Math.Max(0, yp - Radius));
                         int y1 = Convert.ToInt32(Math.Min(height - 1, yp + Radius));
 
-                        int xpos = Convert.ToInt32(xp);
-                        int ypos = Convert.ToInt32(yp);
+                        int x = Convert.ToInt32(xp);
+                        int y = Convert.ToInt32(yp);
 
                         ulong sum = 0;
                         int count = 0;
@@ -100,8 +100,8 @@ namespace ImagerAvalonia.Views.ImageViews
                         {
                             for (int i = x0; i <= x1; i++)
                             {
-                                int dx = i - xpos;
-                                int dy = j - ypos;
+                                int dx = i - x;
+                                int dy = j - y;
                                 if (dx * dx + dy * dy <= Radius * Radius)
                                 {
                                     ushort val = image[j * width + i];
@@ -158,9 +158,9 @@ namespace ImagerAvalonia.Views.ImageViews
 
 
         public ElementPlotViewModel GenerateRegionPlotControl(List<IImageElement> image_elements, string acq, string det, string reg, 
-            ObservableCollection<XYStagePosition> xYStagePositions)
+            ObservableCollection<XYStagePosition> stagePositions)
         {
-                var circle_vm = new CircleElementViewModel(image_elements, acq, det, reg, xYStagePositions);
+                var circle_vm = new CircleElementViewModel(image_elements, acq, det, reg, stagePositions);
                 return circle_vm;
         }
     }

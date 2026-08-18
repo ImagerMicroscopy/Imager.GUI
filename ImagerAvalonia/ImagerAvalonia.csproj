@@ -58,6 +58,7 @@
     <PackageReference Include="ScottPlot" />
     <PackageReference Include="ScottPlot.Avalonia" />
     <PackageReference Include="System.Drawing.Common" />
+    <PackageReference Include="Tmds.DBus.Protocol" />
 
 
 

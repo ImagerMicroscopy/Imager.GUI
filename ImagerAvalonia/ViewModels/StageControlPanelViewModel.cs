@@ -8,7 +8,7 @@ public partial class StageControlPanelViewModel : ViewModelBase
 {
     // Observable properties
 
-    [ObservableProperty] private bool _isStageAvailable = true;
+    [ObservableProperty] private bool _isStageAvailable = false;
 
     private double? _xyStep = 0.0;
     public double? XYStep
@@ -72,9 +72,9 @@ public partial class StageControlPanelViewModel : ViewModelBase
         var pos = _stageController.ReadStagePosition();
         if (pos != null)
         {
-            pos.XPos += xDelta;
-            pos.YPos += yDelta;
-            pos.ZPos += zDelta;
+            pos.Coordinates.x += xDelta;
+            pos.Coordinates.y += yDelta;
+            pos.Coordinates.z += zDelta;
             _stageController.SetStagePosition(pos);
         }
     }

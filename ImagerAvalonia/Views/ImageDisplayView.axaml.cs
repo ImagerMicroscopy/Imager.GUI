@@ -8,7 +8,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ImagerAvalonia.Services.MeasurementControl;
-using ImagerAvalonia.Utils;
+using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.ImageViews;
 using ImagerAvalonia.Views.MultiChannelView;
@@ -121,7 +121,7 @@ public partial class ImageDisplayView : UserControl
 
     }
 
-    public void UpdateXYPositions(object? sender, ILifetimeScope scope)
+    public void UpdateXYitions(object? sender, ILifetimeScope scope)
     {
 
     }
@@ -172,7 +172,7 @@ public partial class ImageDisplayView : UserControl
         if (DataContext is ImageDisplayViewModel vm)
         {
             imageDisplayViewM = vm;
-            imageDisplayViewM.OnXYPositionsChanged += ImageDisplayViewM_OnXYPositionsChanged;
+            imageDisplayViewM.OnXYitionsChanged += ImageDisplayViewM_OnXYitionsChanged;
             imageDisplayViewM.UpdateImage += UpdateCurrentImageFromStream;
             imageDisplayViewM.UpdateRegionProperties += UpdateRegionPropertiesFromStream;
             imageDisplayViewM.GridValuesInitialized += InitializeGrid;
@@ -182,9 +182,9 @@ public partial class ImageDisplayView : UserControl
         imageGrid.OnSelectedItemChanged += ImageGrid_OnSelectedItemChanged;
     }
 
-    private void ImageDisplayViewM_OnXYPositionsChanged(object? sender, ObservableCollection<XYStagePosition> e)
+    private void ImageDisplayViewM_OnXYitionsChanged(object? sender, ObservableCollection<XYStagePosition> e)
     {
-        regionCollectionProperties.SetXYPositions(e);
+        regionCollectionProperties.SetXYitions(e);
     }
 
     private void UpdateRegionPropertiesFromStream(int im_size_x, int im_size_y, string acq, string det, byte[] image_data, XYStagePosition pos, bool canupdate, double timepoint)

@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.Services.MeasurementControl;
@@ -9,7 +11,7 @@ using System;
 
 namespace ImagerAvalonia.Views;
 
-public partial class SmartUpdateAcquisitionView : ExperimentSelector
+public partial class SmartUpdateAcquisitionView : UserControl
 {
     public SmartUpdateAcquisitionView()
     {
@@ -21,18 +23,50 @@ public partial class SmartUpdateAcquisitionView : ExperimentSelector
         AvaloniaXamlLoader.Load(this);
     }
 
-    protected override void ExpPanel_DetectionDoubleTapped(object? sender, Services.NodeBase e)
+    private void OnDragOver(object sender, DragEventArgs e)
     {
-        if (DataContextSender is SmartUpdateAcquisitionFunctionViewModel updateAcquisitionVM)
+        if (e.Data.Contains("ImagerAvalonia.MeasurementElementViewModel")
+            && e.Data.Get("ImagerAvalonia.MeasurementElementViewModel") is MeasurementElementViewModel)
         {
-            expPanel.DetectionDoubleTapped -= ExpPanel_DetectionDoubleTapped;
-            window.Close();
+            e.DragEffects = DragDropEffects.Move;
+        }
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
+    }
 
-            if ( e is ActionNode actionNode && e.MeasurementType is UpdateAcquisition)
-            {
-                updateAcquisitionVM.SelectedNode = actionNode;
-                e.OnNodeDeleted += updateAcquisitionVM.NodeDeleted;
-            }
+    private void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (!e.Data.Contains("ImagerAvalonia.MeasurementElementViewModel"))
+        {
+            return;
+        }
+
+        if (e.Data.Get("ImagerAvalonia.MeasurementElementViewModel") is not MeasurementElementViewModel draggedNode)
+        {
+            return;
+        }
+
+        if (DataContext is not SmartUpdateAcquisitionFunctionViewModel vm)
+        {
+            return;
+        }
+        if (draggedNode is UpdateAcquisitionViewModel update_acq)
+        {
+            vm.SelectedNode = draggedNode;
+            draggedNode.OnNodeDeleted += vm.DraggedNode_OnNodeDeleted; ;
+        }
+        e.DragEffects = DragDropEffects.Move;
+    }
+
+
+
+    private void OnClearSelectionClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is SmartUpdateAcquisitionFunctionViewModel vm)
+        {
+            vm.RemoveExperimentBindings();
         }
     }
 }

@@ -395,7 +395,7 @@
 											<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding SelectedAcquisition.Sources}">
 												<ItemsControl.ItemTemplate>
 													
-												<DataTemplate x:DataType="vm:SourcesViewModel">
+												<DataTemplate x:DataType="vm:SourcesEquipmentViewModel">
 													<ScrollViewer VerticalScrollBarVisibility="Auto">
 
 														<Expander Width="265" IsExpanded="True" Padding="0" MinHeight="13" CornerRadius="5">

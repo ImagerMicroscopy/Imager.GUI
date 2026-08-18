@@ -71,7 +71,7 @@
 				
 				</DataGrid.Styles>
 				<DataGrid.Columns >
-					<DataGridTextColumn Binding="{Binding XPos}">
+					<DataGridTextColumn Binding="{Binding Coordinates.x}">
 						<DataGridTextColumn.Header>
 							<TextBlock Text="X μm"
 									   FontSize="10"
@@ -82,7 +82,7 @@
 									   Margin="-5 0 5 0"/>
 						</DataGridTextColumn.Header>
 					</DataGridTextColumn>
-					<DataGridTextColumn  Binding="{Binding YPos}">
+					<DataGridTextColumn  Binding="{Binding Coordinates.y}">
 						<DataGridTextColumn.Header>
 							<TextBlock Text="Y μm"
 									   FontSize="10"
@@ -94,7 +94,7 @@
 						</DataGridTextColumn.Header>
 
 					</DataGridTextColumn>
-					<DataGridTextColumn Binding="{Binding ZPos}">
+					<DataGridTextColumn Binding="{Binding Coordinates.z}">
 
 						<DataGridTextColumn.Header>
 							<TextBlock Text="Z μm"
@@ -107,7 +107,7 @@
 						</DataGridTextColumn.Header>
 					</DataGridTextColumn>
 					
-					<DataGridCheckBoxColumn Width="43" Binding="{Binding IsPFSEnabled}">
+					<DataGridCheckBoxColumn Width="43" Binding="{Binding Coordinates.usinghardwareautofocus}">
 
 						<DataGridCheckBoxColumn.Header>
 							<TextBlock Text="AF"
@@ -120,7 +120,7 @@
 						</DataGridCheckBoxColumn.Header>
 						
 					</DataGridCheckBoxColumn>
-					<DataGridTextColumn   Binding="{Binding PFSOffset}">
+					<DataGridTextColumn   Binding="{Binding Coordinates.hardwareautofocusoffset}">
 
 
 							<DataGridTextColumn.Header>

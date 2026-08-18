@@ -34,7 +34,7 @@ public partial class ImageRegionCollectionPropertiesView : UserControl
         elementPlotViewModels = _imageElementCollectionsView.GetElementPlots().ToList();
         _viewModel = scope.Resolve<ImageRegionDisplayViewModel>();
        
-        _viewModel.SetXYStagePositions(new List<XYStagePosition>() {IStageControl.DefaultXYStagePosition });
+        _viewModel.SetStagePositions(new List<XYStagePosition>() {IStageControl.DefaultStagePosition });
         _viewModel.ClearPlots += _viewModel_ClearPlots;
         _viewModel.InitiatePlot += OnPlotInitiationRequested;
         _viewModel.UpdateNumberOfRowsInGrid += OnUpdateNumberOfRowsInGrid;
@@ -127,9 +127,9 @@ public partial class ImageRegionCollectionPropertiesView : UserControl
         }
     }
 
-    internal void SetXYPositions(ObservableCollection<XYStagePosition> e)
+    internal void SetXYitions(ObservableCollection<XYStagePosition> e)
     {
-        _viewModel.SetXYStagePositions(e.ToList());
+        _viewModel.SetStagePositions(e.ToList());
     }
 
     public class ImageProcessingJob

@@ -6,7 +6,7 @@
 			 Width="280"
              xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
              x:Class="ImagerAvalonia.Views.RootPanelView"
-			 x:DataType="vm:RootPanelViewModel">
+			 x:DataType="vm:RootNode">
 
 
 
@@ -89,7 +89,7 @@
 										 FontSize="12"
 										 TextTrimming="CharacterEllipsis" />
 					
-					<CheckBox IsChecked="{Binding IsStorageEnabled}"  VerticalAlignment="Center"    Grid.Column="1"> </CheckBox>
+					<CheckBox IsChecked="{Binding IsExperimentStorageEnabled}"  VerticalAlignment="Center"    Grid.Column="1"> </CheckBox>
 
 
 				</Grid>

@@ -20,7 +20,7 @@ public partial class StageLoopView : UserControl
     {
         InitializeComponent();
     }
-    public StageLoopView(SystemDefinedSettingsViewModel availableAcquisitions)
+    public StageLoopView(GlobalDefinedSettingsViewModel availableAcquisitions)
     {
         InitializeComponent();
         DataContext = App.Container.Resolve<StageLoopViewModel>();
@@ -60,7 +60,13 @@ public partial class StageLoopView : UserControl
                         List<string> xy_vals = new List<string>(position.Split('\t'));
                         xy_vals = xy_vals.Select(x => x.Replace("\"", "")).ToList();
 
-                        XYStagePosition pasted_position = new XYStagePosition(float.Parse(xy_vals[0]), float.Parse(xy_vals[1]), float.Parse(xy_vals[2]), bool.Parse(xy_vals[3]), float.Parse(xy_vals[4]), xy_vals[5]);
+                        XYStagePosition pasted_position = new XYStagePosition(
+                             double.Parse(xy_vals[4]), 
+                             double.Parse(xy_vals[0]),
+                             double.Parse(xy_vals[1]), 
+                             double.Parse(xy_vals[2]), 
+                             bool.Parse(xy_vals[3]),
+                             xy_vals[5]);
 
                         stage_vm.AppendStagePosition(pasted_position);
                         

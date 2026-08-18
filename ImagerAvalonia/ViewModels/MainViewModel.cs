@@ -1,14 +1,12 @@
-﻿using Autofac;
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Interactivity;
+using Autofac;
+using AvaloniaEdit.Utils;
 using CommunityToolkit.Mvvm.ComponentModel;
-using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Utils;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -19,15 +17,13 @@ using System.Threading.Tasks;
 
 
 
-
-
 namespace ImagerAvalonia.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
 
 
-    public ComUtils _messages;
+    public IImagerCommunicationManager _communicationManager;
     public ImageDisplayViewModel? ImageView { get; private set; }
 
     public bool IsLiveEnabled = false;
@@ -36,69 +32,87 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty] ImageControlPanelViewModel _ImageControlPanel;
 
-    private bool IsExperimentalPanelOpen { get; set; } = false;
-    public Action<object, RoutedEventArgs>? OnProgramStorageRequested { get; internal set; }
-    public Action<object>? OnProgramLoadRequested { get; internal set; } 
-
-    private int num_acquisition = 1;
-    private AcquisitionSettings? DefaultAcquisition;
-
-
+    private readonly ExperimentManager _experimentManager;
+    private readonly EquipmentWorkspace _equipmentContext;
     [ObservableProperty] bool _IsExperimentEnabled = false;
     [ObservableProperty] bool _IsEnableExperimentalPanel = true;
 
     [ObservableProperty] public ObservableCollection<AcquisitionSettingsViewModel> _Acquisitions = new();
-    [ObservableProperty] public ObservableCollection<ExperimentalPanelViewModel> _Experiments = new();
 
-
-    [ObservableProperty] SourcesViewModel? _SelectedSource;
+    [ObservableProperty] SourcesEquipmentViewModel? _SelectedSource;
     [ObservableProperty] DetectorEquipmentViewModel? _SelectedDetector;
     [ObservableProperty] AcquisitionSettingsViewModel? _SelectedAcquisition;
-    [ObservableProperty] ExperimentalPanelViewModel? _SelectedExperiment;
-    [ObservableProperty] SystemDefinedSettingsViewModel _SystemDefinedSettings;
+    [ObservableProperty] GlobalDefinedSettingsViewModel _SystemDefinedSettings;
 
-    public List<MovableComponent> AvailableFilterWheels = new();
+    public List<MovableComponentModel> AvailableFilterWheels = new();
     public List<Source> AvailableSources = new();
-    public List<Robots> AvailableRobots = new();
-    public List<DetectorEquipment> AvailableDetectors = new List<DetectorEquipment> { };
+    public List<RobotModel> AvailableRobots = new();
+    public List<DetectorEquipmentModel> AvailableDetectors = new List<DetectorEquipmentModel> { };
 
     private readonly IStageControl _stageControl;
     private readonly SmartProcessingRegisterViewModel _processingViewModel;
-    private readonly AcquisitionStateService _acquisitionStateService;
-    private readonly EquipmentState _equipmentState;
+    private readonly ImagerWorkspace _imagerWorkspace;
+
+    // These properties now delegate to ExperimentManager for binding
+    public ObservableCollection<ExperimentalPanelViewModel> Experiments => _experimentManager.Experiments;
+    
+    public ExperimentalPanelViewModel? SelectedExperiment
+    {
+        get => _experimentManager.SelectedExperiment;
+        set
+        {
+            if (_experimentManager.SelectedExperiment != value)
+            {
+                _experimentManager.SetSelectedExperiment(value);
+                OnPropertyChanged(nameof(SelectedExperiment));
+            }
+        }
+    }
 
 
-
-
-
-    public MainViewModel(ComUtils messages, 
+    public MainViewModel(
         IStageControl stageControl, 
         ImageControlPanelViewModel imagePanel, 
-        SystemDefinedSettingsViewModel userDefinedAcquisitions, 
+        GlobalDefinedSettingsViewModel userDefinedAcquisitions, 
         SmartProcessingRegisterViewModel processViewModel,
-        AcquisitionStateService acquisitionState, 
-        EquipmentState equipmentState)
+        ExperimentManager experimentManager,
+        EquipmentWorkspace equipmentContext,
+        ImagerWorkspace imagerWorkspace)
     {
         _SystemDefinedSettings = userDefinedAcquisitions;
         _stageControl = stageControl;
-        _messages = messages;
+        _communicationManager = ImagerCommunicationManager.Instance;
         _processingViewModel = processViewModel;
-        _acquisitionStateService = acquisitionState;
-        _equipmentState = equipmentState;
+        _experimentManager = experimentManager;
+        _equipmentContext = equipmentContext;
+        _imagerWorkspace = imagerWorkspace;
+        // Create the ExperimentManager to handle experiment collection logic
+
+
+        // Forward storage/load callbacks from ExperimentManager to MainViewModel
+        _experimentManager.OnProgramStorageRequested = (program) => 
+            OnProgramStorageRequested?.Invoke(program);
+        _experimentManager.OnProgramLoadRequested = sender => 
+            OnProgramLoadRequested?.Invoke(sender);
+        _experimentManager.ExperimentLoaded += ExperimentManager_ExperimentLoaded;
+
+        _experimentManager.SelectedExperimentChanged += (sender, args) =>
+        {
+            OnPropertyChanged(nameof(SelectedExperiment));
+        };
+
+        _SystemDefinedSettings.SetImagerWorkSpace(_imagerWorkspace);
+        _SystemDefinedSettings.SetExperimentManager(_experimentManager);
 
         ImageControlPanel = imagePanel;
         ImageControlPanel.SetAvailableAcquisitions(SystemDefinedSettings);
     }
 
+
     public void InitializeImageControlPanel()
     {
-        ImageControlPanel.OnInitializeExperiment += _acquisitionStateService.GetSelectedExperiment;
         ImageControlPanel.OnInitializeExperiment += DisableExperimentalPanel;
-
-        ImageControlPanel.OnInitializeLive += _acquisitionStateService.GetLiveSettings;
-        ImageControlPanel.OnInitializeTifReader += _acquisitionStateService.GetTifSettings;
         ImageControlPanel.OnFinishExperiment += EnableExperimentalPanel;
-
     }
 
     public void EnableExperimentalPanel(object? sender, EventArgs e)
@@ -111,90 +125,66 @@ public partial class MainViewModel : ViewModelBase
         IsEnableExperimentalPanel = false;
     }
 
-    public void InitializeEquipment()
+    public void ApplyEquipment(EquipmentInitResult result)
     {
+        AvailableDetectors.AddRange(result.Detectors);
+        AvailableSources = result.Sources;
+        AvailableFilterWheels = result.FilterWheels;
+        AvailableRobots = result.Robots;
+        AvailableDetectors.ForEach(x => x.IsEnabled = true);
 
-        List<string> detector_names = new List<string> { };
-        _messages.SendDataRequest(ComUtils.cancelacquisition, "", null, null);
+        _equipmentContext.Initialize(
+            _imagerWorkspace,
+            AvailableSources,
+            AvailableFilterWheels,
+            AvailableRobots,
+            AvailableDetectors);
 
-
-        _messages.SendDataRequest(_messages.listdetectors, _messages.detectors, message_response =>
+        var initAcquisition = new AcquisitionSettingsViewModel(
+            _equipmentContext.DefaultAcquisition,
+            _imagerWorkspace,
+            _experimentManager)
         {
-            var detectors = JObject.Parse(message_response);
-            var equipment = detectors["detectornames"];
-            detector_names = equipment?.ToObject<List<string>>() ?? new List<string>();
-        }, null);
-
-        detector_names.ForEach((Action<string>)(x => _messages.SendDataRequest(ComUtils.get_detectorproperties(x), _messages.detectorproperties, (Action<string>)(message_response =>
-        {
-            JToken detector_properties = JObject.Parse(message_response);
-            AvailableDetectors.Add(new DetectorEquipment(x, detector_properties));
-
-        }), null)));
-
-
-        _messages.SendDataRequest(_messages.listavailableequipment, _messages.availableequipment, message_response =>
-        {
-            var info = JObject.Parse(message_response);
-            var equipment = info["equipment"];
-            List<Equipment> eq = equipment?.ToObject<List<Equipment>>() ?? new List<Equipment>(); 
-
-            AvailableSources = _equipmentState.ParseAvailableLightSources(eq);
-            AvailableFilterWheels = _equipmentState.ParseAvailableFilterWheels(eq);
-            AvailableRobots = _equipmentState.ParseAvailableRobots(eq);
-
-        }, null);
-
-
-
-        _stageControl.InitializeStageInfo();
-
-        AvailableDetectors.ForEach(x => x.IsEnabled = true);    
-        DefaultAcquisition = AcquisitionSettingsFactory.FromComponents( "NewAcq", AvailableSources, AvailableFilterWheels, AvailableDetectors);
-        AcquisitionSettingsViewModel init_acquisition = new AcquisitionSettingsViewModel(DefaultAcquisition);
-
-
-
-        init_acquisition.AcquisitionID = num_acquisition;
-        DefaultAcquisition.AcquisitionSettingsID = num_acquisition;
-        SystemDefinedSettings.Acquisitions.Add( init_acquisition );
+            AcquisitionID = 1
+        };
+        SystemDefinedSettings.Acquisitions.Add(initAcquisition);
         SystemDefinedSettings.Robots = AvailableRobots;
-        SelectedAcquisition = init_acquisition;
-        _acquisitionStateService.SelectedAcquisition = SelectedAcquisition;
-        _acquisitionStateService.SelectedExperiment = SelectedExperiment;
-    }
 
+        if (_SystemDefinedSettings.Acquisitions.Count > 0)
+        {
+            SelectedAcquisition = _SystemDefinedSettings.Acquisitions[0];
+        }
+    }
 
     partial void OnSelectedAcquisitionChanged(AcquisitionSettingsViewModel? value)
     {
-        _acquisitionStateService.SelectedAcquisition = value;
+        _experimentManager.SelectedDetection = value.DetectionSettings;
     }
 
-    partial void OnSelectedExperimentChanged(ExperimentalPanelViewModel? value)
+    private void ExperimentManager_ExperimentLoaded(ExperimentalPanelViewModel exp, List<AcquisitionSettingsViewModel> acq)
     {
-        _acquisitionStateService.SelectedExperiment = value;
-    }  
-
-
-    public void OpenExperimentPanel(object sender)
-    {
-        ExperimentalPanelViewModel experiment = (ExperimentalPanelViewModel)sender;
+        Acquisitions.AddRange(acq);
+        Experiments.Add(exp);
+        SelectedExperiment = exp;
     }
 
 
     public void CopyAcquisition()
     {
-        num_acquisition++;
+        _experimentManager.IncrementNumAcquisition();
         if (SelectedAcquisition != null)
         {
-            AcquisitionSettings new_acq = AcquisitionSettingsFactory.CloneWithName($"Acquisition {num_acquisition}", SelectedAcquisition.AcquisitionSettings);
+            var copiedDetection = SelectedAcquisition.DetectionSettings.Clone();
+        
+            AcquisitionSettingsViewModel new_acq = new AcquisitionSettingsViewModel(
+                $"Acquisition {_experimentManager.GetNumAcquisition()}",
+                copiedDetection.Settings.Irradiation,
+                copiedDetection.Settings.MovableComponents,
+                copiedDetection.Settings.Detectors,
+                _imagerWorkspace,
+                _experimentManager);
 
-            new_acq.AcquisitionSettingsID = num_acquisition;
-            AcquisitionSettingsViewModel new_acq_model = new AcquisitionSettingsViewModel(new_acq);
-            new_acq_model.AcquisitionID = num_acquisition;
-
-
-            SystemDefinedSettings.Acquisitions.Add(new_acq_model);
+            SystemDefinedSettings.Acquisitions.Add(new_acq);
 
         }
     }
@@ -205,184 +195,62 @@ public partial class MainViewModel : ViewModelBase
     {
         if (SystemDefinedSettings.Acquisitions.Count > 1)
         {
-            num_acquisition++;
+            _experimentManager.IncrementNumAcquisition();
             var toRemove = SystemDefinedSettings.Acquisitions
             .FirstOrDefault(a => a == SelectedAcquisition);
+            var toRemoveInd = SystemDefinedSettings.Acquisitions.IndexOf(toRemove);
+            if (toRemoveInd != 0)
+            {
+                SelectedAcquisition = SystemDefinedSettings.Acquisitions[toRemoveInd - 1];
+            }
+            else
+            {
+                SelectedAcquisition = SystemDefinedSettings.Acquisitions[toRemoveInd + 1];
+            }
 
             if (toRemove != null)
             {
                 SystemDefinedSettings.Acquisitions.Remove(toRemove);
             }
 
-            SelectedAcquisition = SystemDefinedSettings.Acquisitions[SystemDefinedSettings.Acquisitions.Count - 1];
         }
 
     }
 
     public void AddExperiment()
     {
-
-        ExperimentalPanelViewModel exp = new ExperimentalPanelViewModel(SystemDefinedSettings, _stageControl);
-
-
-        List<string?> exp_names = Experiments.Select(x => x.ExperimentName).ToList();
-        string exp_name = "Experiment ";
-        int num_experiment = 1;
-
-        while (exp_names.Contains($"{exp_name}{num_experiment}"))
-        {
-            num_experiment++;
-        }
-        exp.ExperimentName = $"{exp_name}{num_experiment}";
-        Experiments.Add(exp);
+        _experimentManager.AddExperiment();
     }
 
     public async Task SaveExperiment()
     {
-        var experimentSerializer = new ExperimentSerialization();
-        if (SelectedExperiment != null)
-        {
-            try
-            {
-                JObject measurement_program = experimentSerializer.SerializeExperiment(SelectedExperiment, _processingViewModel);
-                OnProgramStorageRequested?.Invoke(measurement_program.ToString(Newtonsoft.Json.Formatting.None), new RoutedEventArgs());
-            }
-            catch (Exception ex) {  
-                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    await ExceptionWindowHandler.ShowDialogAsync(
-                        "Error", ex.Message, ex.StackTrace, desktop.MainWindow);
-                }
-            }
-        }
+        await _experimentManager.SaveExperiment();
     }
 
     public void LoadExperiment()
     {
-        OnProgramLoadRequested?.Invoke(this);
+        _experimentManager.LoadExperiment();
     }
 
     public async void ParseLoadedExperiment(string program)
     {
-        var experimentSerializer = new ExperimentSerialization();
-        JToken json_program;
-
-        try
-        {
-            json_program = JToken.Parse(program);
-        }
-        catch (Exception ex)
-        {
-            await ShowExceptionDialogAsync("Error in parsing experiment. Invalid .imag file", ex);
-            return;
-        }
-
-        try
-        {
-            var acquisitionmodels = JsonConvert.DeserializeObject<List<AcquisitionSettingsDeserializationModel>>(
-                program, new DefinedDetectionsConverter());
-
-            acquisitionmodels.ForEach(x =>
-            {
-                int id = 0;
-                string previous_name = x.Name;
-
-                while (SystemDefinedSettings.Acquisitions.Select(acq => acq.Name).Any(y => y == x.Name))
-                {
-                    x.Name = $"{x.Name}_{id}";
-                    experimentSerializer.AcquisitionMaps.Add(previous_name, x.Name);
-                    id++;
-                }
-
-                var defaultacquisition = AcquisitionSettingsFactory.FromComponents(x.Name, AvailableSources, AvailableFilterWheels, AvailableDetectors);
-                var modified_acquisition = new AcquisitionSettingsViewModel(
-                    AcquisitionSettingsFactory.CopyFromDeserializedModel(defaultacquisition, x));
-
-                SystemDefinedSettings.Acquisitions.Add(modified_acquisition);
-            });
-        }
-        catch (Exception ex)
-        {
-            await ShowExceptionDialogAsync("Error in loading acquisitions", ex);
-        }
-
-        var expVM = new ExperimentalPanelViewModel(SystemDefinedSettings, _stageControl);
-
-        try
-        {
-            experimentSerializer.SetExperiment(expVM);
-            NodeBase exp_nodes = experimentSerializer.GetDeserializedExperiment(json_program, SystemDefinedSettings);
-            expVM.SetExpNodes(new ObservableCollection<NodeBase>() { exp_nodes });
-        }
-        catch (Exception ex)
-        {
-            await ShowExceptionDialogAsync("Error in loading experiment tree", ex);
-            return;
-        }
-
-        List<string?> exp_names = Experiments.Select(x => x.ExperimentName).ToList();
-        string exp_name = "Experiment ";
-        int num_experiment = 1;
-
-        while (exp_names.Contains($"{exp_name}{num_experiment}"))
-        {
-            num_experiment++;
-        }
-        expVM.ExperimentName = $"{exp_name}{num_experiment}";
-        Experiments.Add(expVM);
+        await _experimentManager.ParseLoadedExperiment(program);
     }
-
-    private static async Task ShowExceptionDialogAsync(string title, Exception ex)
-    {
-        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            var mainWindow = desktop.MainWindow;
-            string message = ex.Message;
-
-            await ExceptionWindowHandler.ShowDialogAsync(title, message, ex.StackTrace, mainWindow);
-        }
-    }
-
 
     public void RemoveExperiment()
     {
-        if (Experiments.Count > 0 && SelectedExperiment!=null)
-        {
-            SelectedExperiment.Dispose();
-            Experiments.Remove(SelectedExperiment);
-        }
+        _experimentManager.RemoveExperiment();
     }
+    
+
+    public Action<object>? OnProgramStorageRequested { get; internal set; }
+    public Action<object>? OnProgramLoadRequested { get; internal set; }
+    
+    
     public override void Dispose()
     {
-
+        _experimentManager.Dispose();
     }
 }
-
-public partial class SystemDefinedSettingsViewModel : ViewModelBase
-{
-    [ObservableProperty] ObservableCollection<AcquisitionSettingsViewModel> _Acquisitions = new();
-    public List<Robots> Robots { get; set; } = new();  
-    public SystemDefinedSettingsViewModel(ObservableCollection<AcquisitionSettingsViewModel> acquisitions, List<Robots> robots)
-    {
-        this.Acquisitions = acquisitions;
-        this.Robots = robots;
-    }
-    public SystemDefinedSettingsViewModel(ObservableCollection<AcquisitionSettings> acquisitionSettings, List<Robots> robots)
-    {
-        this.Acquisitions = new ObservableCollection<AcquisitionSettingsViewModel>( acquisitionSettings.Select(x => new AcquisitionSettingsViewModel(x)));
-        this.Robots = robots;
-
-    }
-
-    public SystemDefinedSettingsViewModel()
-    {
-
-    }
-}
-
-
-
-
-
 
 

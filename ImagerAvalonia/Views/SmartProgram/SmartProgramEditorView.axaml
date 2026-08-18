@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
+			 xmlns:models="clr-namespace:ImagerAvalonia.Services.ImagerModels.SmartProgramModels"
 			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
 			
              mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
@@ -13,31 +14,31 @@
 
 	
     <UserControl.DataTemplates>
-		<DataTemplate DataType="{x:Type vm:ScalarVM}">
+		<DataTemplate DataType="{x:Type models:ScalarVM}">
 			<Grid ColumnDefinitions="120, 100">
-				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
-				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="0.001" Value="{Binding Value, Mode=TwoWay}" />
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding annotation}" />
+				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="0.001" Value="{Binding value, Mode=TwoWay}" />
             </Grid>
         </DataTemplate>
 
-		<DataTemplate DataType="{x:Type vm:BooleanVM}">
+		<DataTemplate DataType="{x:Type models:BooleanVM}">
 			<Grid ColumnDefinitions="120, 100">
-				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
-				<CheckBox Grid.Column="1" IsChecked="{Binding Value, Mode=TwoWay}" />
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding annotation}" />
+				<CheckBox Grid.Column="1" IsChecked="{Binding value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>
 
-		<DataTemplate DataType="{x:Type vm:IntegerVM}">
+		<DataTemplate DataType="{x:Type models:IntegerVM}">
 			<Grid ColumnDefinitions="120, 100">
-				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
-				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="1" Value="{Binding Value, Mode=TwoWay}" />
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding annotation}" />
+				<NumericUpDown VerticalAlignment="Center"  Grid.Column="1" Width="100" Classes="custom-numeric-style" Increment="1" Value="{Binding value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>
 
-		<DataTemplate DataType="{x:Type vm:TextVM}">
+		<DataTemplate DataType="{x:Type models:TextVM}">
 			<Grid ColumnDefinitions="120, 100">
-				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding Annotation}" />
-				<TextBox  BorderThickness="1" Grid.Column="1" Padding="0" Margin="0" Width="100" MinHeight="20" Height="20" FontSize="12" Text="{Binding Value, Mode=TwoWay}" />
+				<TextBlock TextTrimming="CharacterEllipsis" Foreground="Black" VerticalAlignment="Center" FontSize="12" Grid.Column="0" Text="{Binding annotation}" />
+				<TextBox  BorderThickness="1" Grid.Column="1" Padding="0" Margin="0" Width="100" MinHeight="20" Height="20" FontSize="12" Text="{Binding value, Mode=TwoWay}" />
 			</Grid>
 		</DataTemplate>
     </UserControl.DataTemplates>

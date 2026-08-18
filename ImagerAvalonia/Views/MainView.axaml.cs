@@ -5,7 +5,6 @@ using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -31,7 +30,6 @@ public partial class MainView : UserControl
 
         MainViewModel mainVM = App.Container.Resolve<MainViewModel>();
         DataContext = mainVM;
-        InitializeDataContextEquipment = mainVM.InitializeEquipment;
         InitializeImageControlPanel = mainVM.InitializeImageControlPanel;
         mainVM.OnProgramStorageRequested += SaveImagerProgram;
         mainVM.OnProgramLoadRequested += LoadImagerProgram;
@@ -42,8 +40,6 @@ public partial class MainView : UserControl
 
         ListBox ClickedItem = (ListBox)sender;
         ExperimentalPanelViewModel experiment = (ExperimentalPanelViewModel)ClickedItem.SelectedItem;
-
-
     }
 
 
@@ -74,7 +70,11 @@ public partial class MainView : UserControl
             }
         }
     }
-    private async void SaveImagerProgram(object sender, RoutedEventArgs args)
+
+
+
+
+    private async void SaveImagerProgram(object sender)
     {
         if (sender is string program)
         {
@@ -157,7 +157,7 @@ public partial class MainView : UserControl
         int openID = imageControlVM.SelectedView.StorageID;
 
         var scope = App.Container.BeginLifetimeScope();
-        var storageProvider = scope.Resolve<Utils.IStorageProvider>();
+        var storageProvider = scope.Resolve<Services.Storage.IStorageProvider>();
 
         var dataSplitterVM = new DataSplitterViewModel(storageProvider);
 

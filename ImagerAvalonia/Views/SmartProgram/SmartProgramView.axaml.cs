@@ -57,13 +57,13 @@ public partial class SmartProgramView: UserControl
             if (tabItem != null && tabItem.Content is SmartProgramEditorView smartprogramview)
             {
                 smartprogramview.CloseAll();
-                //if (dag_view.DataContext is DagProcessingViewModel dag_vm)
-                //{
-                //    _viewModel.DagProcessingViewModels.Remove(dag_vm);
-                //}
+                if(smartprogramview.DataContext is SmartProgramViewModel vm)
+                {
+                    _viewModel.RemoveSmartProgram(vm, vm.Model);
+
+                }
             }
             SmartProgramTab.Items.Remove(tabItem);
-
         }
     }
 

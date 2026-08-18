@@ -9,9 +9,11 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.MultiChannelView;
+using ImagerAvalonia.Views.ViewUtils;
 using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
@@ -150,7 +152,7 @@ namespace ImagerAvalonia.Views
             if (DataContext is FieldViewerViewModel field_viewer)
             {
                 field_viewer.PropertyChanged += Field_viewer_IsFieldViewerEngaged;
-                field_viewer.PropertyChanged += Field_viewer_CenterXYPositionChanged;
+                field_viewer.PropertyChanged += Field_viewer_CenterXYitionChanged;
                 field_viewer.PropertyChanged += Field_viewer_SelectedPropertyChanged;
 
                 field_viewer.FocusViewInitialized += PopulateCanvas;
@@ -189,7 +191,7 @@ namespace ImagerAvalonia.Views
             }
         }
 
-        private void Field_viewer_CenterXYPositionChanged(object? sender, PropertyChangedEventArgs e)
+        private void Field_viewer_CenterXYitionChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == "CurrentStagePosition" && DataContext is FieldViewerViewModel vm)
             {
@@ -197,9 +199,9 @@ namespace ImagerAvalonia.Views
                 {
                     foreach (var key in _canvasContextDict.Keys.ToList())
                     {
-                        _canvasContextDict[key].CenterX = vm.CurrentStagePosition.XPos;
-                        _canvasContextDict[key].CenterY = vm.CurrentStagePosition.YPos;
-                        _canvasContextDict[key].CenterZ = vm.CurrentStagePosition.ZPos;
+                        _canvasContextDict[key].CenterX = vm.CurrentStagePosition.Coordinates.x;
+                        _canvasContextDict[key].CenterY = vm.CurrentStagePosition.Coordinates.y;
+                        _canvasContextDict[key].CenterZ = vm.CurrentStagePosition.Coordinates.z;
 
                     }
 

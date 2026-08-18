@@ -1,18 +1,25 @@
-﻿using System;
-using System.Threading;
-using System.Threading.Tasks;
+using Autofac;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Autofac;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using ImagerAvalonia.Utils;
 using ImagerAvalonia.Exceptions;
+using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Services.Workspace;
+using ImagerAvalonia.Services.Workspace.ExperimentWorkspace;
+using ImagerAvalonia.Utils;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using ImagerAvalonia.Views;
 using Microsoft.Extensions.Logging;
-using ImagerAvalonia.Services;
+using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using ImagerAvalonia.Services.MeasurementControl;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using TextMateSharp.Internal.Parser;
 
 namespace ImagerAvalonia.ViewModels;
 
@@ -27,45 +34,58 @@ public partial class ImageControlPanelViewModel : ViewModelBase
 
     [ObservableProperty] private string _tifDataPath = String.Empty;
 
-    private CancellationTokenSource _cancelLive = new();
     private readonly ILogger _logger;
-    private readonly ComUtils _comUtils;
+    private readonly IImagerConnectionHandler _connectionHandler;
     private readonly IImageDisplayViewModelFactory _imageVmFactory;
-    private readonly AcquisitionStateService _acquisitionState;
-    public SystemDefinedSettingsViewModel? DefinedAcquisitions;
+    private readonly ImagerWorkspace _workspace;
+    private readonly ExperimentManager _experimentManager;
+    public GlobalDefinedSettingsViewModel? DefinedAcquisitions;
 
+    // The ImageHandler currently wired up to LiveView/FieldView events.
+    // This is the ONLY source of truth for what we're subscribed to — never
+    // rely on _workspace.ActiveImageHandler at unsubscribe time, since by
+    // then it may already point to a different (or null) instance.
+    private ImageHandler? _subscribedHandler;
 
-    public ImageHandler? LiveImageHandler { get; private set; }
+    public ImageHandler? LiveImageHandler => _workspace.ActiveImageHandler;
 
     public event EventHandler<ILifetimeScope>? OnInitializeExperiment;
     public event EventHandler<ILifetimeScope>? OnInitializeLive;
     public event EventHandler<ILifetimeScope>? OnInitializeTifReader;
 
     public event EventHandler? OnFinishExperiment;
-    
 
     public ImageControlPanelViewModel(
         ILoggerFactory loggerFactory,
         ImageDisplayViewModel liveView,
         FieldViewerViewModel fieldView,
-        ComUtils comUtils,
+        IImagerConnectionHandler connectionHandler,
         IImageDisplayViewModelFactory imageVmFactory,
-        AcquisitionStateService acquisitionStateService)
+        ImagerWorkspace workspace,
+        ExperimentManager experimentManager)
     {
         _logger = loggerFactory.CreateLogger("Imager");
         _liveView = liveView;
         _fieldView = fieldView;
-        _comUtils = comUtils;
+        _connectionHandler = connectionHandler;
         _imageVmFactory = imageVmFactory;
-        _acquisitionState = acquisitionStateService;
+        _workspace = workspace;
+        _experimentManager = experimentManager;
 
-        _acquisitionState.EndLive += OnEndLiveRequested;
-        _acquisitionState.StartLive += OnStartLiveRequested;
 
+
+        // Wire up to workspace events
+        _workspace.LiveScopeCreated += Workspace_LiveHandlerCreated;
+        _workspace.ExperimentScopeCreated += Workspace_ExperimentHandlerCreated;
+        _workspace.HandlerDestroyed += Workspace_HandlerDestroyed;
+        _workspace.ExperimentFinished += Workspace_ExperimentFinished;
+
+        IsLiveEnabled = _workspace.IsLiveEnabled;
+        IsExperimentEnabled = _workspace.IsExperimentEnabled;
     }
 
     private async void OnEndLiveRequested(object? sender, EventArgs e)
-    { 
+    {
         await EnableLive();
     }
     private async void OnStartLiveRequested(object? sender, EventArgs e)
@@ -82,28 +102,41 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     protected virtual void InitializeTifReader(ILifetimeScope scope) =>
         OnInitializeTifReader?.Invoke(this, scope);
 
-    public void LoadTifData(ImageDisplayView viewer, string path)
+    public void LoadTifData(ImageDisplayViewModel tifViewer, string path)
     {
         var scope = App.Container.BeginLifetimeScope();
         var storageProvider = scope.Resolve<IStorageProvider>();
-        var expSerializer   = scope.Resolve<IExperimentSerialization>();
-        var tifViewer = _imageVmFactory.Create(scope);
-
-
-        viewer.DataContext = tifViewer;
 
         storageProvider.SetStoragePath(path);
+        storageProvider.OpenReadStream();
+        string program = storageProvider.GetImagerProgram();
+        var loader   = new ExperimentLoaderService();
+        var programTree = loader.GetProgramTree(program);
+
+
+        var detections = programTree.Detections;
+        var acqdetpairs = detections.Select(x => x.Value.Detectors.Select(y => new Tuple<string,string>(x.Key, y.Detectorname)))
+            .SelectMany(x => x)
+            .ToList();
+
+
+        var stagePositions = new List<XYStagePosition>();
+        ExperimentManager.ReturnStagePositions(programTree.Program, ref stagePositions);    
+
         InitializeTifReader(scope);
 
-        var tifHandler = new ImageHandler(storageProvider, _logger, _comUtils);
+        var tifHandler = new ImageHandler(storageProvider, _logger, _connectionHandler);
 
+
+
+        storageProvider.SetAcqDetPairs(acqdetpairs);
         tifViewer.SetOpenID(storageProvider.GetOpenID());
-        tifViewer.SetGridData(storageProvider.GetStorageSchema());  
-        tifViewer.SetAvailableXYPositions(expSerializer.ExperimentPositions);
+        tifViewer.SetGridData(acqdetpairs);
+        tifViewer.SetAvailableXYPositions(stagePositions);
 
 
         tifViewer.OnDetectionRequested += tifHandler.LoadImage;
-        tifViewer.MaxFrameCount = storageProvider.GetMaxNumberOfFrames();
+        tifViewer.MaxFrameCount = storageProvider.LoadMaxFrameNumber();
         tifHandler.UpdateImageDisplay += tifViewer.ProcessImages;
         tifHandler.UpdateCurrentPositions += tifViewer.ProcessPositions;
         tifViewer.LoadFirstImage();
@@ -112,192 +145,176 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     [RelayCommand]
     public async Task EnableLive()
     {
-        IsLiveEnabled = !IsLiveEnabled;
-
-        if (IsLiveEnabled)
+        try
         {
-            _acquisitionState.SetLiveState();
-            var scope = App.Container.BeginLifetimeScope();
-            var expSerializer = scope.Resolve<IExperimentSerialization>();
-            var storageProvider = scope.Resolve<IStorageProvider>();
-            if (LiveImageHandler != null)
-            {
-                LiveView.OnDetectionRequested -= LiveImageHandler.LoadImage;
-                LiveImageHandler.UpdateImageDisplay -= LiveView.ProcessImages;
-                LiveImageHandler.UpdateImageElements -= LiveView.ProcessImageElements;
-                LiveImageHandler.UpdateAsyncProgress -= LiveView.ProcessProgress;
-                LiveImageHandler.UpdateCurrentPositions -= LiveView.ProcessPositions;
-            }
-            try
-            {
-                _cancelLive = new CancellationTokenSource();
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
-
-                InitializeLive(scope);
-                LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
-                LiveImageHandler.UpdateImageDisplay += LiveView.ProcessImages;
-                LiveImageHandler.UpdateImageElements += LiveView.ProcessImageElements;
-                LiveImageHandler.UpdateFieldViewDisplay  += FieldView.ProcessImages;
-                LiveImageHandler.UpdateCurrentPositions += LiveView.ProcessPositions;
-
-
-                LiveView.SetExperimentSerializer(expSerializer);
-                LiveView.SetGridData(storageProvider.GetStorageSchema());
-                FieldView.SetGridData(storageProvider.GetStorageSchema());
-
-                LiveView.IsExperimentRunning = false;
-                LiveView.IsDataStreaming = true;
-                LiveView.LiveViewDisabled += LiveImageHandler.EnableDisableLiveView;
-                LiveView.MaxFrameCount = storageProvider.GetMaxNumberOfFrames();
-
-                await LiveImageHandler.ParseProgramAndShowData(_cancelLive);
-            }
-            catch (Exception ex)
-            {
-                IsLiveEnabled = false;
-                if (LiveImageHandler != null)
-                {
-                    LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-                    LiveImageHandler.UpdateImageDisplay -= LiveView.ProcessImages;
-                    LiveImageHandler.UpdateImageElements -= LiveView.ProcessImageElements;
-                    LiveImageHandler.UpdateCurrentPositions -= LiveView.ProcessPositions;
-                }
-                _acquisitionState.SetIdleState();
-
-                await ExceptionWindowHandler.ShowExceptionAsync(ex);
-
-
-            }
+            await _workspace.ToggleLiveAsync(_experimentManager.SelectedDetection);
+            IsLiveEnabled = _workspace.IsLiveEnabled;
         }
-        else
+        catch (Exception ex)
         {
-            if (LiveImageHandler is not null)
-            {
-                _cancelLive?.Cancel();
-                LiveView.IsDataStreaming = false;
-                LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-                LiveImageHandler.UpdateImageDisplay -= LiveView.ProcessImages;
-                LiveImageHandler.UpdateCurrentPositions -= LiveView.ProcessPositions;
-                LiveImageHandler.UpdateImageElements -= LiveView.ProcessImageElements;
-                _acquisitionState.SetIdleState();
-            }
+            IsLiveEnabled = _workspace.IsLiveEnabled;
+            await ExceptionWindowHandler.ShowExceptionAsync(ex);
         }
     }
 
     [RelayCommand]
     public async Task StartExperiment()
     {
-        IsExperimentEnabled = !IsExperimentEnabled;
-
-        if (IsExperimentEnabled)
-        {// Unsubscribe to avoid duplicate event handlers when reusing the view.
-         // The handler will be re-attached immediately after, so we only remove it here.
-         // This allows the detection feature to work correctly across multiple experiment runs.
-            _acquisitionState.SetExperimentState();
-
-            if (LiveImageHandler != null)
-            {
-                LiveView.OnDetectionRequested -= LiveImageHandler.LoadImage;
-                LiveImageHandler.UpdateImageDisplay -= LiveView.ProcessImages;
-                LiveImageHandler.UpdateImageElements -= LiveView.ProcessImageElements;
-                LiveImageHandler.UpdateAsyncProgress -= LiveView.ProcessProgress;
-                LiveImageHandler.UpdateCurrentPositions -= LiveView.ProcessPositions;
-            }
-            var scope = App.Container.BeginLifetimeScope();
-            var experimentSerializer = scope.Resolve<IExperimentSerialization>();
-            var storageProvider = scope.Resolve<IStorageProvider>();
-            _cancelLive = new CancellationTokenSource();
-            try
-            {
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
-                InitializeExperiment(scope);
-
-                LiveImageHandler = new ImageHandler(storageProvider, _logger, _comUtils);
-                LiveView.SetAvailableXYPositions(experimentSerializer.ExperimentPositions);
-                LiveView.ShowLiveView = true;
-                LiveView.SetExperimentSerializer(experimentSerializer);
-                LiveView.SetGridData(storageProvider.GetStorageSchema());
-                FieldView.SetGridData(storageProvider.GetStorageSchema());
-
-                LiveView.IsDataStreaming = true;
-                LiveView.IsExperimentRunning = true;
-                LiveView.OnDetectionRequested += LiveImageHandler.LoadImage;
-                LiveView.MaxFrameCount = storageProvider.GetMaxNumberOfFrames();
-                LiveView.LiveViewDisabled += LiveImageHandler.EnableDisableLiveView;
-
-                
-                LiveImageHandler.UpdateImageElements += LiveView.ProcessImageElements;
-                LiveImageHandler.UpdateImageDisplay += LiveView.ProcessImages;
-                LiveImageHandler.UpdateFieldViewDisplay += FieldView.ProcessImages;
-                LiveImageHandler.UpdateAsyncProgress += LiveView.ProcessProgress;
-                LiveImageHandler.UpdateCurrentPositions += LiveView.ProcessPositions;
-
-                bool success = await LiveImageHandler.ParseProgramAndShowData(_cancelLive);
-
-                if (success)
-                {
-                    LiveView.IsDataStreaming = false;
-                    LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-                    OnFinishExperiment?.Invoke(this, EventArgs.Empty);
-                    IsExperimentEnabled = false;
-                    _acquisitionState.SetIdleState();
-
-
-                }
-            }
-            catch (Exception ex)
-            {
-                LiveView.IsDataStreaming = false;
-                IsExperimentEnabled = false;
-                _comUtils.SendDataRequest(ComUtils.cancelacquisition, "", _ => { }, _ => { });
-                await ExceptionWindowHandler.ShowExceptionAsync(ex);
-                OnFinishExperiment?.Invoke(this, EventArgs.Empty);
-                if (LiveImageHandler != null)
-                {
-                    LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-                }
-                _acquisitionState.SetIdleState();
-
-            }
-            finally
-            {
-                LiveView.IsDataStreaming = false;
-                storageProvider.CloseReadWriteStream();
-                await Task.Delay(2000);
-                storageProvider.OpenReadStream();
-                _acquisitionState.SetIdleState();
-
-            }
-        }
-        else
+        try
         {
-            if (LiveImageHandler is not null)
-            {
-                IsExperimentEnabled = false;
-                LiveView.IsDataStreaming = false;
-                LiveImageHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-                _cancelLive?.Cancel();
-                _acquisitionState.SetIdleState();
-            }
+
+            var experiment = _experimentManager.ReturnMeasurementTree();
+            var storagepath = _experimentManager.GetStoragePath();
+            var isstorageenabeld = _experimentManager.IsStorageEnabled();
+            if (storagepath == null) throw new InvalidOperationException("Storage path is not set.");
+            var detections = _experimentManager.ReturnUsedDetections();
+            var stagePositions = ExperimentManager.ReturnUsedStagePositions(experiment);
+            LiveView.SetAvailableXYPositions(stagePositions);
+            await _workspace.ToggleExperimentAsync(
+                experiment,
+                storagepath,
+                isstorageenabeld,
+                detections
+                );
+            IsExperimentEnabled = _workspace.IsExperimentEnabled;
+        }
+        catch (Exception ex)
+        {
+            IsExperimentEnabled = _workspace.IsExperimentEnabled;
+            await ExceptionWindowHandler.ShowExceptionAsync(ex);
         }
     }
 
+    /// <summary>
+    /// Wires up all LiveView/FieldView <-> ImageHandler event subscriptions for the given
+    /// handler instance, and records that instance so it can be correctly unsubscribed later
+    /// regardless of what _workspace.ActiveImageHandler points to at that time.
+    /// </summary>
+    /// <param name="handler">The handler instance to subscribe to.</param>
+    /// <param name="isExperiment">
+    /// True to also wire the experiment-only subscriptions (progress reporting and
+    /// detection-request routing from LiveView into the handler).
+    /// </param>
+    private void SubscribeToHandler(ImageHandler handler, bool isExperiment)
+    {
+        // Defensive: if something is already wired (shouldn't normally happen), tear it
+        // down first so we never end up with duplicate subscriptions.
+        UnsubscribeFromHandler();
 
+        _subscribedHandler = handler;
 
+        handler.UpdateImageDisplay += LiveView.ProcessImages;
+        handler.UpdateImageElements += LiveView.ProcessImageElements;
+        handler.UpdateFieldViewDisplay += FieldView.ProcessImages;
+        handler.UpdateCurrentPositions += LiveView.ProcessPositions;
+        LiveView.LiveViewDisabled += handler.EnableDisableLiveView;
 
-    //private async Task ShowExceptionAsync(Exception ex)
-    //{
-    //    if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-    //    {
-    //        await ExceptionWindowHandler.ShowDialogAsync(
-    //            "Error", ex.Message, ex.StackTrace, desktop.MainWindow);
-    //    }
-    //}
+        if (isExperiment)
+        {
+            LiveView.OnDetectionRequested += handler.LoadImage;
+            handler.UpdateAsyncProgress += LiveView.ProcessProgress;
+        }
+    }
 
-    internal void SetAvailableAcquisitions(SystemDefinedSettingsViewModel SystemDefinedSettings)
+    /// <summary>
+    /// Tears down all event subscriptions previously wired by <see cref="SubscribeToHandler"/>,
+    /// using the captured <see cref="_subscribedHandler"/> instance rather than the (possibly
+    /// stale or null) <see cref="LiveImageHandler"/> property. Safe to call multiple times.
+    /// </summary>
+    private void UnsubscribeFromHandler()
+    {
+        if (_subscribedHandler is null) return;
+
+        var handler = _subscribedHandler;
+
+        handler.UpdateImageDisplay -= LiveView.ProcessImages;
+        handler.UpdateImageElements -= LiveView.ProcessImageElements;
+        handler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
+        handler.UpdateCurrentPositions -= LiveView.ProcessPositions;
+        LiveView.LiveViewDisabled -= handler.EnableDisableLiveView;
+
+        // These are no-ops if they were never added (experiment-only subscriptions),
+        // which is fine — event -= is safe against handlers that were never attached.
+        LiveView.OnDetectionRequested -= handler.LoadImage;
+        handler.UpdateAsyncProgress -= LiveView.ProcessProgress;
+
+        _subscribedHandler = null;
+    }
+
+    private void Workspace_LiveHandlerCreated(object? sender, ILifetimeScope scope)
+    {
+        IsLiveEnabled = true;
+        InitializeLive(scope);
+
+        if (LiveImageHandler != null && _workspace.ActiveStorageProvider != null)
+        {
+            SubscribeToHandler(LiveImageHandler, isExperiment: false);
+            LiveView.SetAvailableXYPositions(new List<XYStagePosition>() { });
+
+            //LiveView.SetExperimentSerializer(_workspace.ActiveExperimentSerializer);
+            LiveView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
+            FieldView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
+
+            LiveView.IsExperimentRunning = false;
+            LiveView.IsDataStreaming = true;
+            LiveView.MaxFrameCount = _workspace.ActiveStorageProvider.GetMaxNumberOfFrames();
+        }
+    }
+
+    private void Workspace_ExperimentHandlerCreated(object? sender, ILifetimeScope scope)
+    {
+        IsExperimentEnabled = true;
+        InitializeExperiment(scope);
+
+        if (LiveImageHandler != null && _workspace.ActiveStorageProvider != null)
+        {
+            SubscribeToHandler(LiveImageHandler, isExperiment: true);
+
+            //LiveView.SetAvailableXYitions(_workspace.ActiveExperimentSerializer.ExperimentPositions);
+            LiveView.ShowLiveView = true;
+            //LiveView.SetExperimentSerializer(_workspace.ActiveExperimentSerializer);
+            LiveView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
+            FieldView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
+
+            LiveView.IsDataStreaming = true;
+            LiveView.IsExperimentRunning = true;
+
+            LiveView.MaxFrameCount = _workspace.ActiveStorageProvider.GetMaxNumberOfFrames();
+        }
+    }
+
+    private void Workspace_HandlerDestroyed(object? sender, EventArgs e)
+    {
+        IsLiveEnabled = false;
+        IsExperimentEnabled = false;
+
+        if (LiveView != null)
+        {
+            LiveView.IsExperimentRunning = false;
+            LiveView.IsDataStreaming = false;
+        }
+
+        // Uses the captured _subscribedHandler internally, so this correctly detaches
+        // from the handler we actually subscribed to — even if _workspace.ActiveImageHandler
+        // has already changed to null or a new instance by the time this fires.
+        UnsubscribeFromHandler();
+    }
+
+    private void Workspace_ExperimentFinished(object? sender, EventArgs e)
+    {
+        IsExperimentEnabled = false;
+        LiveView.IsDataStreaming = false;
+
+        if (_subscribedHandler != null)
+        {
+            _subscribedHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
+        }
+
+        OnFinishExperiment?.Invoke(this, EventArgs.Empty);
+    }
+
+    internal void SetAvailableAcquisitions(GlobalDefinedSettingsViewModel SystemDefinedSettings)
     {
         DefinedAcquisitions = SystemDefinedSettings;
     }
 }
-
-

@@ -1,7 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
+using ImagerAvalonia.ViewModels;
+using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using static SkiaSharp.HarfBuzz.SKShaper;
 
 namespace ImagerAvalonia.Views;
 
@@ -35,15 +38,16 @@ public partial class MainWindow : Window
 
     }
 
+    public void ApplyEquipment(EquipmentInitResult result)
+    {
+        if (MainUserAndEquipmentControl.DataContext is MainViewModel mainVM)
+            mainVM.ApplyEquipment(result);
+    }
+
     private void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
     {
 
         ForceClosing = !ForceClosing;
-    }
-
-    public void InitializeUserEquipment()
-    {
-        MainUserAndEquipmentControl.InitializeDataContextEquipment();
     }
 
     public void InitializeImageControlPanel()
@@ -51,7 +55,5 @@ public partial class MainWindow : Window
         MainUserAndEquipmentControl.InitializeImageControlPanel();
 
     }
-
-
 
 }

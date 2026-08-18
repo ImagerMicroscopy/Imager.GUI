@@ -1,6 +1,10 @@
-﻿using Avalonia;
+﻿using Autofac;
+using Avalonia;
 using Avalonia.ReactiveUI;
+using ImagerAvalonia.Utils;
+using ImagerAvalonia;
 using System;
+using System.Threading.Tasks;
 
 namespace ImagerAvalonia.Desktop;
 
@@ -17,19 +21,22 @@ sealed class Program
             Console.WriteLine("STARTING");
             System.Globalization.CultureInfo customCulture = (System.Globalization.CultureInfo)System.Threading.Thread.CurrentThread.CurrentCulture.Clone();
             customCulture.NumberFormat.NumberDecimalSeparator = ".";
-            //Environment.SetEnvironmentVariable("AVALONIA_RENDERER", "Wgl");
-
             System.Threading.Thread.CurrentThread.CurrentCulture = customCulture;
+
+            App.Container = CompositionRoot.BuildContainer();
+
             BuildAvaloniaApp()
-            .StartWithClassicDesktopLifetime(args);
+                .StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
         {
+            if(ImagerStartup.ImagerProcess is not null)
+            {
+                ImagerStartup.ImagerProcess.Kill();
+            }
             Console.WriteLine($"{ex.Message}{ex.StackTrace}");
         }
-      
     }
-
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
@@ -38,5 +45,4 @@ sealed class Program
             .WithInterFont()
             .UseReactiveUI()
             .LogToTrace();
-
 }

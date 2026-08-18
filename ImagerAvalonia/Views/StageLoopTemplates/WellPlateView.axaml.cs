@@ -118,34 +118,34 @@ public partial class WellPlateView: UserControl
         {
             await a1dialog.ShowDialog(parentWindow);
 
-            var A1Position = _stageControl.ReadStagePosition();
+            var A1Position = _stageControl.ReadStagePosition().Coordinates;
 
             await b3dialog.ShowDialog(parentWindow);
 
-            var B3Position = _stageControl.ReadStagePosition();
+            var B3Position = _stageControl.ReadStagePosition().Coordinates;
 
             if (A1Position != null && B3Position != null)
             {
 
-                double dirx = Math.Sign(B3Position.XPos - A1Position.XPos);
-                double diry = Math.Sign(B3Position.YPos - A1Position.YPos);
+                double dirx = Math.Sign(B3Position.x - A1Position.x);
+                double diry = Math.Sign(B3Position.y - A1Position.y);
 
                 if (DataContext is WellPlateViewModel wellplatevm)
                 {
 
                     var vm = wellplatevm.StageLoopViewModel;
-                    if (Math.Abs(B3Position.XPos - A1Position.XPos) < Math.Abs(B3Position.YPos - A1Position.YPos))
+                    if (Math.Abs(B3Position.x - A1Position.x) < Math.Abs(B3Position.y - A1Position.y))
                     {
                         for (int i = 0; i < _selectedWellNames.Count; i++)
                         {
-                            vm.AppendStagePosition(A1Position.XPos + _xWellPosition[i] * 9000, A1Position.YPos + _yWellPosition[i] * 9000, A1Position.ZPos, A1Position.IsPFSEnabled, A1Position.PFSOffset, _selectedWellNames[i]);
+                            vm.AppendStagePosition(A1Position.x + _xWellPosition[i] * 9000, A1Position.y + _yWellPosition[i] * 9000, A1Position.z, A1Position.usinghardwareautofocus, A1Position.hardwareautofocusoffset, _selectedWellNames[i]);
                         }
                     }
                     else
                     {
                         for (int i = 0; i < _selectedWellNames.Count; i++)
                         {
-                            vm.AppendStagePosition(A1Position.XPos + _yWellPosition[i] * 9000, A1Position.YPos + _xWellPosition[i] * 9000, A1Position.ZPos, A1Position.IsPFSEnabled, A1Position.PFSOffset, _selectedWellNames[i]);
+                            vm.AppendStagePosition(A1Position.x + _yWellPosition[i] * 9000, A1Position.y + _xWellPosition[i] * 9000, A1Position.z, A1Position.usinghardwareautofocus, A1Position.hardwareautofocusoffset, _selectedWellNames[i]);
                         }
                     }
                 }

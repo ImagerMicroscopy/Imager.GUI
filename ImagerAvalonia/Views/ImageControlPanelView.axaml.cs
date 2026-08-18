@@ -177,7 +177,9 @@ public partial class ImageControlPanelView : UserControl
 
                     viewModel.TifDataPath = path.Path.ToString();
                     localPath = localPath.Replace("\\", "/");
-                    viewModel.LoadTifData(imView, localPath);
+                    var imViewVm = new ImageDisplayViewModel();
+                    imView.DataContext = imViewVm;
+                    viewModel.LoadTifData(imViewVm, localPath);
 
 
                     var contentControl = tab.Content as ContentControl;
