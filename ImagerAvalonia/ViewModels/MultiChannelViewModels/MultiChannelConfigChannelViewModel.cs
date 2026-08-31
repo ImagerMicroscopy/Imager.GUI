@@ -12,7 +12,10 @@ namespace ImagerAvalonia.ViewModels
 {
     public partial class MultiChannelConfigChannelViewModel : ViewModelBase
     {
-        public MeasurementElementViewModel? SelectedDetection { get; set; }
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasSelectedDetection))]
+        private MeasurementElementViewModel? _selectedDetection;
+        public bool HasSelectedDetection => SelectedDetection is not null;
         private MeasurementElementViewModel? _selectedNode;
         public Guid? SelectedDetectionId { get; set; } = Guid.Empty;
         [ObservableProperty] DetectorEquipmentViewModel _detectorInput;
@@ -48,6 +51,7 @@ namespace ImagerAvalonia.ViewModels
                         RefreshFilteredAcquisitions();
 
                         _selectedNode = detectionNode;
+                        SelectedDetection = detectionNode;
                     }
                 }
             }

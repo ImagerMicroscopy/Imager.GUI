@@ -1,4 +1,8 @@
+using Autofac;
+using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
+using ImagerAvalonia.Services.ImagerModels.SmartProgramModels;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Utils;
@@ -92,35 +96,50 @@ public class ExperimentManager : IDisposable
 
         try
         {
-            var payload = ReturnMeasurementTree();
-            var detections = ReturnUsedDetections();
-
-
-            var program = new MeasurementProgram(payload, detections.ToDictionary(d => d.Name, d => d.Settings));
-            var imagerState = new FullEquipmentState()
+            // Refresh each SmartProgram's bundled .py source (main file + connected
+            // local files) before saving, so the project stays reloadable even if the
+            // original folder later disappears/moves - fully automatic, no user action.
+            foreach (var smartProgramVm in _processingViewModel.SmartProgramViewModels)
             {
-                CurrentEquipment = _equipmentWorkspace,
-                CurrentProgram = program,
-            };
-
-            if (SelectedExperiment.ReferenceContext != null)
-            {
-                imagerState = new FullEquipmentState()
+                try
                 {
-                    CurrentEquipment = SelectedExperiment.ReferenceContext.EquipmentWorkspace,
-                    CurrentProgram = program,
-                };
+                    await smartProgramVm.ExportBundleAsync();
+                }
+                catch (Exception bundleEx)
+                {
+                    // Non-fatal: still save the rest of the project even if the Python
+                    // server is unreachable or a program has no folder loaded yet.
+                    ErrorOccurred?.Invoke(this, bundleEx);
+                }
             }
 
-            var programJson = FullEquipmentStateSerializer.Serialize(imagerState);
-            //var measurementProgram = JObject.Parse(MeasurementSerializer.Serialize(payload));
+            var programJson = BuildFullEquipmentStateJson();
             OnProgramStorageRequested?.Invoke(programJson);
         }
         catch (Exception ex)
         {
             ErrorOccurred?.Invoke(this, ex);
         }
-        await Task.CompletedTask;
+    }
+
+    public string BuildFullEquipmentStateJson()
+    {
+        if (SelectedExperiment == null)
+            throw new InvalidOperationException("No experiment is selected.");
+
+        var payload = ReturnMeasurementTree();
+        var detections = ReturnUsedDetections();
+
+        var program = new MeasurementProgram(payload, detections.ToDictionary(d => d.Name, d => d.Settings));
+        var smartPrograms = _processingViewModel.SmartProgramViewModels.Select(vm => vm.Model).ToList();
+        var imagerState = new FullEquipmentState()
+        {
+            CurrentEquipment = SelectedExperiment.ReferenceContext?.EquipmentWorkspace ?? _equipmentWorkspace,
+            CurrentProgram = program,
+            SmartPrograms = smartPrograms,
+        };
+
+        return FullEquipmentStateSerializer.Serialize(imagerState);
     }
 
     public void LoadExperiment()
@@ -128,7 +147,7 @@ public class ExperimentManager : IDisposable
         OnProgramLoadRequested?.Invoke(this);
     }
 
-    public Task ParseLoadedExperiment(string programjson)
+    public async Task ParseLoadedExperiment(string programjson)
     {
         var fullimagerstate = FullEquipmentStateSerializer.Deserialize(programjson);
 
@@ -136,6 +155,8 @@ public class ExperimentManager : IDisposable
         var measurementProgram = fullimagerstate.CurrentProgram;
         var nameMap = _systemDefinedSettings.ReconcileAcquisitions(
           measurementProgram.Detections.Select(kvp => (kvp.Key, kvp.Value)), fullimagerstate.CurrentEquipment);
+
+        RenameAcquisitionReferencesInSmartPrograms(fullimagerstate.SmartPrograms, nameMap);
 
         var context = new LoadContext
         {
@@ -146,14 +167,16 @@ public class ExperimentManager : IDisposable
             AcquisitionNameMap = nameMap
         };
 
+        var experimentBuilder = _experimentBuilderFactory.Create();
         var programVMTree = MeasurementElementViewModelFactory.Build(measurementProgram.Program, context);
         var programRoot = new RootNode()
         {
-            Children = programVMTree.Children
+            Children = programVMTree.Children,
+            StorageService = experimentBuilder.StorageService
         };
 
 
-        var experimentVm = new ExperimentalPanelViewModel(_systemDefinedSettings, _stageControl, _experimentBuilderFactory.Create())
+        var experimentVm = new ExperimentalPanelViewModel(_systemDefinedSettings, _stageControl, experimentBuilder)
         {
             ExperimentName = "Loaded Experiment",
             Root = programRoot,
@@ -162,9 +185,101 @@ public class ExperimentManager : IDisposable
         var acquisitions = nameMap.Values.ToList();
         experimentVm.ReferenceContext = context;
 
+        await RestoreSmartProgramsAsync(fullimagerstate.SmartPrograms, programRoot);
 
         ExperimentLoaded?.Invoke(experimentVm, acquisitions);
-        return Task.CompletedTask;
+    }
+
+    private static void RenameAcquisitionReferencesInSmartPrograms(
+        List<SmartProgramModel> smartPrograms,
+        IReadOnlyDictionary<string, AcquisitionSettingsViewModel> nameMap)
+    {
+        var renames = nameMap
+            .Where(kvp => kvp.Value.Name != kvp.Key)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Name);
+
+        if (renames.Count == 0)
+            return;
+
+        foreach (var program in smartPrograms)
+        {
+            foreach (var method in program.SmartProgramDefinition.methods)
+            {
+                foreach (var inputParam in method.inputparams)
+                {
+                    if (inputParam.acquisition != null && renames.TryGetValue(inputParam.acquisition, out var newName))
+                    {
+                        inputParam.acquisition = newName;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Recreates a SmartProgramViewModel (GUI tab) for each SmartProgram saved with this
+    /// project, adopting the deserialized SmartProgramModel (preserving its SmartProgramID
+    /// and bundled .py source) instead of the fresh one DI normally hands out. If the
+    /// program's original folder is no longer reachable, prompts once per program for a
+    /// folder to restore its bundled files into, then re-applies its saved detection
+    /// element bindings against treeRoot - fully automatic, no explicit "import" action.
+    /// </summary>
+    private async Task RestoreSmartProgramsAsync(List<SmartProgramModel> smartPrograms, MeasurementElementViewModel treeRoot)
+    {
+        foreach (var savedModel in smartPrograms)
+        {
+            var vm = App.Container.Resolve<SmartProgramViewModel>();
+            vm.AdoptModel(savedModel);
+            _processingViewModel.RequestTabFor(vm);
+
+            // ProgramFolders/LoadedFolder are [JsonIgnore] (never persisted - see
+            // SmartProgramModel), so a freshly deserialized program never has a
+            // remembered folder path to fall back on; the bundled source (if any) is
+            // always what drives restoration after a project load.
+            if (savedModel.FileBundle is null)
+            {
+                ErrorOccurred?.Invoke(this, new InvalidOperationException(
+                    $"Smart program '{savedModel.SmartProgramDefinition.programname}' has no reachable folder and no bundled source - it could not be restored."));
+                continue;
+            }
+
+            var chosenFolder = await PromptForBundleRestoreFolderAsync(savedModel.SmartProgramDefinition.programname);
+            if (string.IsNullOrEmpty(chosenFolder))
+            {
+                ErrorOccurred?.Invoke(this, new InvalidOperationException(
+                    $"Smart program '{savedModel.SmartProgramDefinition.programname}' was skipped - no folder was chosen to restore its files into."));
+                continue;
+            }
+
+            var warnings = await vm.ImportBundleAsync(chosenFolder, treeRoot);
+            if (warnings.Count > 0)
+            {
+                ErrorOccurred?.Invoke(this, new InvalidOperationException(
+                    $"Smart program '{savedModel.SmartProgramDefinition.programname}' was restored with warnings:\n- {string.Join("\n- ", warnings)}"));
+            }
+        }
+    }
+
+    private static async Task<string?> PromptForBundleRestoreFolderAsync(string programName)
+    {
+        var topLevel = new Window();
+        try
+        {
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = $"Choose a folder to restore smart program '{programName}'",
+                AllowMultiple = false
+            });
+
+            if (folders.Count == 0)
+                return null;
+
+            return folders[0].Path.ToString().Replace("file:///", "");
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public void RemoveExperiment()

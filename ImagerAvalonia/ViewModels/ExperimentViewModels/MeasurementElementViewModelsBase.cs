@@ -67,6 +67,28 @@ public abstract partial class MeasurementElementViewModel : ObservableObject, ID
     }
 
     /// <summary>
+    /// Depth-first search of this node and its descendants for the node with
+    /// the given Elementid. Used to re-resolve a saved elementid (e.g. from
+    /// InputParameterModel.elementid) back to a live tree node after a
+    /// project load / smart program import, so bindings can be re-attached
+    /// via the normal SelectedNode setter rather than reconstructed by hand.
+    /// </summary>
+    public MeasurementElementViewModel? FindByElementId(Guid elementId)
+    {
+        if (Elementid == elementId)
+            return this;
+
+        foreach (var child in Children)
+        {
+            var found = child.FindByElementId(elementId);
+            if (found is not null)
+                return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Calculates the total number of detections across the entire measurement tree,
     /// accounting for DoTimes repetitions that multiply the detection count of descendant nodes.
     /// </summary>

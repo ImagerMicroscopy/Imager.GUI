@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using System;
+using System.Linq;
 
 namespace ImagerAvalonia.ViewModels;
 
@@ -28,7 +29,7 @@ public partial class DoTimesViewModel : MeasurementElementViewModel
         return new DoTimesElement
         {
             NTotal = NumRepeats,
-            SmartProgramId = SelectedProgramId?.ToString() ?? null,
+            SmartProgramId = SelectedProgramId?.SmartProgramID.ToString() ?? null,
             ElementId = Elementid.ToString()
         };
     }
@@ -40,6 +41,11 @@ public partial class DoTimesViewModel : MeasurementElementViewModel
 
         base.LoadFromModel(model, context);
         NumRepeats = doTimes.NTotal; // triggers OnNumRepeatsChanged -> updates DisplayedInfo
+
+        if (doTimes.SmartProgramId != null && Guid.TryParse(doTimes.SmartProgramId, out var smartProgramId))
+        {
+            SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
+        }
     }
 }
 

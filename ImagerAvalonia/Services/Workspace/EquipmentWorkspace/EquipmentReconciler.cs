@@ -34,7 +34,7 @@ namespace ImagerAvalonia.Services.Workspace
 
             var result = new Source(master); // pulls current AvailableChannels, name, capability flags
 
-            if (selected != null)
+            if (selected != null && selected.LightsourceChannel.Count > 0)
             {
                 result.LightsourceChannel = new List<string>(selected.LightsourceChannel);
                 result.LightsourcePower = new List<int>(selected.LightsourcePower);
@@ -42,7 +42,8 @@ namespace ImagerAvalonia.Services.Workspace
             }
             else
             {
-                // not selected at save time — present, but disabled, empty selection
+                // not selected at save time, or selected with zero active channels
+                // (equivalent to not selected at all) — present, but disabled, empty selection
                 result.LightsourceChannel = new List<string>();
                 result.LightsourcePower = new List<int>();
                 result.IsEnabled = false;

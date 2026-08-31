@@ -145,19 +145,22 @@ public class ImagerWorkspace : IDisposable {
     public async Task ToggleExperimentAsync(MeasurementElementBase experiment,
         string storagepath,
         bool isstorageenabeld,
-        List<DefinedDetection> detections) {
+        List<DefinedDetection> detections,
+        string fullEquipmentStateJson) {
         if (IsExperimentEnabled) await StopExperimentAsync();
         else await StartExperimentAsync(experiment,
             storagepath,
             isstorageenabeld,
-            detections);
+            detections,
+            fullEquipmentStateJson);
     }
 
     public async Task StartExperimentAsync(
         MeasurementElementBase experiment,
         string storagepath,
-        bool isstorageenabeld, 
-        List<DefinedDetection> detections
+        bool isstorageenabeld,
+        List<DefinedDetection> detections,
+        string fullEquipmentStateJson
         ) {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsExperimentEnabled = true;
@@ -171,14 +174,12 @@ public class ImagerWorkspace : IDisposable {
 
         var program = new MeasurementProgram(
                 experiment,
-                detections.ToDictionary(d => d.Name, 
-                d => d.Settings)            
+                detections.ToDictionary(d => d.Name,
+                d => d.Settings)
         );
 
-
         ActiveStorageProvider.SetEnabledStorage(isstorageenabeld);
-        ActiveStorageProvider.SetMeasurementProgram(JObject.FromObject(program,
-            Newtonsoft.Json.JsonSerializer.Create(MeasurementSerializer.Settings)));
+        ActiveStorageProvider.SetMeasurementProgram(fullEquipmentStateJson);
         ActiveStorageProvider.SetMaxFrameNumber((int)experiment.CountTotalDetections());
 
         ActiveStorageProvider.SetAcqDetPairs(acq_det_pairs);

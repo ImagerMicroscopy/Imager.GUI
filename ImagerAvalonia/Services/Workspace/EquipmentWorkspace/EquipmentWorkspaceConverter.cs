@@ -1,5 +1,6 @@
 ﻿using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
 using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
+using ImagerAvalonia.Services.ImagerModels.SmartProgramModels;
 using ImagerAvalonia.Services.MeasurementControl;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -120,11 +121,22 @@ namespace ImagerAvalonia.Services.Workspace
                     ?.ToObject<EquipmentWorkspace>(serializer)
             };
 
+           
+            var smartProgramSerializer = JsonSerializer.Create(new JsonSerializerSettings
+            {
+                Converters = { new InputParameterConverter() }
+            });
+            var smartProgramsToken = jo.GetValue(nameof(FullEquipmentState.SmartPrograms), StringComparison.OrdinalIgnoreCase) as JArray;
+            if (smartProgramsToken != null)
+            {
+                state.SmartPrograms = smartProgramsToken.ToObject<List<SmartProgramModel>>(smartProgramSerializer) ?? new List<SmartProgramModel>();
+            }
+
             var programToken = jo.GetValue(nameof(FullEquipmentState.CurrentProgram), StringComparison.OrdinalIgnoreCase) as JObject;
             if (programToken != null)
             {
-                var measurementSerializer = JsonSerializer.Create(MeasurementSerializer.Settings);
-                var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.Settings);
+                var measurementSerializer = JsonSerializer.Create(MeasurementSerializer.SettingsForStorage);
+                var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.SettingsIncludingDisabled);
 
                 var programElementToken = programToken.GetValue(nameof(MeasurementProgram.Program), StringComparison.OrdinalIgnoreCase)
                     ?? throw new JsonSerializationException("Missing 'Program' in CurrentProgram JSON.");
@@ -147,8 +159,8 @@ namespace ImagerAvalonia.Services.Workspace
         public static string Serialize(FullEquipmentState state)
         {
             var serializer = JsonSerializer.Create(Settings);
-            var measurementSerializer = JsonSerializer.Create(MeasurementSerializer.Settings);
-            var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.Settings);
+            var measurementSerializer = JsonSerializer.Create(MeasurementSerializer.SettingsForStorage);
+            var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.SettingsIncludingDisabled);
 
             var jo = new JObject
             {
@@ -168,7 +180,13 @@ namespace ImagerAvalonia.Services.Workspace
 
                         [ConverterHelpers.ResolvePropertyName(serializer, nameof(MeasurementProgram.ApiVersion))]
                             = state.CurrentProgram.ApiVersion
-                    }
+                    },
+
+                [ConverterHelpers.ResolvePropertyName(serializer, nameof(FullEquipmentState.SmartPrograms))]
+                    = JArray.FromObject(state.SmartPrograms, JsonSerializer.Create(new JsonSerializerSettings
+                    {
+                        Converters = { new InputParameterConverter() }
+                    }))
             };
 
             return jo.ToString(Formatting.Indented);
@@ -181,6 +199,7 @@ namespace ImagerAvalonia.Services.Workspace
         public MeasurementProgram CurrentProgram { get; set; }
         public EquipmentWorkspace CurrentEquipment { get; set; }
         public string ApiVersion { get; set; } = "2.0";
+        public List<SmartProgramModel> SmartPrograms { get; set; } = new();
 
 
         [JsonConstructor]

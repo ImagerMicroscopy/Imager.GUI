@@ -29,8 +29,9 @@ namespace ImagerAvalonia.ViewModels
 
         private readonly IPythonCom _nodeComService;
         private readonly EquipmentState _equipmentState;
+        private readonly SmartProcessingRegisterViewModel _smartProcessingRegister;
 
-        public SmartProgramModel Model { get; } = new();
+        public SmartProgramModel Model { get; private set; } = new();
 
         public Guid SmartProgramID => Model.SmartProgramID;
 
@@ -52,10 +53,186 @@ namespace ImagerAvalonia.ViewModels
         {
             _nodeComService = nodeComService;
             _equipmentState = eqState;
+            _smartProcessingRegister = smartProcessingRegister;
             smartProcessingRegister.AddSmartProgram(this, Model);
             this.PropertyChanged += SmartProgramEditorViewModel_PropertyChanged;
             HookAvailableParametersCollectionChanged(AvailableParameters);
             HookAvailableAcquisitionUpdatesCollectionChanged(AvailableAcquisitionUpdates);
+        }
+
+        /// <summary>
+        /// Replaces this VM's freshly-constructed SmartProgramModel with one just
+        /// deserialized (project load / bundle import), preserving its SmartProgramID,
+        /// FileBundle, and saved SmartProgramDefinition (methods/parameters/bindings-by-id).
+        /// Must be called before RequestMethodsAndParametersAsync/ImportBundleAsync run,
+        /// since those read/write through Model.
+        /// </summary>
+        internal void AdoptModel(SmartProgramModel loadedModel)
+        {
+            var oldModel = Model;
+            Model = loadedModel;
+            _smartProcessingRegister.ReplaceSmartProgramModel(oldModel, loadedModel);
+            OnPropertyChanged(nameof(SmartProgramID));
+            OnPropertyChanged(nameof(LoadedFolder));
+        }
+
+        /// <summary>
+        /// Writes this program's bundled .py source (Model.FileBundle) into targetFolder
+        /// via the Python API, submits that folder so the program(s) register normally,
+        /// refetches methods/parameters, then re-applies the saved per-parameter detection
+        /// element bindings (Model.SmartProgramDefinition.methods[].inputparams[].elementid)
+        /// against the live measurement tree rooted at treeRoot - driven through the normal
+        /// InputParameterViewModel.SelectedNode setter so all the usual binding side effects
+        /// (SmartProgramBindings, OnNodeDeleted subscription, acquisition wiring) happen the
+        /// same way a manual drag-and-drop binding would.
+        /// </summary>
+        public async Task<List<string>> ImportBundleAsync(string targetFolder, MeasurementElementViewModel? treeRoot)
+        {
+            var warnings = new List<string>();
+            var bundle = Model.FileBundle;
+            if (bundle is null)
+            {
+                warnings.Add("No bundled source is stored for this smart program - nothing to import.");
+                return warnings;
+            }
+
+            var bundleJson = JObject.FromObject(bundle);
+            await _nodeComService.ImportBundle(targetFolder, bundleJson);
+
+            await SubmitFolderToSmartProgramServer(targetFolder, toload: true);
+
+            // Snapshot the saved bindings before RequestMethodsAndParametersAsync clears
+            // and rebuilds AvailableMethods/AvailableAcquisitionUpdates from the
+            // freshly-fetched lists. Method-parameter bindings and acquisition-update
+            // bindings are two structurally separate mechanisms (InputParameterViewModel.
+            // SelectedNode vs SmartUpdateAcquisitionFunctionViewModel.SelectedNode) - both
+            // need to be captured here and restored after the refetch.
+            var savedMethods = Model.SmartProgramDefinition.methods
+                .Select(m => new
+                {
+                    m.methodname,
+                    Params = m.inputparams.ToList()
+                })
+                .ToList();
+            var savedAcquisitionUpdates = Model.SmartProgramDefinition.acquisitionupdates
+                .Where(a => a.elementid != Guid.Empty)
+                .ToList();
+
+            this.PropertyChanged -= SmartProgramEditorViewModel_PropertyChanged;
+            try
+            {
+                SelectedProgram = bundle.programname;
+            }
+            finally
+            {
+                this.PropertyChanged += SmartProgramEditorViewModel_PropertyChanged;
+            }
+            await RequestMethodsAndParametersAsync();
+
+            if (treeRoot is null)
+            {
+                warnings.Add("No experiment tree was available - detection element bindings were not restored.");
+                return warnings;
+            }
+
+            foreach (var savedMethod in savedMethods)
+            {
+                var liveMethod = AvailableMethods.FirstOrDefault(m => m.MethodName == savedMethod.methodname);
+                if (liveMethod is null)
+                {
+                    warnings.Add($"Method '{savedMethod.methodname}' no longer exists in the reloaded program - its bindings were dropped.");
+                    continue;
+                }
+
+                // Matched positionally, same assumption SubstituteMethods already makes
+                // elsewhere in this class (method name + parameter order/count unchanged
+                // since save) - there is no per-parameter name stored on InputParameterModel
+                // to match on more precisely.
+                if (liveMethod.MethodParams.Count != savedMethod.Params.Count)
+                {
+                    warnings.Add($"Method '{savedMethod.methodname}': parameter count changed since this program was saved - its bindings were dropped.");
+                    continue;
+                }
+
+                for (int i = 0; i < savedMethod.Params.Count; i++)
+                {
+                    var savedParam = savedMethod.Params[i];
+                    if (savedParam?.elementid is not Guid elementId)
+                        continue;
+
+                    var liveParam = liveMethod.MethodParams[i];
+                    var targetNode = treeRoot.FindByElementId(elementId);
+
+                    if (targetNode is null)
+                    {
+                        warnings.Add($"Method '{savedMethod.methodname}': detection element {elementId} was not found in the current experiment - left unbound.");
+                        continue;
+                    }
+
+                    // SelectedNode only restores the elementid link - it does not touch
+                    // AcquisitionInput/DetectorInput, so the saved acquisition (camera) and
+                    // detector names have to be re-selected afterwards, in that order (picking
+                    // an AcquisitionInput is what populates DefinedDetectors that DetectorInput
+                    // then chooses from - see OnAcquisitionInputChanged/OnDetectorInputChanged).
+                    liveParam.SelectedNode = targetNode;
+
+                    if (!string.IsNullOrEmpty(savedParam.acquisition))
+                    {
+                        // Must match against FilteredAcquisitions (the ComboBox's actual
+                        // ItemsSource, enabled-only), not DefinedAcquisitions (all of them,
+                        // enabled or not) - AcquisitionInput can only visually show as
+                        // selected if it's a reference that's actually present in the
+                        // dropdown's item list.
+                        var matchedAcquisition = liveParam.FilteredAcquisitions
+                            .FirstOrDefault(a => a.Name == savedParam.acquisition);
+                        if (matchedAcquisition is null)
+                        {
+                            warnings.Add($"Method '{savedMethod.methodname}': acquisition '{savedParam.acquisition}' is disabled or no longer available on the bound detection element - left unset.");
+                        }
+                        else
+                        {
+                            liveParam.AcquisitionInput = matchedAcquisition;
+
+                            if (!string.IsNullOrEmpty(savedParam.detection))
+                            {
+                                var matchedDetector = liveParam.DefinedDetectors
+                                    .FirstOrDefault(d => d.Name == savedParam.detection);
+                                if (matchedDetector is null)
+                                {
+                                    warnings.Add($"Method '{savedMethod.methodname}': detector '{savedParam.detection}' is no longer available for acquisition '{savedParam.acquisition}' - left unset.");
+                                }
+                                else
+                                {
+                                    liveParam.DetectorInput = matchedDetector;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            foreach (var savedAcqUpdate in savedAcquisitionUpdates)
+            {
+                var liveAcqUpdate = AvailableAcquisitionUpdates
+                    .FirstOrDefault(a => a.AcquisitionUpdate == savedAcqUpdate.acquisitionupdatefunction);
+
+                if (liveAcqUpdate is null)
+                {
+                    warnings.Add($"Acquisition update '{savedAcqUpdate.acquisitionupdatefunction}' no longer exists in the reloaded program - its binding was dropped.");
+                    continue;
+                }
+
+                var targetNode = treeRoot.FindByElementId(savedAcqUpdate.elementid);
+                if (targetNode is null)
+                {
+                    warnings.Add($"Acquisition update '{savedAcqUpdate.acquisitionupdatefunction}': detection element {savedAcqUpdate.elementid} was not found in the current experiment - left unbound.");
+                    continue;
+                }
+
+                liveAcqUpdate.SelectedNode = targetNode;
+            }
+
+            return warnings;
         }
 
         // Keeps Model.SelectedProgram in step whenever the bindable SelectedProgram changes.
@@ -135,6 +312,15 @@ namespace ImagerAvalonia.ViewModels
         #endregion
 
         private async void RequestMethodsAndParameters()
+        {
+            await RequestMethodsAndParametersAsync();
+        }
+
+        // Awaitable core of RequestMethodsAndParameters - split out so the
+        // smart-program-import flow (ImportBundleAsync) can await the fetch
+        // completing before it reapplies saved detection-element bindings,
+        // which need AvailableMethods to already be populated.
+        private async Task RequestMethodsAndParametersAsync()
         {
 
             try
@@ -232,6 +418,21 @@ namespace ImagerAvalonia.ViewModels
         public void LoadFolder()
         {
             OnOpenFolderRequested?.Invoke(this, new EventArgs());
+        }
+
+        /// <summary>
+        /// Fetches this program's main .py file plus every locally-connected .py file
+        /// (via the Python API's dependency-walker) and stores it on Model.FileBundle,
+        /// so it gets persisted the next time the project is saved (see
+        /// FullEquipmentState.SmartPrograms). Storage only - never sent to Haskell.
+        /// </summary>
+        public async Task ExportBundleAsync()
+        {
+            if (string.IsNullOrEmpty(SelectedProgram))
+                return;
+
+            var bundleJson = await _nodeComService.ExportBundle(SelectedProgram);
+            Model.FileBundle = JsonConvert.DeserializeObject<SmartProgramBundle>(bundleJson);
         }
 
         public void ReloadFolder()

@@ -83,7 +83,6 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
         public DetectorEquipmentModel() { }
         public double Framerate = 20;
 
-        [JsonIgnore]
         public bool IsEnabled { get; set; }
 
         [JsonIgnore]

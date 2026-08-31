@@ -170,11 +170,13 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             var detections = _experimentManager.ReturnUsedDetections();
             var stagePositions = ExperimentManager.ReturnUsedStagePositions(experiment);
             LiveView.SetAvailableXYPositions(stagePositions);
+            var fullEquipmentStateJson = _experimentManager.BuildFullEquipmentStateJson();
             await _workspace.ToggleExperimentAsync(
                 experiment,
                 storagepath,
                 isstorageenabeld,
-                detections
+                detections,
+                fullEquipmentStateJson
                 );
             IsExperimentEnabled = _workspace.IsExperimentEnabled;
         }

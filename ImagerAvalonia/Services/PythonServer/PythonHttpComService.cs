@@ -21,6 +21,8 @@ namespace ImagerAvalonia.Services
         public Task<string> GetParameters(string selectedProgram);
         public Task<string> GetAcquisitionUpdates(string selectedProgram);
         public Task<string> GetUpdateAcqParameters(string selectedProgram);
+        public Task<string> ExportBundle(string selectedProgram);
+        public Task<string> ImportBundle(string targetFolder, JObject bundle);
     }
 
 
@@ -171,6 +173,30 @@ namespace ImagerAvalonia.Services
 
 
             return stream;
+        }
+
+        public async Task<string> ExportBundle(string selectedProgram)
+        {
+            var url = $"submission/export_bundle?smartprogramname={Uri.EscapeDataString(selectedProgram)}";
+            var response = await _httpClient.GetAsync(url);
+
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
+        }
+
+        public async Task<string> ImportBundle(string targetFolder, JObject bundle)
+        {
+            var payload = new JObject
+            {
+                ["target_folder"] = targetFolder,
+                ["bundle"] = bundle
+            };
+
+            var content = new StringContent(payload.ToString(), Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("submission/import_bundle", content);
+
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
         }
     }
 }

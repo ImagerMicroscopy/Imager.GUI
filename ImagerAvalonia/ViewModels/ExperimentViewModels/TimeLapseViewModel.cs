@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using System;
+using System.Linq;
 
 namespace ImagerAvalonia.ViewModels
 {
@@ -40,7 +41,7 @@ namespace ImagerAvalonia.ViewModels
                 NTotal = NTimes ?? 1,
                 TimeDelta = (double)(TimeDelta ?? 0),
                 ElementId = Elementid.ToString(),
-                SmartProgramId = SelectedProgramId?.ToString() ?? null
+                SmartProgramId = SelectedProgramId?.SmartProgramID.ToString() ?? null
             };
         }
 
@@ -55,6 +56,11 @@ namespace ImagerAvalonia.ViewModels
 
             NTimes = model.NTotal;
             TimeDelta = (decimal)model.TimeDelta;
+
+            if (model.SmartProgramId != null && Guid.TryParse(model.SmartProgramId, out var smartProgramId))
+            {
+                SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
+            }
         }
     }
 }

@@ -154,7 +154,7 @@ public partial class RelStageViewModel : MeasurementElementViewModel
 
         if (SelectedProgramId is not null)
         {
-            element.SmartProgramId = SelectedProgramId?.ToString();
+            element.SmartProgramId = SelectedProgramId.SmartProgramID.ToString();
         }
         else
         {
@@ -185,6 +185,10 @@ public partial class RelStageViewModel : MeasurementElementViewModel
 
         ReturnToStartingPosition = relStage.Params.ReturnToStartingPosition;
 
+        if (relStage.SmartProgramId != null && Guid.TryParse(relStage.SmartProgramId, out var smartProgramId))
+        {
+            SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
+        }
     }
 }
 
