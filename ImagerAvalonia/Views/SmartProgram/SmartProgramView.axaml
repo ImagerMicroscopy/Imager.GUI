@@ -4,7 +4,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
 			 xmlns:views="clr-namespace:ImagerAvalonia.Views"
-			
+			 xmlns:genai="clr-namespace:ImagerAvalonia.Views.GenAIViews"
+
              mc:Ignorable="d" d:DesignWidth="2200" d:DesignHeight="1850"
              x:Class="ImagerAvalonia.Views.SmartProgramView"
 			 Background="#454545">
@@ -140,7 +141,7 @@
 
 	<GridSplitter Grid.Row="1" Background="Black" ResizeDirection="Rows"/>
 	<ContentControl Grid.Row="2">
-		<views:SmartServerOutputView></views:SmartServerOutputView>
+		<genai:GenAIChatView></genai:GenAIChatView>
 	</ContentControl>
 	</Grid>
 

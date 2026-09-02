@@ -26,7 +26,7 @@ public partial class SmartProgramView: UserControl
 
         DataContext = _viewModel;
         SmartProgramTab = this.FindControl<TabControl>("SmartProgramTab");
-
+        _viewModel.SmartProgramNeedsTab += vm => AddProcessingTab(vm);
 
     }
 
@@ -67,13 +67,20 @@ public partial class SmartProgramView: UserControl
         }
     }
 
-    public void AddProcessingTab()
+    public void AddProcessingTab() => AddProcessingTab(null);
+
+    /// <summary>
+    /// Adds a tab for an existing SmartProgramViewModel (e.g. one restored from a
+    /// project load, see ExperimentManager.RestoreSmartProgramsAsync), or - when vm
+    /// is null - creates a brand new one via DI, same as the "+" button always did.
+    /// </summary>
+    public void AddProcessingTab(SmartProgramViewModel? vm)
     {
-        var dagView = new SmartProgramEditorView();
+        var dagView = vm is null ? new SmartProgramEditorView() : new SmartProgramEditorView(vm);
         string smartProgramTextID = string.Empty;
-        if (dagView.DataContext is SmartProgramViewModel vm)
+        if (dagView.DataContext is SmartProgramViewModel dagViewModel)
         {
-            smartProgramTextID = vm.SmartProgramID.ToString().Substring(0,10);
+            smartProgramTextID = dagViewModel.SmartProgramID.ToString().Substring(0,10);
         }
 
         var tabItem = new TabItem

@@ -2,6 +2,7 @@
 using Autofac.Extensions.DependencyInjection;
 using ImagerAvalonia.Data;
 using ImagerAvalonia.Services;
+using ImagerAvalonia.Services.GenAI;
 using ImagerAvalonia.Services.Logging;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Storage;
@@ -9,6 +10,7 @@ using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.Services.Workspace.SmartProgramWorkspace;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.ViewModels.GenAIViewModels;
 using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using ImagerAvalonia.Views;
 using Microsoft.EntityFrameworkCore;
@@ -76,6 +78,8 @@ public static class CompositionRoot
 
         builder.RegisterType<SmartProgramRegistry>().SingleInstance();
 
+        builder.RegisterType<GenAIChatViewModel>().SingleInstance();
+
         builder.RegisterType<ExperimentalPanelViewModel>();
         builder.RegisterType<DoTimesView>();
         builder.RegisterType<RelStageView>();
@@ -118,6 +122,7 @@ public static class CompositionRoot
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddHttpClient<IPythonCom, PythonHttpComService>();
         serviceCollection.AddHttpClient<IPythonLinting, PythonLintingService>();
+        serviceCollection.AddHttpClient<IAnthropicChatService, AnthropicChatService>();
         builder.Populate(serviceCollection);
 
         return builder.Build();

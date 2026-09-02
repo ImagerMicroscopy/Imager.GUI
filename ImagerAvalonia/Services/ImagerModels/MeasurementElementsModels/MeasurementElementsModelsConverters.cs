@@ -299,6 +299,74 @@ namespace ImagerAvalonia.Services.MeasurementControl
         }
     }
 
+    // Same as DetectionParamsDictionaryConverter but uses
+    // DetectionEquipmentSerializer.SettingsIncludingDisabled instead of
+    // DetectionEquipmentSerializer.Settings, so a DefinedDetection's disabled
+    // detectors are kept (not dropped from the list) when persisted to the
+    // .imag project file. Used only by MeasurementSerializer.SettingsForStorage -
+    // the measurement backend payload must keep using DetectionParamsDictionaryConverter.
+    public class DetectionParamsDictionaryStorageConverter : JsonConverter
+    {
+        public override bool CanConvert(Type objectType)
+            => objectType == typeof(Dictionary<string, DetectionParams>);
+
+        public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+        {
+            if (reader.TokenType == JsonToken.Null)
+                return null;
+
+            var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.SettingsIncludingDisabled);
+
+            var result = new Dictionary<string, DetectionParams>();
+
+            if (reader.TokenType == JsonToken.StartArray)
+            {
+                var array = JArray.Load(reader);
+                foreach (var item in array)
+                {
+                    var name = item.Value<string>("name")
+                        ?? item.Value<string>("Name")
+                        ?? throw new JsonSerializationException("Legacy detection entry missing 'name'.");
+
+                    var settingsToken = item["settings"] ?? item["Settings"];
+                    var settings = settingsToken?.ToObject<DetectionParams>(equipmentSerializer) ?? new DetectionParams();
+
+                    result[name] = settings;
+                }
+
+                return result;
+            }
+
+            var jo = JObject.Load(reader);
+            foreach (var prop in jo.Properties())
+            {
+                result[prop.Name] = prop.Value.ToObject<DetectionParams>(equipmentSerializer) ?? new DetectionParams();
+            }
+
+            return result;
+        }
+
+        public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+        {
+            if (value is null)
+            {
+                writer.WriteNull();
+                return;
+            }
+
+            var equipmentSerializer = JsonSerializer.Create(DetectionEquipmentSerializer.SettingsIncludingDisabled);
+            var dict = (Dictionary<string, DetectionParams>)value;
+
+            writer.WriteStartObject();
+            foreach (var kvp in dict)
+            {
+                writer.WritePropertyName(kvp.Key);
+                equipmentSerializer.Serialize(writer, kvp.Value);
+            }
+            writer.WriteEndObject();
+        }
+    }
+
     // =========================
     // MEASUREMENT SERIALIZER
     // =========================
@@ -316,6 +384,25 @@ namespace ImagerAvalonia.Services.MeasurementControl
                 new RobotProgramArgumentConverter(),
                 new RobotProgramParametersConverter(),
                 new DetectionParamsDictionaryConverter()
+
+            }
+        };
+
+        // Same as Settings but with DetectionParamsDictionaryStorageConverter
+        // instead of DetectionParamsDictionaryConverter, so disabled detectors
+        // survive .imag save/load. Used only by FullEquipmentStateSerializer.
+        public static readonly JsonSerializerSettings SettingsForStorage = new()
+        {
+            ContractResolver = new DefaultContractResolver
+            {
+                NamingStrategy = new LowercaseNamingStrategy()
+            },
+            Converters = new List<JsonConverter>
+            {
+                new MeasurementElementConverter(),
+                new RobotProgramArgumentConverter(),
+                new RobotProgramParametersConverter(),
+                new DetectionParamsDictionaryStorageConverter()
 
             }
         };

@@ -133,7 +133,9 @@ namespace ImagerAvalonia.Services
                 if (item is IEnableGated gated && !gated.IsEnabled)
                     continue; // skip disabled items entirely
 
-                serializer.Serialize(writer, item);
+                var jo = JObject.FromObject(item, serializer);
+                jo.Remove(ConverterHelpers.ResolvePropertyName(serializer, nameof(IEnableGated.IsEnabled)));
+                jo.WriteTo(writer);
             }
             writer.WriteEndArray();
         }
@@ -361,6 +363,28 @@ namespace ImagerAvalonia.Services
             new RobotProgramParametersConverter(),
             new MovableComponentPartPropertiesConverter()   // ← must be present
 
+        }
+        };
+
+        // Same as Settings but without EnableGatedListConverter, so disabled
+        // detectors are kept (with their IsEnabled flag) instead of being
+        // dropped from the list entirely. Used only for .imag project
+        // save/load (see DetectionParamsDictionaryStorageConverter) - the
+        // measurement backend payload must keep using the gated Settings above.
+        public static readonly JsonSerializerSettings SettingsIncludingDisabled = new()
+        {
+            ContractResolver = new DefaultContractResolver
+            {
+                NamingStrategy = new LowercaseNamingStrategy()
+            },
+            Converters = new List<JsonConverter>
+        {
+            new RoundingDoubleJsonConverter(),
+            new DetectorEquipmentPropertiesConverter(),
+            new SelectedMovableComponentConverter(),
+            new ProgramArgumentConverter(),
+            new RobotProgramParametersConverter(),
+            new MovableComponentPartPropertiesConverter()
         }
         };
     }

@@ -252,6 +252,10 @@ namespace ImagerAvalonia.Views
             _savePath = documentPath;
             _textEditor.Document = new TextDocument(
                 ResourceLoader.LoadSampleFile(documentPath));
+
+            Language pythonLanguage = _registryOptions.GetLanguageByExtension(".py");
+            _textMateInstallation.SetGrammar(_registryOptions.GetScopeByLanguageId(pythonLanguage.Id));
+
             if(DataContext is PythonEditorWindowViewModel vm)
             {
                 vm.SavePath = _savePath;

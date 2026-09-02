@@ -21,17 +21,24 @@ public partial class SmartProgramEditorView : UserControl
 {
     private EditorView? _editorView;
     private readonly SmartProcessingRegisterViewModel _registerViewModel;   
-    public SmartProgramEditorView()
+    public SmartProgramEditorView() : this(App.Container.Resolve<SmartProgramViewModel>())
+    {
+    }
+
+    // Lets a caller (e.g. project-load smart-program restoration) supply an
+    // already-created SmartProgramViewModel - one that adopted a deserialized
+    // SmartProgramModel via AdoptModel - instead of always getting a brand new
+    // one straight from DI.
+    public SmartProgramEditorView(SmartProgramViewModel vm)
     {
         InitializeComponent();
-        var vm = App.Container.Resolve<SmartProgramViewModel>();
         _registerViewModel = App.Container.Resolve<SmartProcessingRegisterViewModel>();
         vm.OnOpenFolderRequested += VM_OnOpenFolderRequested;
         vm.OnSelectedProgramChangedEvent += VM_OnSelectedProgramChangedEvent;
         DataContext = vm;
         _editorView = this.FindControl<EditorView>("EditorView");
         _editorView.OnReloadRequested += _editorView_OnReloadRequested;
-        
+
     }
 
     private async void _editorView_OnReloadRequested(object? sender, string e)

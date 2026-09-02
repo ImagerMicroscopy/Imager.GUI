@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels.GenAIViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="200"
+             x:Class="ImagerAvalonia.Views.GenAIViews.GenAIChatView"
+             x:DataType="vm:GenAIChatViewModel"
+             Background="#2B2B2B">
+
+	<UserControl.Styles>
+		<Style Selector="Border.chatbubble">
+			<Setter Property="Padding" Value="8"/>
+			<Setter Property="Margin" Value="4"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="MaxWidth" Value="600"/>
+		</Style>
+		<Style Selector="Border.chatbubble.user">
+			<Setter Property="Background" Value="#3A6EA5"/>
+			<Setter Property="HorizontalAlignment" Value="Right"/>
+		</Style>
+		<Style Selector="Border.chatbubble.assistant">
+			<Setter Property="Background" Value="#3C3C3C"/>
+			<Setter Property="HorizontalAlignment" Value="Left"/>
+		</Style>
+		<Style Selector="Border.chatbubble.systemmsg">
+			<Setter Property="Background" Value="#555555"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="Border.chatbubble.errormsg">
+			<Setter Property="Background" Value="#7A2E2E"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Grid RowDefinitions="*, Auto">
+		<ScrollViewer Grid.Row="0" Name="MessagesScrollViewer">
+			<ItemsControl ItemsSource="{Binding Messages}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="vm:ChatMessageViewModel">
+						<Border Classes="chatbubble"
+								Classes.user="{Binding IsUser}"
+								Classes.assistant="{Binding IsAssistant}"
+								Classes.systemmsg="{Binding IsSystem}"
+								Classes.errormsg="{Binding IsError}">
+							<TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="White" FontSize="12"/>
+						</Border>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</ScrollViewer>
+
+		<Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="4">
+			<TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText, Mode=TwoWay}"
+					  Watermark="Describe the experiment you want..."
+					  AcceptsReturn="False"
+					  KeyDown="InputBox_KeyDown"/>
+			<Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}"
+					IsEnabled="{Binding !IsBusy}" Margin="4 0 0 0"/>
+		</Grid>
+	</Grid>
+</UserControl>

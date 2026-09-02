@@ -175,7 +175,7 @@ namespace ImagerAvalonia.ViewModels
                 StageName = _stageName ?? "",
                 Positions = XYPositions.ToList(),
                 ElementId = Elementid.ToString(),
-                SmartProgramId = SelectedProgramId?.ToString() ?? null
+                SmartProgramId = SelectedProgramId?.SmartProgramID.ToString() ?? null
             };
         }
 
@@ -201,6 +201,11 @@ namespace ImagerAvalonia.ViewModels
             current_id = XYPositions.Count;
 
             CurrentSelectedIndex = XYPositions.Count > 0 ? 0 : -1;
+
+            if (model.SmartProgramId != null && Guid.TryParse(model.SmartProgramId, out var smartProgramId))
+            {
+                SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
+            }
         }
     }
 }

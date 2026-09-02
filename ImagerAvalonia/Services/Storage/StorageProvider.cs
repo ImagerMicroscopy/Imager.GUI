@@ -52,7 +52,7 @@ namespace ImagerAvalonia.Services.Storage
 
         void SetStoragePath(string path);
 
-        void SetMeasurementProgram(JObject measurementProgram);
+        void SetMeasurementProgram(string measurementProgramJson);
 
         void SetAcqDetPairs(List<Tuple<string,string>> acqDetPair);
 
@@ -67,7 +67,7 @@ namespace ImagerAvalonia.Services.Storage
 
         string _storagePath { get;  }
 
-        JObject _measurementProgram { get; } 
+        string _measurementProgram { get; }
     }
 
 
@@ -244,7 +244,7 @@ namespace ImagerAvalonia.Services.Storage
 
 
         public string _storagePath { get; private set; }
-        public JObject _measurementProgram { get; set; }
+        public string _measurementProgram { get; set; }
         public List<TiffPlaneMetadata> metadata { get; set; }
         public int MaxFrames = 0;
 
@@ -385,8 +385,7 @@ namespace ImagerAvalonia.Services.Storage
         {
             if (_storagePath != null && _isStorageEnabled)
             {
-                string measurement_program = _measurementProgram.ToString(Newtonsoft.Json.Formatting.None);
-                IntPtr measurement_descriptor_ptr = Marshal.StringToHGlobalAnsi(measurement_program);
+                IntPtr measurement_descriptor_ptr = Marshal.StringToHGlobalAnsi(_measurementProgram);
                 IntPtr storage_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
                 int storerId;
 
@@ -512,9 +511,9 @@ namespace ImagerAvalonia.Services.Storage
             _storagePath = path;
         }
 
-        public void SetMeasurementProgram(JObject measurementProgram)
-        { 
-            _measurementProgram = measurementProgram; 
+        public void SetMeasurementProgram(string measurementProgramJson)
+        {
+            _measurementProgram = measurementProgramJson;
         }
 
         public int GetMaxNumberOfFrames()

@@ -108,6 +108,7 @@ namespace ImagerAvalonia.ViewModels
                         }
 
                         _selectedNode = detectionNode;
+                        SelectedDetection = detectionNode;
                         SmartProgramBinding<InputFunctionViewModel> smBinding = new SmartProgramBinding<InputFunctionViewModel>(_inputFunction);
                         SmartProgramBinding = smBinding;
                         SmartProgramBinding.SmartProgramID = SmartProgramID;
