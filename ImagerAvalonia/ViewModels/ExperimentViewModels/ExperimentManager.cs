@@ -187,6 +187,22 @@ public class ExperimentManager : IDisposable
 
         await RestoreSmartProgramsAsync(fullimagerstate.SmartPrograms, programRoot);
 
+        // Loop nodes (dotimes/timelapse/stageloop/relativestageloop) store their smart
+        // program binding as a SmartProgramID on the node itself, but the tree above was
+        // built before RestoreSmartProgramsAsync registered any of those programs - so
+        // the bindings are still pending and only resolvable now. Unlike the detection
+        // bindings, nothing on the smart program side re-applies them.
+        programRoot.ResolveSmartProgramBindings();
+
+        var unresolvedBindings = programRoot.GetUnresolvedSmartProgramBindings().ToList();
+        if (unresolvedBindings.Count > 0)
+        {
+            var details = string.Join("\n- ", unresolvedBindings
+                .Select(b => $"element {b.ElementId} -> smart program {b.SmartProgramId}"));
+            ErrorOccurred?.Invoke(this, new InvalidOperationException(
+                $"Some elements reference a smart program that was not restored - they were left unbound:\n- {details}"));
+        }
+
         ExperimentLoaded?.Invoke(experimentVm, acquisitions);
     }
 

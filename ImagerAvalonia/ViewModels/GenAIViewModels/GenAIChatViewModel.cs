@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ImagerAvalonia.Services.GenAI;
@@ -26,6 +27,11 @@ namespace ImagerAvalonia.ViewModels.GenAIViewModels
         [ObservableProperty] private ObservableCollection<ChatMessageViewModel> _messages = new();
         [ObservableProperty] private string _inputText = string.Empty;
         [ObservableProperty] private bool _isBusy;
+        [ObservableProperty] private string _busyStatusText = ThinkingText;
+
+        private const string ThinkingText = "Thinking…";
+        private readonly DispatcherTimer _busyTimer;
+        private DateTime _busyStartedUtc;
 
         public GenAIChatViewModel(
             IAnthropicChatService chatService,
@@ -37,6 +43,13 @@ namespace ImagerAvalonia.ViewModels.GenAIViewModels
             _equipmentWorkspace = equipmentWorkspace;
             _globalSettings = globalSettings;
             _experimentManager = experimentManager;
+
+            _busyTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            _busyTimer.Tick += (_, _) =>
+            {
+                var elapsed = (int)(DateTime.UtcNow - _busyStartedUtc).TotalSeconds;
+                BusyStatusText = elapsed > 0 ? $"{ThinkingText} ({elapsed}s)" : ThinkingText;
+            };
 
             Messages.Add(new ChatMessageViewModel(ChatRole.System,
                 "Describe the experiment you want and I'll generate it from your current hardware and acquisition settings."));
@@ -52,7 +65,7 @@ namespace ImagerAvalonia.ViewModels.GenAIViewModels
             InputText = string.Empty;
             Messages.Add(new ChatMessageViewModel(ChatRole.User, userText));
 
-            IsBusy = true;
+            StartBusyIndicator();
             try
             {
                 var contextualizedText = BuildContextualizedUserMessage(userText);
@@ -83,8 +96,22 @@ namespace ImagerAvalonia.ViewModels.GenAIViewModels
             }
             finally
             {
-                IsBusy = false;
+                StopBusyIndicator();
             }
+        }
+
+        private void StartBusyIndicator()
+        {
+            _busyStartedUtc = DateTime.UtcNow;
+            BusyStatusText = ThinkingText;
+            IsBusy = true;
+            _busyTimer.Start();
+        }
+
+        private void StopBusyIndicator()
+        {
+            _busyTimer.Stop();
+            IsBusy = false;
         }
 
         private async Task HandleAssistantResponseAsync(string assistantText)

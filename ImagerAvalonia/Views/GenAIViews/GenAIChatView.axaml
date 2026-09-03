@@ -30,23 +30,103 @@
 		<Style Selector="Border.chatbubble.errormsg">
 			<Setter Property="Background" Value="#7A2E2E"/>
 		</Style>
+
+		<Style Selector="SelectableTextBlock.messagetext">
+			<Setter Property="TextWrapping" Value="Wrap"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="SelectionBrush" Value="#6FA8DC"/>
+			<Setter Property="SelectionForegroundBrush" Value="Black"/>
+		</Style>
+
+		<!-- Copy button: hidden until the bubble is hovered, so it doesn't clutter the log. -->
+		<Style Selector="Button.copy">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Padding" Value="4 0"/>
+			<Setter Property="MinWidth" Value="0"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Foreground" Value="#D0D0D0"/>
+			<Setter Property="VerticalAlignment" Value="Top"/>
+			<Setter Property="Opacity" Value="0"/>
+			<Setter Property="Transitions">
+				<Transitions>
+					<DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+				</Transitions>
+			</Setter>
+		</Style>
+		<Style Selector="Border.chatbubble:pointerover Button.copy">
+			<Setter Property="Opacity" Value="0.75"/>
+		</Style>
+		<Style Selector="Button.copy:pointerover">
+			<Setter Property="Opacity" Value="1"/>
+		</Style>
+		<Style Selector="Button.copy:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#20FFFFFF"/>
+			<Setter Property="CornerRadius" Value="3"/>
+		</Style>
+
+		<!-- Spinner shown while waiting for the server. -->
+		<Style Selector="Ellipse.spinner">
+			<Setter Property="Width" Value="14"/>
+			<Setter Property="Height" Value="14"/>
+			<Setter Property="Stroke" Value="#8AB4F8"/>
+			<Setter Property="StrokeThickness" Value="2"/>
+			<Setter Property="StrokeDashArray" Value="6,22"/>
+			<Setter Property="StrokeLineCap" Value="Round"/>
+			<Style.Animations>
+				<Animation Duration="0:0:1" IterationCount="Infinite">
+					<KeyFrame Cue="0%">
+						<Setter Property="RotateTransform.Angle" Value="0"/>
+					</KeyFrame>
+					<KeyFrame Cue="100%">
+						<Setter Property="RotateTransform.Angle" Value="360"/>
+					</KeyFrame>
+				</Animation>
+			</Style.Animations>
+		</Style>
+		<Style Selector="TextBlock.thinking">
+			<Setter Property="Foreground" Value="#D0D0D0"/>
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="FontStyle" Value="Italic"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
 	</UserControl.Styles>
 
 	<Grid RowDefinitions="*, Auto">
 		<ScrollViewer Grid.Row="0" Name="MessagesScrollViewer">
-			<ItemsControl ItemsSource="{Binding Messages}">
-				<ItemsControl.ItemTemplate>
-					<DataTemplate x:DataType="vm:ChatMessageViewModel">
-						<Border Classes="chatbubble"
-								Classes.user="{Binding IsUser}"
-								Classes.assistant="{Binding IsAssistant}"
-								Classes.systemmsg="{Binding IsSystem}"
-								Classes.errormsg="{Binding IsError}">
-							<TextBlock Text="{Binding Text}" TextWrapping="Wrap" Foreground="White" FontSize="12"/>
-						</Border>
-					</DataTemplate>
-				</ItemsControl.ItemTemplate>
-			</ItemsControl>
+			<StackPanel>
+				<ItemsControl ItemsSource="{Binding Messages}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="vm:ChatMessageViewModel">
+							<Border Classes="chatbubble"
+									Classes.user="{Binding IsUser}"
+									Classes.assistant="{Binding IsAssistant}"
+									Classes.systemmsg="{Binding IsSystem}"
+									Classes.errormsg="{Binding IsError}">
+								<Border.ContextMenu>
+									<ContextMenu>
+										<MenuItem Header="Copy message" Click="CopyMessage_Click"/>
+									</ContextMenu>
+								</Border.ContextMenu>
+								<Grid ColumnDefinitions="*,Auto">
+									<SelectableTextBlock Grid.Column="0" Classes="messagetext" Text="{Binding Text}"/>
+									<Button Grid.Column="1" Classes="copy" Content="Copy"
+											ToolTip.Tip="Copy this message"
+											Click="CopyMessage_Click"/>
+								</Grid>
+							</Border>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+
+				<Border Classes="chatbubble assistant" IsVisible="{Binding IsBusy}">
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<Ellipse Classes="spinner"/>
+						<TextBlock Classes="thinking" Text="{Binding BusyStatusText}"/>
+					</StackPanel>
+				</Border>
+			</StackPanel>
 		</ScrollViewer>
 
 		<Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="4">
@@ -54,8 +134,13 @@
 					  Watermark="Describe the experiment you want..."
 					  AcceptsReturn="False"
 					  KeyDown="InputBox_KeyDown"/>
-			<Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}"
-					IsEnabled="{Binding !IsBusy}" Margin="4 0 0 0"/>
+			<Button Grid.Column="1" Command="{Binding SendCommand}"
+					IsEnabled="{Binding !IsBusy}" Margin="4 0 0 0" MinWidth="60">
+				<Panel>
+					<TextBlock Text="Send" IsVisible="{Binding !IsBusy}"/>
+					<Ellipse Classes="spinner" Width="12" Height="12" IsVisible="{Binding IsBusy}"/>
+				</Panel>
+			</Button>
 		</Grid>
 	</Grid>
 </UserControl>

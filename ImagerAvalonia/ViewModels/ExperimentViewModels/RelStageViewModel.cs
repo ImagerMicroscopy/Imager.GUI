@@ -185,10 +185,7 @@ public partial class RelStageViewModel : MeasurementElementViewModel
 
         ReturnToStartingPosition = relStage.Params.ReturnToStartingPosition;
 
-        if (relStage.SmartProgramId != null && Guid.TryParse(relStage.SmartProgramId, out var smartProgramId))
-        {
-            SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
-        }
+        LoadSmartProgramBinding(relStage.SmartProgramId);
     }
 }
 

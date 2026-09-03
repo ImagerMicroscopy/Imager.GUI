@@ -124,6 +124,67 @@ public abstract partial class MeasurementElementViewModel : ObservableObject, ID
             Elementid = id;
     }
 
+    /// <summary>
+    /// Smart program this node was saved as bound to, kept until a matching
+    /// SmartProgramViewModel actually exists. A project load builds the tree
+    /// before it restores the smart programs (ExperimentManager.ParseLoadedExperiment),
+    /// so the lookup at LoadFromModel time normally finds nothing - without
+    /// remembering the id here, the saved binding would be silently dropped and
+    /// the loop node would come back unbound.
+    /// </summary>
+    public Guid? PendingSmartProgramId { get; private set; }
+
+    /// <summary>
+    /// Restores this node's smart program binding from the saved GUID, deferring
+    /// it if that program hasn't been registered yet. Call from LoadFromModel in
+    /// place of a direct SmartPrograms lookup.
+    /// </summary>
+    protected void LoadSmartProgramBinding(string? smartProgramId)
+    {
+        PendingSmartProgramId = Guid.TryParse(smartProgramId, out var parsed) ? parsed : null;
+        ResolveSmartProgramBinding();
+    }
+
+    /// <summary>
+    /// Resolves this node and all its descendants against the smart programs
+    /// registered so far. Safe to call repeatedly; a node stays pending until its
+    /// program shows up, and is left alone once resolved.
+    /// </summary>
+    public void ResolveSmartProgramBindings()
+    {
+        ResolveSmartProgramBinding();
+        foreach (var child in Children)
+        {
+            child.ResolveSmartProgramBindings();
+        }
+    }
+
+    /// <summary>Element ids of this subtree's nodes still waiting on a smart program that never arrived.</summary>
+    public IEnumerable<(Guid ElementId, Guid SmartProgramId)> GetUnresolvedSmartProgramBindings()
+    {
+        if (PendingSmartProgramId is Guid pending)
+            yield return (Elementid, pending);
+
+        foreach (var child in Children)
+        {
+            foreach (var unresolved in child.GetUnresolvedSmartProgramBindings())
+                yield return unresolved;
+        }
+    }
+
+    private void ResolveSmartProgramBinding()
+    {
+        if (PendingSmartProgramId is not Guid pending)
+            return;
+
+        var program = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == pending);
+        if (program is null)
+            return;
+
+        SelectedProgramId = program;
+        PendingSmartProgramId = null;
+    }
+
 }
 
 

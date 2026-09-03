@@ -202,10 +202,7 @@ namespace ImagerAvalonia.ViewModels
 
             CurrentSelectedIndex = XYPositions.Count > 0 ? 0 : -1;
 
-            if (model.SmartProgramId != null && Guid.TryParse(model.SmartProgramId, out var smartProgramId))
-            {
-                SelectedProgramId = SmartPrograms.FirstOrDefault(p => p.SmartProgramID == smartProgramId);
-            }
+            LoadSmartProgramBinding(model.SmartProgramId);
         }
     }
 }

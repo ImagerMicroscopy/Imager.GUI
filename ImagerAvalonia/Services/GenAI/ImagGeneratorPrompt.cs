@@ -110,6 +110,13 @@ namespace ImagerAvalonia.Services.GenAI
 
         Nodes are discriminated by `"elementtype"`; children live in `"elements"` (containers only — leaves omit it). Every node has a fresh random-GUID `"elementid"`. Root is typically a `dotimes` with `ntotal:1` wrapping the whole experiment.
 
+        Two different SmartProgram-binding fields live on tree nodes — don't mix them up:
+        - Containers carry **`"smartprogramid"`** (singular, string-or-null): the `SmartProgramID`
+          of the program whose `*_decision_requested` method drives this loop at runtime
+          (section 7.7). The examples below all show `null`, but any of them takes a GUID.
+        - `detection` leaves carry **`"smartprogramids"`** (plural, array): the programs that
+          receive this node's images.
+
         **`dotimes`** (container) — repeat N times:
         ```json
         { "ntotal": 1, "smartprogramid": null, "elementtype": "dotimes", "elementid": "<guid>", "elements": [] }
@@ -181,8 +188,16 @@ namespace ImagerAvalonia.Services.GenAI
           "FileBundle": { "programname": "MyProgram", "main_file": { "relative_path": "myprogram.py", "content": "<python source>" }, "dependencies": [], "requirements": [] }
         }
         ```
-        - `SmartProgramID`: fresh GUID, referenced by `smartprogramids`/`smartprogramid` on tree nodes.
-        - `inputparams[].elementid` = the bound `detection`/loop node's `elementid`; `acquisition`/`detection` name the acquisition and detector (must match a real `detectorname`).
+        - `SmartProgramID`: fresh GUID. All coupling to it happens **in the program tree** (section 5),
+          never inside this entry: a `detection` node's `smartprogramids` array feeds it images, and a
+          container node's `smartprogramid` field lets it decide that loop (section 7.7). A program may
+          legitimately be referenced by no node at all — but then it can only observe, never decide.
+        - `methods[]` is the **image-callback** list only (`@onimagesreceived`). `inputparams[].elementid`
+          = the bound `detection` node's `elementid`; `acquisition`/`detection` name the acquisition and
+          detector (must match a real `detectorname`). Bind each image callback **both ways**: the
+          `elementid` here, and this program's `SmartProgramID` in that detection's `smartprogramids`.
+        - `*_decision_requested` methods are **not** listed in `methods` and never get an `inputparams`
+          entry — their only wiring is the loop node's `smartprogramid` (section 7.7).
         - `parameters[].type` ∈ `Scalar` (float) / `Boolean` / `Integer` / `Text` — matches `Scalar(...)`/etc. attributes in `__init__`.
         - `requirements`: pip strings (e.g. `"numpy==2.2.6"`) for every third-party import beyond `core.*`/`models.*`/stdlib. List every one — never assume installed. Storage only, nothing auto-installs. A need no pip package can satisfy (proprietary SDK, missing model file, unsupported hardware) → `PYTHON_REQS_NOT_SATISFIED`.
 
@@ -232,11 +247,30 @@ namespace ImagerAvalonia.Services.GenAI
         Add only when the description implies programmatic hardware adjustment.
 
         ### 7.6 Program lifetime — two scopes
-        **`self.` attributes persist for exactly one run.** The class is instantiated once when a run starts; the same instance handles every `images_received`/`acquisitionupdate`/`*_decision_requested` call for that whole run. This is the only way to accumulate data across images (running averages, frame-to-frame comparison, collect-then-decide):
+
+        **The instance lives from the first image to the next decision, and no longer.** The class is
+        instantiated when its **first image arrives**, that same instance receives every subsequent
+        `images_received`/`acquisitionupdate` call, and it is **destroyed the moment a decision is
+        requested** — `*_decision_requested` is the last call that instance ever serves, and it is
+        garbage-collected immediately after returning. The next image after that builds a **fresh**
+        instance with `__init__` defaults again.
+
+        Consequences to design around, every time:
+        - `self.` state accumulated from images is exactly what the decision method gets to read —
+          that's the collect-then-decide window, and it's the whole point of `self.`.
+        - `self.` state does **not** survive the decision. Never expect a value written before a
+          decision to still be there on the next image, and never try to compare across decisions
+          with `self.`.
+        - A decision method that needs history spanning decisions must read a module-level global.
+        - No image ever arrives ⇒ no instance ever exists ⇒ nothing to accumulate; a program whose
+          decision depends on image data must be bound to a `detection` that actually runs before it.
+
+        Accumulating across images inside one such window (running averages, frame-to-frame
+        comparison, collect-then-decide):
         ```python
         class MyAutofocusProgram(BaseUserProgram, metaclass=SmartImagerProgram):
             def __init__(self):
-                self.focus_scores = []   # persists across calls THIS run only
+                self.focus_scores = []   # lives from the first image until the decision below
                 self.positions = []
 
             @onimagesreceived
@@ -250,11 +284,14 @@ namespace ImagerAvalonia.Services.GenAI
                 loop.append_stage_position(self.positions[best])
                 return loop
         ```
-        **As soon as that run's loop/decision cycle completes, the instance is discarded** — the next run starts fresh, wiping every `self.` attribute back to `__init__` defaults. `self.` state does NOT survive across separate runs.
+        Returning that `StageLoop` ends this instance: `focus_scores`/`positions` are gone, and the
+        next image starts a new instance with both lists empty again.
 
-        **Module-level globals persist across every run**, for the life of the Python process — use only when the description implies something must survive between runs (a counter, a calibration value):
+        **Module-level globals persist for the life of the Python process**, across every instance and
+        every run — the only scope that outlives a decision. Use when the description implies something
+        must survive it (a counter, a calibration value, a comparison against the previous decision):
         ```python
-        _persistent_counter = 0  # outside the class - survives across runs
+        _persistent_counter = 0  # outside the class - survives instance destruction
 
         class MyProgram(SmartImagerBase, metaclass=SmartImagerProgram):
             @onimagesreceived
@@ -262,10 +299,44 @@ namespace ImagerAvalonia.Services.GenAI
                 global _persistent_counter
                 _persistent_counter += 1
         ```
-        Default to `self.` (per-run) unless cross-run persistence is explicitly implied.
+        Default to `self.` unless the value genuinely has to cross a decision.
 
         ### 7.7 Dynamic loop control — the real "if" mechanism
-        A loop node (`dotimes`/`timelapse`/`relativestageloop`/`stageloop`) bound to a SmartProgram has its parameters **requested live each iteration**, overriding the static `.imag` values, via:
+
+        A loop node (`dotimes`/`timelapse`/`relativestageloop`/`stageloop`) bound to a SmartProgram has
+        its parameters **requested live each iteration**, overriding the static `.imag` values.
+
+        **The binding is two-sided, and the tree side is the one that gets forgotten.** Writing
+        `dotimes_decision_requested` in Python does nothing on its own — the program is only asked for a
+        decision by loop nodes that name it. The coupling lives **in the program tree** (section 5): the
+        container node's `"smartprogramid"` field carries that program's `SmartProgramID` as a string.
+
+        | container `elementtype` | Python method (exact name)              | returns             |
+        |---|---|---|
+        | `dotimes`               | `dotimes_decision_requested`            | `DoTimes`           |
+        | `timelapse`             | `timelapse_decision_requested`          | `TimeLapse`         |
+        | `relativestageloop`     | `relative_stageloop_decision_requested` | `RelativeStageLoop` |
+        | `stageloop`             | `stageloop_decision_requested`          | `StageLoop`         |
+
+        ```json
+        { "ntotal": 1, "smartprogramid": "3f1c9a02-...-b7", "elementtype": "dotimes", "elementid": "<guid>", "elements": [] }
+        ```
+        Rules, both directions:
+        - Every `*_decision_requested` you write ⇒ at least one node of the matching `elementtype`
+          carries that program's `SmartProgramID` in `smartprogramid`. Never leave it `null` and assume
+          the GUI will infer it or the user will wire it — nothing does.
+        - Every node with a non-null `smartprogramid` ⇒ that program defines the method matching that
+          node's `elementtype`, spelled exactly as in the table.
+        - `smartprogramid` is singular and a plain string. It is not the `detection`-leaf
+          `smartprogramids` array, and decision methods get **no** entry in
+          `SmartProgramDefinition.methods`/`inputparams`.
+        - One program's decision method answers for every node of that type bound to it. Two loops of
+          the same type needing different logic ⇒ two SmartPrograms.
+        - Keep the node's static values (`ntotal`/`timedelta`/`positions`/`params`) sensible anyway —
+          they are what the GUI displays before the run and what applies if no decision arrives.
+        - A decision reading image data needs a `detection` bound to the same program *and* executing
+          before the loop it decides — no image, no instance, no accumulated state (section 7.6).
+
         ```python
         from models.decisions import DoTimes, TimeLapse, RelativeStageLoop, StageLoop, XYStagePosition
 
@@ -285,7 +356,48 @@ namespace ImagerAvalonia.Services.GenAI
                 loop.append_stage_position(XYStagePosition(name="Pos1", x=0.0, y=0.0, z=0.0))
                 return loop
         ```
-        Only override the method(s) for elements actually bound dynamically (set that node's `smartprogramid`). For a fixed, known-in-advance count/schedule, set `ntotal`/`timedelta`/`positions` directly on the tree node and leave `smartprogramid: null`.
+        Only override the method(s) for elements actually bound dynamically. For a fixed,
+        known-in-advance count/schedule, set `ntotal`/`timedelta`/`positions` directly on the tree node
+        and leave `smartprogramid: null` — no Python at all.
+
+        ### 7.8 Worked example — both bindings at once
+
+        "Survey the field, and only if it's bright enough, take a high-res image." Three GUIDs, three
+        jobs — the detection's `elementid` in `inputparams` (images in), the program's `SmartProgramID`
+        in that detection's `smartprogramids`, and the same `SmartProgramID` in the inner `dotimes`'
+        `smartprogramid` (decision out). Drop that last one and the file loads as an unconditional loop.
+
+        ```json
+        "currentprogram": { "apiversion": "2.0", "detections": { "Survey": { /* section 4 */ }, "HighRes": { /* section 4 */ } }, "program": {
+          "ntotal": 1, "smartprogramid": null, "elementtype": "dotimes", "elementid": "a0000000-0000-0000-0000-000000000001", "elements": [
+            { "detectionnames": ["Survey"], "smartprogramids": ["c0000000-0000-0000-0000-00000000000c"],
+              "elementtype": "detection", "elementid": "b0000000-0000-0000-0000-000000000002" },
+            { "ntotal": 1, "smartprogramid": "c0000000-0000-0000-0000-00000000000c",
+              "elementtype": "dotimes", "elementid": "d0000000-0000-0000-0000-000000000003", "elements": [
+                { "detectionnames": ["HighRes"], "smartprogramids": [], "elementtype": "detection", "elementid": "e0000000-0000-0000-0000-000000000004" } ] } ] } }
+        ```
+        ```json
+        "smartprograms": [ { "SmartProgramID": "c0000000-0000-0000-0000-00000000000c",
+          "SmartProgramDefinition": { "programname": "RescanIfBright",
+            "methods": [ { "methodname": "images_received", "inputparams": [
+              { "acquisition": "Survey", "detection": "Cam0", "elementid": "b0000000-0000-0000-0000-000000000002" } ] } ],
+            "parameters": [ { "type": "Scalar", "annotation": "mean intensity threshold", "variable": "threshold", "value": 500.0 } ],
+            "acquisitionupdates": [] },
+          "FileBundle": { "programname": "RescanIfBright", "main_file": { "relative_path": "rescanifbright.py", "content": "<python source>" }, "dependencies": [], "requirements": [] } } ]
+        ```
+        ```python
+        class RescanIfBright(SmartImagerBase, metaclass=SmartImagerProgram):
+            def __init__(self):
+                self.threshold = Scalar(value=500.0, annotation="mean intensity threshold")
+                self.bright = False
+
+            @onimagesreceived
+            def images_received(self, image: ImagerData):
+                self.bright = image.image.mean() > self.threshold   # instance starts at this first image
+
+            def dotimes_decision_requested(self):
+                return DoTimes(ntotal=1 if self.bright else 0)      # ...and ends when this returns
+        ```
 
         ## 8. Validation checklist
 
@@ -294,6 +406,16 @@ namespace ImagerAvalonia.Services.GenAI
         - No Source enabled/empty-channel mismatch (section 2), anywhere.
         - Containers (`dotimes`/`relativestageloop`/`stageloop`/`timelapse`) have `"elements"`; leaves (`detection`/`wait`/`irradiation`/`executerobotprogram`) don't.
         - Every `smartprogramid(s)` GUID reference has a matching `SmartProgramID` in `smartprograms`.
+        - **Every `*_decision_requested` method is coupled in the program tree**: a container node of the
+          matching `elementtype` (section 7.7 table) carries that program's `SmartProgramID` in its
+          singular `smartprogramid`. Walk the Python methods and find that node for each one — an
+          uncoupled decision method is dead code, and it is the single most common way to get this wrong.
+        - Conversely, every non-null `smartprogramid` names a program that defines that node type's
+          decision method.
+        - Every image-callback binding is written on both sides: the detection's `elementid` in
+          `inputparams`, and the program's `SmartProgramID` in that detection's `smartprogramids`.
+        - No `self.` state is expected to survive a decision call (section 7.6) — anything that must
+          cross one is a module-level global.
         - Every method/parameter in `SmartProgramDefinition` is defined in the Python source by exact name; every third-party import has a `requirements` entry.
         - `dotimes(N)` wrapping a single `detection` used for fast bursts (section 5).
         - Casing matches section 3 exactly, per-section.
