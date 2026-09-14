@@ -1,0 +1,172 @@
+using Autofac;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
+using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Services.Workspace;
+using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
+using ImagerAvalonia.Views;
+using Xunit;
+
+namespace ImagerAvalonia.Tests.Experiments;
+
+/// <summary>
+/// User-flow tests for composing measurement programs and specifying an output
+/// folder, running against the real composition root.
+/// </summary>
+[Collection(AppContainerCollection.Name)]
+public sealed class UserFlowReproTests : IDisposable
+{
+    private readonly IContainer? _previous;
+    private readonly IContainer _container;
+
+    public UserFlowReproTests()
+    {
+        _container = CompositionRoot.BuildContainer();
+        _previous = App.Container;
+        App.SetTestContainer(_container);
+    }
+
+    public void Dispose()
+    {
+        App.SetTestContainer(_previous!);
+        // Note: disposing the container throws NotImplementedException from
+        // ObservableLoggerProvider.Dispose - left undisposed here on purpose.
+    }
+
+    private static T ShowInWindow<T>(T control) where T : Control
+    {
+        var window = new Window { Content = control, Width = 500, Height = 700 };
+        window.Show();
+        return control;
+    }
+
+    [Fact]
+    public void App_starts_with_a_default_selected_experiment()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+
+        var exp = Assert.Single(mainVM.Experiments);
+        Assert.Same(exp, mainVM.SelectedExperiment);
+    }
+
+    [Fact]
+    public void Adding_an_experiment_selects_it_immediately()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var first = mainVM.SelectedExperiment!;
+
+        mainVM.AddExperiment();
+
+        Assert.Equal(2, mainVM.Experiments.Count);
+        Assert.Same(mainVM.Experiments[1], mainVM.SelectedExperiment);
+        Assert.NotSame(first, mainVM.SelectedExperiment);
+    }
+
+    [Fact]
+    public void User_can_compose_a_program_from_primitives()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        exp.AddElementCommand(ExperimentElementType.DoTimes);
+        exp.AddElementCommand(ExperimentElementType.Detection);
+        exp.AddElementCommand(ExperimentElementType.WaitForTime);
+
+        Assert.Equal(3, exp.Root.Children.Count);
+
+        var tree = exp.GetMeasurementElement();
+        Assert.Equal("dotimes", tree.ElementType);
+        Assert.Equal(3, tree.Elements.Count);
+        Assert.Equal("dotimes", tree.Elements[0].ElementType);
+        Assert.Equal("detection", tree.Elements[1].ElementType);
+        Assert.Equal("wait", tree.Elements[2].ElementType);
+    }
+
+    [Fact]
+    public void User_can_specify_an_output_folder_and_get_a_storage_path()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var dir = Directory.CreateDirectory(
+            Path.Combine(Path.GetTempPath(), "imager-repro-" + Guid.NewGuid().ToString("N"))).FullName;
+
+        exp.Root.OutputFolder = dir;
+        exp.Root.FileName = "exp";
+
+        var path = exp.GetStoragePath();
+
+        Assert.StartsWith(dir, path);
+        Assert.EndsWith(".tif", path);
+    }
+
+    [AvaloniaFact]
+    public void Open_button_on_root_panel_has_a_working_command()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var view = ShowInWindow(new RootPanelView { DataContext = exp.Root });
+
+        var openButton = view.GetVisualDescendants()
+            .OfType<Button>()
+            .First(b => b.Content as string == "Open");
+
+        Assert.NotNull(openButton.Command);
+        Assert.True(openButton.Command!.CanExecute(null));
+    }
+
+    [Fact]
+    public void RootNode_notifies_when_the_storage_service_output_folder_changes()
+    {
+        var service = new ExperimentStorageService();
+        var root = new RootNode { StorageService = service };
+
+        var changed = new List<string?>();
+        root.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        service.OutputFolder = "/some/dir";
+
+        Assert.Contains(nameof(RootNode.OutputFolder), changed);
+    }
+
+    [AvaloniaFact]
+    public void Picking_an_output_folder_updates_the_save_path_display()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var view = ShowInWindow(new RootPanelView { DataContext = exp.Root });
+
+        var savePathBox = view.GetVisualDescendants()
+            .OfType<TextBox>()
+            .First(t => t.Watermark == "Save path");
+
+        // Simulate what the folder picker does: set the folder on the storage service.
+        exp.Root.StorageService!.OutputFolder = "/some/dir";
+
+        Assert.Equal("/some/dir", savePathBox.Text);
+    }
+
+    [AvaloniaFact]
+    public void Added_elements_appear_in_the_experiment_tree()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var view = ShowInWindow(new ExperimentalPanelViewControl { DataContext = exp });
+
+        exp.AddElementCommand(ExperimentElementType.Detection);
+        exp.AddElementCommand(ExperimentElementType.WaitForTime);
+
+        var tree = view.FindControl<TreeView>("ExperimentTreeView");
+        Assert.NotNull(tree);
+        Assert.Equal(2, exp.Root.Children.Count);
+
+        // The tree must have realized a container for the root and its two children.
+        var treeItems = view.GetVisualDescendants().OfType<TreeViewItem>().ToList();
+        Assert.Equal(3, treeItems.Count);
+    }
+}
