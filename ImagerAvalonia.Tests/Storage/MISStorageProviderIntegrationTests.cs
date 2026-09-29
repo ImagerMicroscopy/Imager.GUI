@@ -1,4 +1,5 @@
 using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Services.MeasurementControl;
 using Xunit;
 
 namespace ImagerAvalonia.Tests.Storage;
@@ -203,13 +204,34 @@ public sealed class MISStorageProviderIntegrationTests : IDisposable
     }
 
     [NativeStorageFact]
-    public void Imager_program_is_stored_verbatim()
+    public void Imager_program_is_stored_and_read_back()
     {
         var program = FullProgramJson();
 
         var provider = WriteAndReopen(PathFor("program.tif"), new[] { (Image16(2, 2), Meta(2, 2, 0)) }, program: program);
+        var stored = provider.GetImagerProgram();
 
-        Assert.Equal(program, provider.GetImagerProgram());
+        // The program is kept inside the file's OME-XML, and XML parsing normalises line
+        // endings, so on Windows the indented JSON (\r\n) comes back with \n. Compare the JSON.
+        Assert.NotNull(stored);
+        Assert.True(Newtonsoft.Json.Linq.JToken.DeepEquals(
+                Newtonsoft.Json.Linq.JToken.Parse(program), Newtonsoft.Json.Linq.JToken.Parse(stored!)),
+            "Stored imager program differs from what was written.");
+        Assert.Equal(program.Replace("\r\n", "\n"), stored!.Replace("\r\n", "\n"));
+    }
+
+    [NativeStorageFact]
+    public void Stored_program_can_be_loaded_as_a_project()
+    {
+        // What a saved measurement file is later opened with: the stored program must still
+        // be a loadable .imag project.
+        var provider = WriteAndReopen(PathFor("program-load.tif"), new[] { (Image16(2, 2), Meta(2, 2, 0)) },
+            program: FullProgramJson());
+
+        var state = ImagerAvalonia.Services.Workspace.FullEquipmentStateSerializer.Deserialize(provider.GetImagerProgram()!);
+
+        Assert.Equal(70, state.CurrentProgram.Program.CountTotalDetections());
+        Assert.Equal(new[] { "Acq1" }, state.CurrentProgram.Detections.Keys);
     }
 
     // ---------- Smart program decisions ----------
