@@ -71,14 +71,13 @@ namespace ImagerAvalonia.ViewModels
 
         public void DeleteSelectedItem()
         {
-            if (CurrentSelectedIndex >= 0 && XYPositions.Count != 0)
+            if (CurrentSelectedIndex >= 0 && CurrentSelectedIndex < XYPositions.Count)
             {
                 XYPositions.RemoveAt(CurrentSelectedIndex);
             }
-            if (XYPositions.Count == 0)
-            {
-                CurrentSelectedIndex = -1;
-            }
+
+            // Keep the selection on a valid row (the one that moved up, or the new last one).
+            CurrentSelectedIndex = Math.Min(CurrentSelectedIndex, XYPositions.Count - 1);
         }
 
         public XYStagePosition ReadStagePosition()
@@ -116,7 +115,7 @@ namespace ImagerAvalonia.ViewModels
 
         public void SetToCurrentStagePosition()
         {
-            if (_stageName != null && CurrentSelectedIndex != -1 && CurrentSelectedIndex != XYPositions.Count + 1)
+            if (_stageName != null && CurrentSelectedIndex >= 0 && CurrentSelectedIndex < XYPositions.Count)
             {
                 StageControl.StageName = _stageName;
                 XYPositions[CurrentSelectedIndex] = ReadStagePosition();
@@ -125,7 +124,7 @@ namespace ImagerAvalonia.ViewModels
 
         public void SetStagePosition()
         {
-            if (_stageName != null && CurrentSelectedIndex != -1 && CurrentSelectedIndex != XYPositions.Count + 1)
+            if (_stageName != null && CurrentSelectedIndex >= 0 && CurrentSelectedIndex < XYPositions.Count)
             {
                 try
                 {

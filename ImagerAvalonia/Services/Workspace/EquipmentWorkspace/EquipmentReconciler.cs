@@ -30,7 +30,9 @@ namespace ImagerAvalonia.Services.Workspace
 
         private static Source ReconcileSource(Source master, List<Source> incomingIrradiation)
         {
-            var selected = incomingIrradiation.FirstOrDefault(s => s.EquipmentName == master.EquipmentName);
+            // One equipment can expose several light sources, so match on both names.
+            var selected = incomingIrradiation.FirstOrDefault(s =>
+                s.EquipmentName == master.EquipmentName && s.LightSourceName == master.LightSourceName);
 
             var result = new Source(master); // pulls current AvailableChannels, name, capability flags
 
@@ -53,7 +55,12 @@ namespace ImagerAvalonia.Services.Workspace
         }
         private static MovableComponentModel ReconcileMovableComponent(MovableComponentModel incoming, IReadOnlyList<MovableComponentModel> available)
         {
-            var master = available.First(m => m.equipmentname == incoming.equipmentname);
+            var master = available.FirstOrDefault(m => m.equipmentname == incoming.equipmentname);
+
+            // Not part of the reference equipment: keep the saved selection as-is
+            // rather than failing the whole load.
+            if (master is null)
+                return new MovableComponentModel(incoming);
 
         
             var parts = master.movablecomponents

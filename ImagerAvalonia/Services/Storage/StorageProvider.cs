@@ -32,6 +32,9 @@ namespace ImagerAvalonia.Services.Storage
 
         void SaveDecisions(List<string> decisions);
 
+        /// <summary>Smart program decisions stored in the open file, as JSON strings.</summary>
+        List<string> GetSmartProgramDecisions();
+
         byte[] ReadPlane(string acq_name, string det_name, int time_position);
 
         TiffPlaneMetadata GetPlaneMetadata(string acqName, string detName, int imageidx);
@@ -279,67 +282,72 @@ namespace ImagerAvalonia.Services.Storage
 
         public int GetImageIndex(string acqName, string detName, int requestedTime)
         {
-            unsafe
+            IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acqName);
+            IntPtr detectorName = Marshal.StringToHGlobalAnsi(detName);
+            try
             {
-                IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acqName);
-                IntPtr detectorName = Marshal.StringToHGlobalAnsi(detName);
-                IntPtr image_idx_pointer = Marshal.AllocHGlobal(sizeof(int));
-                MISGetImageIndex(_storageId, acqTypeName, detectorName, requestedTime, image_idx_pointer);
-                int imageIdx = Marshal.ReadInt32(image_idx_pointer);
-
+                int imageIdx = -1;
+                unsafe
+                {
+                    // An unknown channel is an error in the library; treat it as "no image yet".
+                    if (MISGetImageIndex(_storageId, acqTypeName, detectorName, requestedTime, (IntPtr)(&imageIdx)) != 0)
+                        return -1;
+                }
+                return imageIdx;
+            }
+            finally
+            {
                 Marshal.FreeHGlobal(detectorName);
                 Marshal.FreeHGlobal(acqTypeName);
-                Marshal.FreeHGlobal(image_idx_pointer);
-
-                return imageIdx;
             }
         }
 
         public TiffPlaneMetadata GetPlaneMetadata(string acqName, string detName, int imageidx)
         {
-            TiffPlaneMetadata metadata = new TiffPlaneMetadata();
+            if (!AcqDetPairs.Contains(new Tuple<string,string>(acqName, detName)))
+                throw new Exception("Acquisition/Detection pair not present in the dataset");
 
-            if (AcqDetPairs.Contains(new Tuple<string,string>(acqName, detName)))
+            TiffPlaneMetadata metadata = new TiffPlaneMetadata();
+            IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acqName);
+            IntPtr detectorName = Marshal.StringToHGlobalAnsi(detName);
+            try
             {
-                IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acqName);
-                IntPtr detectorName = Marshal.StringToHGlobalAnsi(detName);
                 unsafe
                 {
-                    double[] posx = new double[1];
-                    double[] posy = new double[1];
-                    double[] posz = new double[1];
-                    double[] time_point = new double[1];
-                    char* position_name_ptr;
+                    double posx = 0, posy = 0, posz = 0, timePoint = 0;
+                    long detectionIndex = 0;
+                    char* position_name_ptr = null;
 
-                    fixed (double* posx_ptr = posx, posy_ptr = posy, posz_ptr = posz, time_point_ptr = time_point)
+                    MISGetStagePosition(_storageId, acqTypeName, detectorName, imageidx, &posx, &posy, &posz);
+                    MISGetTimePoint(_storageId, acqTypeName, detectorName, imageidx, &timePoint);
+                    MISGetDetectionIndex(_storageId, acqTypeName, detectorName, imageidx, (IntPtr)(&detectionIndex));
+
+                    string? positionName = null;
+                    if (MISGetStagePositionName(_storageId, acqTypeName, detectorName, imageidx, &position_name_ptr) == 0
+                        && position_name_ptr != null)
                     {
-                        MISGetStagePosition(_storageId, acqTypeName, detectorName, imageidx, posx_ptr, posy_ptr, posz_ptr);
-                        MISGetStagePositionName(_storageId, acqTypeName, detectorName, imageidx, &position_name_ptr);
-                        MISGetTimePoint(_storageId, acqTypeName, detectorName, imageidx, time_point_ptr);
-                        metadata.PositionX = posx[0];
-                        metadata.PositionY = posy[0];
-                        metadata.PositionZ = posz[0];
-                        metadata.AcquisitionName = acqName;
-                        metadata.DetectorName = detName;
-                        metadata.PositionName = Marshal.PtrToStringAnsi((IntPtr)position_name_ptr);
-                        metadata.Width = (uint)_width;
-                        metadata.Height = (uint)_height;
-                        metadata.TimePoint = time_point[0];
-                        metadata.CurrentStagePosition = new XYStagePosition(0, metadata.PositionX, metadata.PositionY, metadata.PositionZ, false, metadata.PositionName);
-                     
-
+                        positionName = Marshal.PtrToStringAnsi((IntPtr)position_name_ptr);
                         MISFreeStagePositionName((IntPtr)position_name_ptr);
-
                     }
+
+                    metadata.PositionX = posx;
+                    metadata.PositionY = posy;
+                    metadata.PositionZ = posz;
+                    metadata.AcquisitionName = acqName;
+                    metadata.DetectorName = detName;
+                    metadata.PositionName = positionName;
+                    metadata.Width = (uint)_width;
+                    metadata.Height = (uint)_height;
+                    metadata.TimePoint = timePoint;
+                    metadata.DetectionIndex = (int)detectionIndex;
+                    metadata.CurrentStagePosition = new XYStagePosition(0, posx, posy, posz, false, positionName ?? string.Empty);
                 }
+                return metadata;
+            }
+            finally
+            {
                 Marshal.FreeHGlobal(acqTypeName);
                 Marshal.FreeHGlobal(detectorName);
-                return metadata;
-
-            }
-            else
-            {
-                throw new Exception("Acquisition/Detection pair not present in the dataset");
             }
         }
 
@@ -353,13 +361,19 @@ namespace ImagerAvalonia.Services.Storage
         {
             if (_storagePath != null && _isStorageEnabled)
             {
-
                 IntPtr input_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
-                int storageIdPtr;
+                try
+                {
+                    if (MISOpenFile(input_path_ptr, out int storageId) != 0)
+                        throw new IOException($"Could not open measurement storage '{_storagePath}'.");
 
-                MISOpenFile(input_path_ptr, out storageIdPtr);
-                _storageId = storageIdPtr;
-                OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
+                    _storageId = storageId;
+                    OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(input_path_ptr);
+                }
             }
         }
 
@@ -367,34 +381,57 @@ namespace ImagerAvalonia.Services.Storage
         {
             unsafe
             {
-                char* imager_program_ptr;
+                char* imager_program_ptr = null;
 
-                MISGetImagerProgram(_storageId, &imager_program_ptr);
+                if (MISGetImagerProgram(_storageId, &imager_program_ptr) != 0 || imager_program_ptr == null)
+                    return null;
 
-                string imager_program = Marshal.PtrToStringAnsi((IntPtr)imager_program_ptr);
-
+                string? imager_program = Marshal.PtrToStringAnsi((IntPtr)imager_program_ptr);
                 MISFreeProgramDescription(imager_program_ptr);
-
                 return imager_program;
-
             }
-
         }
 
         public void OpenWriteStream()
         {
             if (_storagePath != null && _isStorageEnabled)
             {
+                // If the library cannot create the file, it terminates the whole process
+                // (its writer thread is left un-joined), so make sure it can before calling it.
+                EnsureStorageFileIsWritable(_storagePath);
+
                 IntPtr measurement_descriptor_ptr = Marshal.StringToHGlobalAnsi(_measurementProgram);
                 IntPtr storage_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
-                int storerId;
+                try
+                {
+                    if (MISNewStorage(storage_path_ptr, measurement_descriptor_ptr, out int storerId) != 0)
+                        throw new IOException($"Could not create measurement storage '{_storagePath}'.");
 
-                MISNewStorage(storage_path_ptr, measurement_descriptor_ptr, out storerId);
-                _storageId = (int)storerId;
-                OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
+                    _storageId = storerId;
+                    OpenStorageIDS.OpenStorageIDSList.Add(_storageId);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(measurement_descriptor_ptr);
+                    Marshal.FreeHGlobal(storage_path_ptr);
+                }
+            }
+        }
 
-                Marshal.FreeHGlobal(measurement_descriptor_ptr);
-                Marshal.FreeHGlobal(storage_path_ptr);
+        private static void EnsureStorageFileIsWritable(string path)
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+                throw new DirectoryNotFoundException($"Storage folder '{directory}' does not exist.");
+
+            try
+            {
+                // The library creates/truncates the file anyway.
+                using (new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { }
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new IOException($"Cannot write measurement storage '{path}'.", ex);
             }
         }
 
@@ -402,108 +439,194 @@ namespace ImagerAvalonia.Services.Storage
 
         public byte[] ReadPlane(string acq_name, string det_name, int time_position)
         {
-            unsafe
-            {
-                if (_isStorageEnabled)
-                {
-                    IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acq_name);
-                    IntPtr detectorName = Marshal.StringToHGlobalAnsi(det_name);
-
-                    if (time_position != -1)
-                    {
-
-                        ushort* data_buffer;
-
-
-                        MISGetImage(_storageId, acqTypeName, detectorName, time_position, &data_buffer, ref _width, ref _height);
-
-                        byte[] byteArray = new byte[_width * _height * 2];
-                        fixed (byte* dest = byteArray)
-                        {
-                            byte* d = dest;
-                            if (data_buffer != null)
-                            {
-                                for (int buf_ind = 0; buf_ind < _width * _height; buf_ind++)
-                                {
-                                    *(d++) = (byte)(*data_buffer);
-                                    *(d++) = (byte)(*data_buffer >> 8);
-                                    data_buffer++;
-
-                                }
-                            }
-                            MISReleaseImageData(data_buffer - _width * _height);
-                            return byteArray;
-                        }
-                    }
-                }
-
+            if (!_isStorageEnabled || time_position == -1)
                 return Array.Empty<byte>();
 
-            }
+            IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(acq_name);
+            IntPtr detectorName = Marshal.StringToHGlobalAnsi(det_name);
+            try
+            {
+                unsafe
+                {
+                    ushort* data_buffer = null;
+                    int nRows = 0, nCols = 0;
 
+                    // The library reports rows first, then columns. On failure (no such image or
+                    // channel, or a pixel format the library cannot read back) return "no image",
+                    // which is what callers already handle, instead of reading a garbage pointer.
+                    if (MISGetImage(_storageId, acqTypeName, detectorName, time_position, &data_buffer, ref nRows, ref nCols) != 0
+                        || data_buffer == null)
+                    {
+                        return Array.Empty<byte>();
+                    }
+
+                    try
+                    {
+                        _height = nRows;
+                        _width = nCols;
+
+                        // Mono16: two bytes per pixel, already in the byte order the GUI uses.
+                        byte[] byteArray = new byte[nRows * nCols * 2];
+                        fixed (byte* dest = byteArray)
+                        {
+                            Buffer.MemoryCopy(data_buffer, dest, byteArray.Length, byteArray.Length);
+                        }
+                        return byteArray;
+                    }
+                    finally
+                    {
+                        MISReleaseImageData(data_buffer);
+                    }
+                }
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(acqTypeName);
+                Marshal.FreeHGlobal(detectorName);
+            }
         }
 
         public void SavePlanes(List<byte[]> data_buffer, List<TiffPlaneMetadata> metadata)
         {
+            if (_storagePath == null || !_isStorageEnabled)
+                return;
 
             for (int buf_ind = 0; buf_ind < data_buffer.Count; buf_ind++)
             {
-                if (_storagePath != null   && _isStorageEnabled)
+                byte[] frame_data = data_buffer[buf_ind];
+                var meta = metadata[buf_ind];
+
+                IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(meta.AcquisitionName);
+                IntPtr detectorName = Marshal.StringToHGlobalAnsi(meta.DetectorName);
+                IntPtr posName = Marshal.StringToHGlobalAnsi(meta.PositionName ?? string.Empty);
+                try
                 {
-                    byte[] frame_data = data_buffer[buf_ind];
-                    //ushort[] frame_data = new ushort[data_buffer[buf_ind].Length / 2];
-                    //Buffer.BlockCopy(data_buffer[buf_ind], 0, frame_data, 0, data_buffer[buf_ind].Length);
-
-
-                    IntPtr acqTypeName = Marshal.StringToHGlobalAnsi(metadata[buf_ind].AcquisitionName);
-                    IntPtr detectorName = Marshal.StringToHGlobalAnsi(metadata[buf_ind].DetectorName);
-                    IntPtr posName = Marshal.StringToHGlobalAnsi(metadata[buf_ind].PositionName);
-
-                    long detectionIdx = metadata[buf_ind].DetectionIndex;
                     unsafe
                     {
                         fixed (byte* data_buf_ptr = frame_data)
                         {
-                            System.Diagnostics.Debug.WriteLine(detectionIdx);
-                            MISAddNewImage(_storageId, acqTypeName, detectorName, metadata[buf_ind].TimePoint, metadata[buf_ind].PositionX, metadata[buf_ind].PositionY, metadata[buf_ind].PositionZ,
-                                           detectionIdx, posName,metadata[buf_ind].Type, (int)metadata[buf_ind].Width, (int)metadata[buf_ind].Height, data_buf_ptr);
+                            // The library takes rows (height) before columns (width); passing
+                            // width first stored every non-square image transposed in the file.
+                            MISAddNewImage(_storageId, acqTypeName, detectorName, meta.TimePoint,
+                                           meta.PositionX, meta.PositionY, meta.PositionZ,
+                                           meta.DetectionIndex, posName, meta.Type,
+                                           (int)meta.Height, (int)meta.Width, data_buf_ptr);
                         }
                     }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(acqTypeName);
+                    Marshal.FreeHGlobal(detectorName);
+                    Marshal.FreeHGlobal(posName);
                 }
             }
         }
 
         public void SaveDecisions(List<string> decisions)
         {
+            // Same guard as SavePlanes: there is no open storage in live mode or when
+            // storage is disabled.
+            if (_storagePath == null || !_isStorageEnabled)
+                return;
+
             foreach(var decision in decisions)
             {
-                IntPtr decisionPtr = Marshal.StringToHGlobalAnsi(decision);
-                MISAddSmartProgramDecision(_storageId, decisionPtr);
+                // The library re-parses every decision as JSON when it writes the file; one
+                // that is not valid JSON would make that throw inside the native writer.
+                if (!IsJson(decision))
+                    continue;
+
+                // nlohmann::json requires UTF-8, which StringToHGlobalAnsi is not on Windows.
+                IntPtr decisionPtr = Marshal.StringToCoTaskMemUTF8(decision);
+                try
+                {
+                    MISAddSmartProgramDecision(_storageId, decisionPtr);
+                }
+                finally
+                {
+                    Marshal.FreeCoTaskMem(decisionPtr);
+                }
             }
+        }
+
+        private static bool IsJson(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            try
+            {
+                Newtonsoft.Json.Linq.JToken.Parse(text);
+                return true;
+            }
+            catch (Newtonsoft.Json.JsonException)
+            {
+                return false;
+            }
+        }
+
+        public List<string> GetSmartProgramDecisions()
+        {
+            var decisions = new List<string>();
+            if (_storagePath == null || !_isStorageEnabled)
+                return decisions;
+
+            unsafe
+            {
+                IntPtr array = IntPtr.Zero;
+                int count = 0;
+                MISGetSmartProgramDecisions(_storageId, (IntPtr)(&array), (IntPtr)(&count));
+
+                try
+                {
+                    for (int i = 0; i < count && array != IntPtr.Zero; i++)
+                    {
+                        var decision = Marshal.PtrToStringUTF8(Marshal.ReadIntPtr(array, i * IntPtr.Size));
+                        if (decision != null)
+                            decisions.Add(decision);
+                    }
+                }
+                finally
+                {
+                    if (array != IntPtr.Zero)
+                        MISFreeStringArray(array);
+                }
+            }
+
+            return decisions;
         }
 
         public int GetNumberOfImages(string acquisition, string detector)
         {
-
             IntPtr acqName = Marshal.StringToHGlobalAnsi(acquisition);
             IntPtr detectorName = Marshal.StringToHGlobalAnsi(detector);
-            IntPtr nimages_ptr = Marshal.AllocHGlobal(sizeof(int));
-
-            MISGetNumberOfImages(_storageId, acqName, detectorName, nimages_ptr);
-
-
-            int nimages = Marshal.ReadInt32(nimages_ptr);
-            Marshal.FreeHGlobal(acqName);
-            Marshal.FreeHGlobal(detectorName);
-            Marshal.FreeHGlobal(nimages_ptr);
-            return nimages;
+            try
+            {
+                int nimages = 0;
+                unsafe
+                {
+                    if (MISGetNumberOfImages(_storageId, acqName, detectorName, (IntPtr)(&nimages)) != 0)
+                        return 0;
+                }
+                return nimages;
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(acqName);
+                Marshal.FreeHGlobal(detectorName);
+            }
         }
 
         public int LoadMaxFrameNumber()
         {
-            IntPtr num_detections = Marshal.AllocHGlobal(sizeof(int));
-            MISGetNumberOfDetections(_storageId, num_detections);
-            return Marshal.ReadInt32(num_detections);
+            // The library writes an int64 here; a 4-byte buffer was overrun.
+            long numDetections = 0;
+            unsafe
+            {
+                if (MISGetNumberOfDetections(_storageId, (IntPtr)(&numDetections)) != 0)
+                    return 0;
+            }
+            return (int)numDetections;
         }
 
         public void SetStoragePath(string path)

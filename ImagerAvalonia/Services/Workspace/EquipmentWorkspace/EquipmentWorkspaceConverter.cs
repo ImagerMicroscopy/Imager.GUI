@@ -22,7 +22,11 @@ namespace ImagerAvalonia.Services.Workspace
 
             writer.WriteStartObject();
 
+            writer.WritePropertyName(nameof(EquipmentWorkspace.DefaultAcquisition));
+            serializer.Serialize(writer, value.DefaultAcquisition);
 
+            writer.WritePropertyName(nameof(EquipmentWorkspace.NumAcquisition));
+            writer.WriteValue(value.NumAcquisition);
 
             writer.WritePropertyName(nameof(EquipmentWorkspace.AvailableSources));
             serializer.Serialize(writer, value.AvailableSources);

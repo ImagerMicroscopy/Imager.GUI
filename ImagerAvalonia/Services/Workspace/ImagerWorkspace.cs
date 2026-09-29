@@ -45,6 +45,9 @@ public class ImagerWorkspace : IDisposable {
     public bool IsExperimentEnabled { get; private set; }
 
     private CancellationTokenSource? _cancelToken;
+
+    /// <summary>How long to wait after closing the write stream before reopening it for reading.</summary>
+    internal TimeSpan StorageReleaseDelay { get; set; } = TimeSpan.FromSeconds(2);
     private ILifetimeScope? _activeScope;
 
     public ImagerWorkspace(
@@ -86,6 +89,17 @@ public class ImagerWorkspace : IDisposable {
         IsLiveEnabled = true;
         //_acquisitionState.SetLiveState();
         CurrentState = WorkspaceState.Acquiring;
+
+        try {
+            await RunLiveAsync(selectedDetection);
+        } catch (Exception) {
+            CurrentState = WorkspaceState.Idle;
+            await StopLiveInternalAsync();
+            throw;
+        }
+    }
+
+    private async Task RunLiveAsync(DefinedDetection selectedDetection) {
         _activeScope = _lifetimeScope.BeginLifetimeScope();
         ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
 
@@ -102,7 +116,7 @@ public class ImagerWorkspace : IDisposable {
         
         var smartprograms =  new SmartProgramRegistry();
         var detections =     new Dictionary<string,DetectionParams>() { { selectedDetection.Name, selectedDetection.Settings } };
-        ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler);
+        ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler, _communicationManager);
         _cancelToken =       new CancellationTokenSource();
 
 
@@ -112,14 +126,7 @@ public class ImagerWorkspace : IDisposable {
 
         LiveScopeCreated?.Invoke(this, _activeScope);
 
-        try {
-            await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, smartprograms);
-        } catch (Exception) {
-
-            CurrentState = WorkspaceState.Idle;
-            await StopLiveInternalAsync();
-            throw;
-        }
+        await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, smartprograms);
     }
 
     public async Task StopLiveAsync() {
@@ -165,59 +172,61 @@ public class ImagerWorkspace : IDisposable {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsExperimentEnabled = true;
 
-        _activeScope = _lifetimeScope.BeginLifetimeScope();
-        ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
-        var acq_det_pairs = detections.Select(x => ResolveAcqDetPairs(x))
-            .SelectMany(list => list)
-            .Distinct()
-            .ToList();
-
-        var program = new MeasurementProgram(
-                experiment,
-                detections.ToDictionary(d => d.Name,
-                d => d.Settings)
-        );
-
-        ActiveStorageProvider.SetEnabledStorage(isstorageenabeld);
-        ActiveStorageProvider.SetMeasurementProgram(fullEquipmentStateJson);
-        ActiveStorageProvider.SetMaxFrameNumber((int)experiment.CountTotalDetections());
-
-        ActiveStorageProvider.SetAcqDetPairs(acq_det_pairs);
-        ActiveStorageProvider.SetStoragePath(storagepath);
-        ActiveStorageProvider.OpenWriteStream();
-
-        ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler);
-        _cancelToken = new CancellationTokenSource();
-
-        ExperimentScopeCreated?.Invoke(this, _activeScope);
-        CurrentState = WorkspaceState.Acquiring;
+        // Keep our own reference: StopExperimentAsync clears ActiveStorageProvider while
+        // this method is still awaiting, and the stream must be closed either way.
+        IStorageProvider? storageProvider = null;
 
         try
         {
-            bool success = await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, _smartProgramRegistry);
-            if (success) {
-                ExperimentFinished?.Invoke(this, EventArgs.Empty);
-                CurrentState = WorkspaceState.Idle;
-            }
-        } catch (Exception) {
-            CurrentState = WorkspaceState.Idle;
-            IsExperimentEnabled = false;
-            ExperimentFinished?.Invoke(this, EventArgs.Empty);
+            _activeScope = _lifetimeScope.BeginLifetimeScope();
+            storageProvider = ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
+            var acq_det_pairs = detections.Select(x => ResolveAcqDetPairs(x))
+                .SelectMany(list => list)
+                .Distinct()
+                .ToList();
+
+            var program = new MeasurementProgram(
+                    experiment,
+                    detections.ToDictionary(d => d.Name,
+                    d => d.Settings)
+            );
+
+            storageProvider.SetEnabledStorage(isstorageenabeld);
+            storageProvider.SetMeasurementProgram(fullEquipmentStateJson);
+            storageProvider.SetMaxFrameNumber((int)experiment.CountTotalDetections());
+
+            storageProvider.SetAcqDetPairs(acq_det_pairs);
+            storageProvider.SetStoragePath(storagepath);
+            // The write stream is opened by ImageHandler.ParseProgramAndShowData; opening it
+            // here as well created a second storage for the same path.
+
+            ActiveImageHandler = new ImageHandler(storageProvider, _logger, _connectionHandler, _communicationManager);
+            _cancelToken = new CancellationTokenSource();
+
+            ExperimentScopeCreated?.Invoke(this, _activeScope);
+            CurrentState = WorkspaceState.Acquiring;
+
+            await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, _smartProgramRegistry);
+        }
+        catch (Exception)
+        {
             try
             {
                 await _communicationManager.CancelMeasurementProgramAsync();
             } catch {}
             throw;
-        } finally {
+        }
+        finally
+        {
             IsExperimentEnabled = false;
             CurrentState = WorkspaceState.Idle;
             ExperimentFinished?.Invoke(this, EventArgs.Empty);
 
-            if (ActiveStorageProvider != null) {
-                ActiveStorageProvider.CloseReadWriteStream();
-                await Task.Delay(2000);
+            if (storageProvider != null) {
+                storageProvider.CloseReadWriteStream();
+                await Task.Delay(StorageReleaseDelay);
                 if(isstorageenabeld) {
-                    ActiveStorageProvider.OpenReadStream();
+                    storageProvider.OpenReadStream();
                 }
             }
         }
@@ -226,6 +235,7 @@ public class ImagerWorkspace : IDisposable {
     public async Task StopExperimentAsync() {
         if (!IsExperimentEnabled) return;
         IsExperimentEnabled = false;
+        CurrentState = WorkspaceState.Idle;
         _cancelToken?.Cancel();
 
         try {

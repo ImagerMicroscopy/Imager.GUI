@@ -41,9 +41,13 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
     private readonly ExperimentManager _experimentManager;
     private CancellationTokenSource? _numericThrottleCts;
 
-    public DetectorEquipmentViewModel(DetectorEquipmentModel detEquipment, ImagerWorkspace imagerWorkspace, ExperimentManager experimentManager)
+    public DetectorEquipmentViewModel(
+        DetectorEquipmentModel detEquipment,
+        ImagerWorkspace imagerWorkspace,
+        ExperimentManager experimentManager,
+        IImagerCommunicationManager? communicationManager = null)
     {
-        _communicationManager = ImagerCommunicationManager.Instance;
+        _communicationManager = communicationManager ?? ImagerCommunicationManager.Instance;
         _imagerWorkspace = imagerWorkspace;
         _experimentManager = experimentManager;
         Name = detEquipment.Detectorname;
@@ -112,6 +116,10 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         if (e.PropertyName == nameof(CategoricDetectorPropertyViewModel.SelectedChoice) &&
             sender is CategoricDetectorPropertyViewModel categoricDetectorPropertyViewModel)
         {
+            if (categoricDetectorPropertyViewModel.IsRefreshingFromModel ||
+                string.IsNullOrEmpty(categoricDetectorPropertyViewModel.SelectedChoice))
+                return;
+
             if (_imagerWorkspace.CurrentState == WorkspaceState.Acquiring)
             {
                 await _imagerWorkspace.StopLiveAsync();
@@ -281,8 +289,17 @@ public partial class CategoricDetectorPropertyViewModel : DetectorEquipmentViewM
         }
     }
 
+    // True while the view model is being synced from the backend, so that the
+    // resulting SelectedChoice changes are not sent back as user edits.
+    public bool IsRefreshingFromModel { get; private set; }
+
     partial void OnSelectedChoiceChanged(string value)
     {
+        // The ComboBox pushes null into SelectedItem whenever its ItemsSource is
+        // cleared/replaced; never let that overwrite the model value.
+        if (IsRefreshingFromModel || string.IsNullOrEmpty(value))
+            return;
+
         if(Property is CategoricDetectorProperty catProp)
         {
             catProp.current = value;
@@ -293,15 +310,26 @@ public partial class CategoricDetectorPropertyViewModel : DetectorEquipmentViewM
     {
         if (Property is CategoricDetectorProperty cat)
         {
-            if (Label != cat.descriptor)
-                Label = cat.descriptor;
+            IsRefreshingFromModel = true;
+            try
+            {
+                if (Label != cat.descriptor)
+                    Label = cat.descriptor;
 
-            Availableoptions.Clear();
-            foreach (var option in cat.availableoptions)
-                Availableoptions.Add(option);
+                if (!Availableoptions.SequenceEqual(cat.availableoptions))
+                {
+                    Availableoptions.Clear();
+                    foreach (var option in cat.availableoptions)
+                        Availableoptions.Add(option);
+                }
 
-            if (SelectedChoice != cat.current)
+                // Always reassign: clearing the options may have nulled SelectedChoice.
                 SelectedChoice = cat.current;
+            }
+            finally
+            {
+                IsRefreshingFromModel = false;
+            }
         }
     }
 }

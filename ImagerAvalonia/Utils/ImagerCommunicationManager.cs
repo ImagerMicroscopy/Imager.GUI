@@ -83,6 +83,16 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
     private ImagerCommunicationManager() { }
 
+    // Used by tests to run the manager against a fake connection handler
+    // instead of the one resolved from App.Container.
+    internal ImagerCommunicationManager(
+        IImagerConnectionHandler connectionHandler,
+        ILogger<ImagerCommunicationManager>? logger = null)
+    {
+        _connectionHandler = connectionHandler;
+        _logger = logger;
+    }
+
     private async Task<(TResponse? Result, StatusErrorResponse? Error)>
         SendAndValidateAsync<TResponse>(ImagerRequest request, CancellationToken cancellationToken)
         where TResponse : ImagerResponse

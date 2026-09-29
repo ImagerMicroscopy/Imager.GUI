@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -24,6 +25,7 @@ namespace ImagerAvalonia.Utils
         private readonly MessagePackAcquisitionHandler? _acquisitionHandler;
 
         private readonly IImagerConnectionHandler _connectionHandler;
+        private readonly IImagerCommunicationManager _communicationManager = ImagerCommunicationManager.Instance;
 
         private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
 
@@ -37,9 +39,14 @@ namespace ImagerAvalonia.Utils
             _storageProvider = storageProvider; 
         }
 
-        public ImageHandler(IStorageProvider storageProvider, ILogger logger, IImagerConnectionHandler connectionHandler )
+        public ImageHandler(
+            IStorageProvider storageProvider,
+            ILogger logger,
+            IImagerConnectionHandler connectionHandler,
+            IImagerCommunicationManager? communicationManager = null)
         {
             _storageProvider = storageProvider;
+            _communicationManager = communicationManager ?? ImagerCommunicationManager.Instance;
             _logger = logger;
             _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, connectionHandler);
             _connectionHandler = connectionHandler;
@@ -167,7 +174,7 @@ namespace ImagerAvalonia.Utils
                       
 
                         var channel = Channel.CreateUnbounded<MeasurementEvent>();
-                        ImagerCommunicationManager.Instance.ExecuteMeasurementProgram(request, channel.Writer, src.Token);
+                        _communicationManager.ExecuteMeasurementProgram(request, channel.Writer, src.Token);
   
 
                         _storageProvider.OpenWriteStream();
@@ -179,6 +186,13 @@ namespace ImagerAvalonia.Utils
                                     if (images.Images.Count > 0) {
                                         _storageProvider.SavePlanes(images.Images, images.Metadata);
                                         var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                                    }
+
+                                    // Smart program decisions arrive in the same batches as images
+                                    // (possibly on their own) and are stored alongside them.
+                                    var decisions = images.Decisions.Where(d => !string.IsNullOrEmpty(d)).ToList();
+                                    if (decisions.Count > 0) {
+                                        _storageProvider.SaveDecisions(decisions);
                                     }
                                     break;
 

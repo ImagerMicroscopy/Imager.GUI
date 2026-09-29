@@ -29,9 +29,9 @@ namespace ImagerAvalonia.Services
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
         {
             if (reader.TokenType == JsonToken.Null)
-                return null;
+                return objectType == typeof(double?) ? null : 0.0;
 
-            return Convert.ToDouble(reader.Value);
+            return Convert.ToDouble(reader.Value, System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)

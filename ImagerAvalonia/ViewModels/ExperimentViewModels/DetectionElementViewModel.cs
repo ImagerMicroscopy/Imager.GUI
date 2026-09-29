@@ -110,8 +110,8 @@ public partial class DetectionElementViewModel : MeasurementElementViewModel
         foreach (var enabled_acq in EnabledAcquisitions)
             detection.DetectionNames.Add(enabled_acq.Name);
 
-        foreach (var smartprogrambinding in SmartProgramBindings)
-            detection.SmartProgramIds.Add(smartprogrambinding.SmartProgramID.ToString());
+        foreach (var smartprogrambinding in SmartProgramBindings.Where(b => b != null))
+            detection.SmartProgramIds.Add(smartprogrambinding!.SmartProgramID.ToString());
 
         return detection;
     }

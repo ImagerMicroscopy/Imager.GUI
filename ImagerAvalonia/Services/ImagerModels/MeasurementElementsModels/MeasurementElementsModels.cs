@@ -2,6 +2,7 @@
 using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json;
 
 namespace ImagerAvalonia.Services.MeasurementControl
@@ -90,8 +91,13 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
     public class RelativeStageLoopParams
     {
+        // [negative, positive] extra planes. Replace (not the default Auto) so that
+        // deserializing does not append the saved values to the {0, 0} defaults.
+        [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
         public List<int> AdditionalPlanesX { get; set; } = new() { 0, 0 };
+        [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
         public List<int> AdditionalPlanesY { get; set; } = new() { 0, 0 };
+        [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
         public List<int> AdditionalPlanesZ { get; set; } = new() { 0, 0 };
 
         public double DeltaX { get; set; }
@@ -338,9 +344,9 @@ namespace ImagerAvalonia.Services.MeasurementControl
                     multiplier = stageLoop.Positions.Count;
                 else if (element is RelativeStageLoopElement relStageLoop)
                 {
-                    multiplier = (1 + relStageLoop.Params.AdditionalPlanesX[0] + relStageLoop.Params.AdditionalPlanesX[1]) *
-                                 (1 + relStageLoop.Params.AdditionalPlanesY[0] + relStageLoop.Params.AdditionalPlanesY[1]) *
-                                 (1 + relStageLoop.Params.AdditionalPlanesZ[0] + relStageLoop.Params.AdditionalPlanesZ[1]);
+                    multiplier = PlanesAlong(relStageLoop.Params.AdditionalPlanesX) *
+                                 PlanesAlong(relStageLoop.Params.AdditionalPlanesY) *
+                                 PlanesAlong(relStageLoop.Params.AdditionalPlanesZ);
                 }
 
                 // Recursively count detections in all children
@@ -354,6 +360,10 @@ namespace ImagerAvalonia.Services.MeasurementControl
 
             return 0;
         }
+
+        // 1 (the starting plane) + negative + positive extra planes; tolerates short lists.
+        private static long PlanesAlong(List<int>? additionalPlanes)
+            => 1 + (additionalPlanes?.ElementAtOrDefault(0) ?? 0) + (additionalPlanes?.ElementAtOrDefault(1) ?? 0);
     }
 }
 

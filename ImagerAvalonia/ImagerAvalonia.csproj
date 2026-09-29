@@ -9,6 +9,9 @@
 	  <Platforms>AnyCPU;x64</Platforms>
 
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ImagerAvalonia.Tests" />
+  </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>

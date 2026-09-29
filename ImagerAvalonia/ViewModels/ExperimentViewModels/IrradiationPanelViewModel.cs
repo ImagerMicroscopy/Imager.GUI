@@ -19,7 +19,8 @@ public partial class IrradiationPanelViewModel  : MeasurementElementViewModel {
     [ObservableProperty] ObservableCollection<SourcesEquipmentViewModel> _sourcesViewModels = new();
 
     public IrradiationPanelViewModel(GlobalDefinedSettingsViewModel availableAcquisitions) {
-        var sources = availableAcquisitions.Acquisitions.First().DetectionSettings.Settings.Irradiation;
+        var sources = availableAcquisitions.Acquisitions.FirstOrDefault()?.DetectionSettings.Settings.Irradiation
+            ?? new List<Source>();
         var newsources = sources.Select(x => {
             var src = new Source(x.allowmultiplechannels, x.cancontrolpower, x.AvailableChannels, x.LightSourceName);
             src.EquipmentName = x.EquipmentName;
@@ -98,6 +99,7 @@ public partial class IrradiationPanelViewModel  : MeasurementElementViewModel {
                 channel.PropertyChanged -= Channel_PropertyChanged;
             }
         }
+        base.Dispose();
     }
 
     public override MeasurementElementBase ToModel()

@@ -172,12 +172,12 @@ public partial class RelStageViewModel : MeasurementElementViewModel
 
         StageName = relStage.StageName;
 
-        TileNegativeX = relStage.Params.AdditionalPlanesX[2];
-        TilePositiveX = relStage.Params.AdditionalPlanesX[3];
-        TileNegativeY = relStage.Params.AdditionalPlanesY[2];
-        TilePositiveY = relStage.Params.AdditionalPlanesY[3];
-        TileNegativeZ = relStage.Params.AdditionalPlanesZ[2];
-        TilePositiveZ = relStage.Params.AdditionalPlanesZ[3];
+        TileNegativeX = relStage.Params.AdditionalPlanesX.ElementAtOrDefault(0);
+        TilePositiveX = relStage.Params.AdditionalPlanesX.ElementAtOrDefault(1);
+        TileNegativeY = relStage.Params.AdditionalPlanesY.ElementAtOrDefault(0);
+        TilePositiveY = relStage.Params.AdditionalPlanesY.ElementAtOrDefault(1);
+        TileNegativeZ = relStage.Params.AdditionalPlanesZ.ElementAtOrDefault(0);
+        TilePositiveZ = relStage.Params.AdditionalPlanesZ.ElementAtOrDefault(1);
 
         StepSizeX = (decimal)relStage.Params.DeltaX;
         StepSizeY = (decimal)relStage.Params.DeltaY;

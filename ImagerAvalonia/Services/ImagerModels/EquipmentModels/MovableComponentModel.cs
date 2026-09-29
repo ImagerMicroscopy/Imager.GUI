@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
@@ -98,8 +99,17 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
                 .Select(x => new MovableComponentPart(x))
                 .ToList();
 
+            // A setting that is the same object as one of the parts' properties (as set up by
+            // the (parts, name) constructor) must stay linked to the copied part, otherwise
+            // edits through movablecomponents no longer reach the serialized settings.
             movablecomponentsettings = other.movablecomponentsettings
-                   .Select(CloneComponentProperties)
+                   .Select(setting =>
+                   {
+                       int partIndex = other.movablecomponents.FindIndex(p => ReferenceEquals(p.movablecomponent, setting));
+                       return setting is not null && partIndex >= 0
+                           ? movablecomponents[partIndex].movablecomponent
+                           : CloneComponentProperties(setting);
+                   })
                    .ToList();
 
             equipmentname = other.equipmentname;    
@@ -143,7 +153,7 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
                 switch (component.movablecomponent)
                 {
                     case ContinuousMovableComponentPartProperties continuous:
-                        continuous.desiredsetting = Convert.ToDouble(value);
+                        continuous.desiredsetting = MovableComponentParsing.ParseInvariant(value);
                         break;
 
                     case DiscreteMovableComponentPartProperties discrete:
@@ -189,10 +199,10 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
                             componentname,
                             0,
                             0,
-                            Convert.ToDouble(increment),
+                            MovableComponentParsing.ParseInvariant(increment),
                             string.IsNullOrEmpty(desiredsetting)
                                 ? null
-                                : double.Parse(desiredsetting));
+                                : MovableComponentParsing.ParseInvariant(desiredsetting));
                     break;
             }
         }
@@ -238,12 +248,12 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
                     movablecomponent =
                         new ContinuousMovableComponentPartProperties(
                             componentname,
-                            Convert.ToDouble(minvalue),
-                            Convert.ToDouble(maxvalue),
-                            Convert.ToDouble(increment),
+                            MovableComponentParsing.ParseInvariant(minvalue),
+                            MovableComponentParsing.ParseInvariant(maxvalue),
+                            MovableComponentParsing.ParseInvariant(increment),
                             string.IsNullOrEmpty(desiredsetting)
                                 ? null
-                                : double.Parse(desiredsetting));
+                                : MovableComponentParsing.ParseInvariant(desiredsetting));
                     break;
             }
         }
@@ -273,6 +283,14 @@ namespace ImagerAvalonia.Services.ImagerModels.EquipmentModels
                 _ => throw new NotSupportedException("Unknown component type.")
             };
         }
+    }
+
+    internal static class MovableComponentParsing
+    {
+        // Backend numbers reach these constructors as strings rendered with the invariant
+        // culture ("0.5"); parsing with the current culture turns that into 5 on nl-BE/de.
+        public static double ParseInvariant(string? value)
+            => string.IsNullOrEmpty(value) ? 0 : double.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
 
     public enum MovableComponentType

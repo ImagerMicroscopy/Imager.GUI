@@ -79,17 +79,17 @@ namespace ImagerAvalonia.Views.ViewUtils
 
 
 
-                        if (ptr[i] < max_val && ptr[i] > min_val)
-                        {
-                            ptr[i] = (byte)((float)((ptr[i] - min_val)) / (max_val - min_val) * byte.MaxValue);
-                        }
-                        else if (ptr[i] < min_val)
+                        if (ptr[i] <= min_val)
                         {
                             ptr[i] = 0;
                         }
-                        else if (ptr[i] > max_val)
+                        else if (ptr[i] >= max_val)
                         {
                             ptr[i] = byte.MaxValue;
+                        }
+                        else
+                        {
+                            ptr[i] = (byte)((float)((ptr[i] - min_val)) / (max_val - min_val) * byte.MaxValue);
                         }
                     }
                 }
@@ -113,17 +113,17 @@ namespace ImagerAvalonia.Views.ViewUtils
 
 
 
-                        if (ptr[i] < max_val && ptr[i] > min_val)
-                        {
-                            ptr[i] = (ushort)((float)((ptr[i] - min_val)) / ((ushort)max_val - (ushort)min_val) * ushort.MaxValue);
-                        }
-                        else if (ptr[i] < min_val)
+                        if (ptr[i] <= min_val)
                         {
                             ptr[i] = 0;
                         }
-                        else if (ptr[i] > max_val)
+                        else if (ptr[i] >= max_val)
                         {
                             ptr[i] = ushort.MaxValue;
+                        }
+                        else
+                        {
+                            ptr[i] = (ushort)((float)((ptr[i] - min_val)) / (max_val - min_val) * ushort.MaxValue);
                         }
                     }
                 }
@@ -216,15 +216,12 @@ namespace ImagerAvalonia.Views.ViewUtils
             Buffer.BlockCopy(image_array, 0, converted_array, 0, image_array.Length);
 
 
-            for (int hist_val = 0; hist_val < histogram_vals_y.Length; hist_val++)
-            {
-                histogram_vals_y[hist_val] = 0;
-            }
+            Array.Clear(histogram_vals_y);
+            Array.Clear(histogram_vals_y_low);
 
-            for (int hist_val = 0; hist_val < histogram_vals_y.Length; hist_val++)
-            {
-                histogram_vals_y[hist_val] = 0;
-            }
+            if (converted_array.Length == 0)
+                return;
+
             double min_image_val = converted_array.Min();
             double max_image_val = converted_array.Max();
            
