@@ -99,6 +99,9 @@ public partial class DetectorEquipmentViewModel : ViewModelBase
         if (e.PropertyName == nameof(NumericDetectorPropertyViewModel.ThrottledValue) &&
             sender is NumericDetectorPropertyViewModel numericDetectorPropertyViewModel)
         {
+            if (numericDetectorPropertyViewModel.IsRefreshingFromModel)
+                return;
+
             if(_imagerWorkspace.CurrentState == WorkspaceState.Acquiring)
             {
                 await _imagerWorkspace.StopLiveAsync();
@@ -216,6 +219,10 @@ public partial class NumericDetectorPropertyViewModel : DetectorEquipmentViewMod
     private IDisposable? _throttledSubscription;
     public override DetectorEquipmentProperties Property { get; set; }
 
+    // True while the view model is being synced from the backend, so that the
+    // resulting Value/ThrottledValue changes are not sent back as user edits.
+    public bool IsRefreshingFromModel { get; private set; }
+
     public NumericDetectorPropertyViewModel(NumericDetectorProperty numProp)
     {
         this.Property = numProp;
@@ -248,11 +255,25 @@ public partial class NumericDetectorPropertyViewModel : DetectorEquipmentViewMod
     {
         if (Property is NumericDetectorProperty num)
         {
-            if (Label != num.descriptor)
-                Label = num.descriptor;
+            IsRefreshingFromModel = true;
+            try
+            {
+                if (Label != num.descriptor)
+                    Label = num.descriptor;
 
-            if (Value != num.value)
-                Value = num.value;
+                if (Value != num.value)
+                    Value = num.value;
+
+                // Keep ThrottledValue in sync as well: the throttled echo of the
+                // Value change above arrives ~1s later and must find nothing to
+                // change, so a backend refresh is not sent back as a user edit.
+                if (ThrottledValue != num.value)
+                    ThrottledValue = num.value;
+            }
+            finally
+            {
+                IsRefreshingFromModel = false;
+            }
         }
     }
 

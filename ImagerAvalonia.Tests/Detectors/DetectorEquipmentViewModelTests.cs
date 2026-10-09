@@ -302,6 +302,31 @@ public class DetectorEquipmentViewModelTests
         Assert.Equal(0.5, ((NumericDetectorProperty)exposure.Property).value);
     }
 
+    [AvaloniaFact]
+    public async Task Numeric_refresh_from_model_is_not_echoed_back_to_the_backend()
+    {
+        // Regression: a backend-originated refresh used to travel Value -> throttle
+        // -> ThrottledValue ~1s later and was then sent back to the backend as if
+        // it were a user edit, sustaining a set/fetch/refresh loop.
+        var backend = DummyCam();
+        var vm = CreateViewModel(backend);
+        var exposure = Numeric(vm, 0);
+
+        backend.WithNumeric(0, "Exposure time", 0.05);
+        var model = (NumericDetectorProperty)exposure.Property;
+        model.value = 0.05;
+        exposure.RefreshFromModel();
+
+        Assert.Equal(0.05, exposure.Value);
+        Assert.Equal(0.05, exposure.ThrottledValue);
+
+        // Wait past the 1s throttle: the refresh must not be echoed.
+        await Task.Delay(1600);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Empty(backend.SentProperties);
+    }
+
     // ---------- Full set -> re-list -> refresh round trip ----------
 
     [AvaloniaFact]
