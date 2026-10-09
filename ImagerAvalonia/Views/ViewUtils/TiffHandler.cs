@@ -238,27 +238,40 @@ namespace ImagerAvalonia.Views.ViewUtils
 
         public static void UpdateHistogramValues(byte[] image_array, ImagePixelFormat format, ref double[] histogram_vals_y, ref double[] histogram_vals_y_low, ref double[] histogram_vals_x  )
         {
-            ushort[] converted_array = NormalizeToUInt16(image_array, format);
-
             Array.Clear(histogram_vals_y);
             Array.Clear(histogram_vals_y_low);
 
-            if (converted_array.Length == 0)
+            // Pixels are read straight from the raw bytes in their native format.
+            // Binning is relative to the image's own min/max, so byte, ushort and
+            // double pixels are all binned by the same generic pass: value minus
+            // min, divided by bin size.
+            var bytes = image_array.AsSpan();
+            int pixelCount = bytes.Length / format.BytesPerPixel();
+            if (pixelCount == 0)
                 return;
 
-            double min_image_val = converted_array[0];
-            double max_image_val = converted_array[0];
-            for (int i = 1; i < converted_array.Length; i++)
+            double min_image_val;
+            double max_image_val;
+
+            switch (format)
             {
-                ushort val = converted_array[i];
-                if (val < min_image_val) min_image_val = val;
-                if (val > max_image_val) max_image_val = val;
+                case ImagePixelFormat.Mono8:
+                    (min_image_val, max_image_val) = MinMaxOver(bytes);
+                    break;
+                case ImagePixelFormat.Mono16:
+                    (min_image_val, max_image_val) = MinMaxOver(MemoryMarshal.Cast<byte, ushort>(bytes.Slice(0, pixelCount * 2)));
+                    break;
+                case ImagePixelFormat.Float64:
+                    (min_image_val, max_image_val) = MinMaxOver(MemoryMarshal.Cast<byte, double>(bytes.Slice(0, pixelCount * 8)));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format.");
             }
 
             if (max_image_val == min_image_val)
             {
                 int bin_position = min_image_val == 0 ? 0 : histogram_vals_x.Length - 1;
-                histogram_vals_y[bin_position] = converted_array.Length;
+                histogram_vals_y[bin_position] = pixelCount;
 
                 for (int hist_val = 0; hist_val < histogram_vals_x.Length; hist_val++)
                 {
@@ -275,27 +288,63 @@ namespace ImagerAvalonia.Views.ViewUtils
                 histogram_vals_x[hist_val] = min_image_val + hist_val * bin_size;
             }
 
-            unsafe
+            switch (format)
             {
-                fixed (ushort* ptr = converted_array)
-                {
-                    for (int i = 0; i < converted_array.Length; i++)
-                    {
-                        double bin_value = (double)ptr[i] - min_image_val;
-                        int bin_position = 0;
-
-                        if (bin_value != 0)
-                        {
-                            bin_position = (int)(bin_value / bin_size);
-                        }
-
-                        histogram_vals_y[bin_position] += 1;
-
-
-                    }
-                }
+                case ImagePixelFormat.Mono8:
+                    BinPixels(bytes, histogram_vals_y, min_image_val, bin_size);
+                    break;
+                case ImagePixelFormat.Mono16:
+                    BinPixels(MemoryMarshal.Cast<byte, ushort>(bytes.Slice(0, pixelCount * 2)), histogram_vals_y, min_image_val, bin_size);
+                    break;
+                case ImagePixelFormat.Float64:
+                    BinPixels(MemoryMarshal.Cast<byte, double>(bytes.Slice(0, pixelCount * 8)), histogram_vals_y, min_image_val, bin_size);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format.");
             }
         }
+
+        /// <summary>
+        /// Min and max of the pixel values, in the pixels' native numeric range.
+        /// </summary>
+        private static (double Min, double Max) MinMaxOver<T>(ReadOnlySpan<T> pixels)
+            where T : unmanaged, System.Numerics.INumber<T>
+        {
+            T min = pixels[0];
+            T max = pixels[0];
+            for (int i = 1; i < pixels.Length; i++)
+            {
+                T val = pixels[i];
+                if (val < min) min = val;
+                if (val > max) max = val;
+            }
+            return (double.CreateChecked(min), double.CreateChecked(max));
+        }
+
+        private static void BinPixels<T>(ReadOnlySpan<T> pixels, double[] histogram_vals_y, double min_image_val, double bin_size)
+            where T : unmanaged, System.Numerics.INumber<T>
+        {
+            for (int i = 0; i < pixels.Length; i++)
+            {
+                double bin_value = double.CreateChecked(pixels[i]) - min_image_val;
+                int bin_position = bin_value != 0 ? (int)(bin_value / bin_size) : 0;
+                histogram_vals_y[bin_position] += 1;
+            }
+        }
+
+        /// <summary>
+        /// Converts a pixel value from its native format range onto the 16-bit
+        /// display scale: Mono8 is bit-replicated (byte * 257), Float64 saturates
+        /// at the scale's endpoints so a fully saturated frame reports 65535 and
+        /// renders white rather than black in the flat-image branch.
+        /// </summary>
+        private static int ToDisplayScale(double value, ImagePixelFormat format) => format switch
+        {
+            ImagePixelFormat.Mono8 => (int)(value * 257),
+            ImagePixelFormat.Mono16 => (int)value,
+            ImagePixelFormat.Float64 => value <= 0 ? 0 : value >= ushort.MaxValue ? ushort.MaxValue : (ushort)value,
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format."),
+        };
 
         public static byte[] UpdateContrastAndHistogramValues(byte[] image_array, ushort min_val, ushort max_val, bool autocontrast)
         {
@@ -424,30 +473,32 @@ namespace ImagerAvalonia.Views.ViewUtils
             bool autocontrast,
             WriteableBitmap? existingBitmap = null)
         {
-            ushort[] pixels = NormalizeToUInt16(image_array, format);
-
-            // Mono8 contrast limits are expressed in the 0..255 range.
+            // Contrast limits are expressed on the 16-bit display scale; Mono8
+            // slider values (0..255) are bit-replicated onto it.
             if (format == ImagePixelFormat.Mono8)
             {
                 min_val = Math.Clamp(min_val, 0, 255) * 257;
                 max_val = Math.Clamp(max_val, 0, 255) * 257;
             }
 
-            // Auto-contrast: compute min/max directly from the pixels
+            var bytes = image_array.AsSpan();
+            int pixelCount = bytes.Length / format.BytesPerPixel();
+
+            // Auto-contrast: min/max over the raw pixels in their native range
+            // (shared with the histogram), converted once onto the 16-bit
+            // display scale.
             if (autocontrast)
             {
-                ushort localMin = ushort.MaxValue;
-                ushort localMax = ushort.MinValue;
-
-                for (int i = 0; i < pixels.Length; i++)
+                (double rawMin, double rawMax) = format switch
                 {
-                    ushort val = pixels[i];
-                    if (val < localMin) localMin = val;
-                    if (val > localMax) localMax = val;
-                }
+                    ImagePixelFormat.Mono8 => MinMaxOver(bytes),
+                    ImagePixelFormat.Mono16 => MinMaxOver(MemoryMarshal.Cast<byte, ushort>(bytes.Slice(0, pixelCount * 2))),
+                    ImagePixelFormat.Float64 => MinMaxOver(MemoryMarshal.Cast<byte, double>(bytes.Slice(0, pixelCount * 8))),
+                    _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format."),
+                };
 
-                min_val = localMin;
-                max_val = localMax;
+                min_val = ToDisplayScale(rawMin, format);
+                max_val = ToDisplayScale(rawMax, format);
             }
 
             if (existingBitmap == null || existingBitmap.Size != new Size(width, height))
@@ -469,7 +520,7 @@ namespace ImagerAvalonia.Views.ViewUtils
                     {
                         byte* dest = (byte*)lockedBitmap.Address.ToPointer();
 
-                        for (int i = 0; i < pixels.Length; i++)
+                        for (int i = 0; i < pixelCount; i++)
                         {
                             byte gray = (byte)(flatValue >> 8);
                             uint packed = (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
@@ -484,36 +535,89 @@ namespace ImagerAvalonia.Views.ViewUtils
             double range = max_val - min_val;
             double scale = (double)ushort.MaxValue / range;
 
+            // Pixels are decoded straight from the raw bytes: Mono8 on the
+            // bit-replicated 16-bit display scale, Float64 compared and stretched
+            // as raw values (the limits always sit inside 0..65535, so
+            // out-of-range values fall into the black/white branches naturally).
             unsafe
             {
-                fixed (ushort* src = pixels)
+                using (var lockedBitmap = existingBitmap.Lock())
                 {
-                    using (var lockedBitmap = existingBitmap.Lock())
+                    byte* dest = (byte*)lockedBitmap.Address.ToPointer();
+
+                    switch (format)
                     {
-                        byte* dest = (byte*)lockedBitmap.Address.ToPointer();
+                        case ImagePixelFormat.Mono8:
+                            for (int i = 0; i < pixelCount; i++)
+                            {
+                                ushort val = (ushort)(bytes[i] << 8 | bytes[i]);
+                                *(uint*)(dest + (i * 4)) = StretchedGray(val, min_val, max_val, scale);
+                            }
+                            break;
 
-                        for (int i = 0; i < pixels.Length; i++)
+                        case ImagePixelFormat.Mono16:
                         {
-                            ushort val = src[i];
-
-                            if (val <= min_val)
-                                val = 0;
-                            else if (val >= max_val)
-                                val = ushort.MaxValue;
-                            else
-                                val = (ushort)((val - min_val) * scale);
-
-                            byte gray = (byte)(val >> 8);
-
-                            uint packed = (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
-
-                            *(uint*)(dest + (i * 4)) = packed;
+                            var pixels = MemoryMarshal.Cast<byte, ushort>(bytes.Slice(0, pixelCount * 2));
+                            for (int i = 0; i < pixels.Length; i++)
+                            {
+                                *(uint*)(dest + (i * 4)) = StretchedGray(pixels[i], min_val, max_val, scale);
+                            }
+                            break;
                         }
+
+                        case ImagePixelFormat.Float64:
+                        {
+                            var pixels = MemoryMarshal.Cast<byte, double>(bytes.Slice(0, pixelCount * 8));
+                            for (int i = 0; i < pixels.Length; i++)
+                            {
+                                *(uint*)(dest + (i * 4)) = StretchedGray(pixels[i], min_val, max_val, scale);
+                            }
+                            break;
+                        }
+
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format.");
                     }
                 }
             }
 
             return existingBitmap!;
+        }
+
+        /// <summary>
+        /// Applies the contrast stretch to a 16-bit display-scale pixel and packs
+        /// it as an opaque RGBA value.
+        /// </summary>
+        private static uint StretchedGray(ushort val, int min_val, int max_val, double scale)
+        {
+            if (val <= min_val)
+                val = 0;
+            else if (val >= max_val)
+                val = ushort.MaxValue;
+            else
+                val = (ushort)((val - min_val) * scale);
+
+            byte gray = (byte)(val >> 8);
+
+            return (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
+        }
+
+        /// <summary>
+        /// Applies the contrast stretch to a floating-point pixel against limits
+        /// expressed on the 16-bit display scale.
+        /// </summary>
+        private static uint StretchedGray(double val, int min_val, int max_val, double scale)
+        {
+            if (val <= min_val)
+                return 0xFF000000u; // opaque black
+
+            if (val >= max_val)
+                return uint.MaxValue;
+
+            int stretched = (int)((val - min_val) * scale);
+            byte gray = (byte)(stretched >> 8);
+
+            return (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
         }
 
 
