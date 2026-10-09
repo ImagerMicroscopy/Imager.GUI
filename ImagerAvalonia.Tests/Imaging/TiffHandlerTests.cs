@@ -29,11 +29,11 @@ public class TiffHandlerTests
     }
 
     [Fact]
-    public void Auto_contrast_8bit_on_a_flat_image_does_not_throw()
+    public void Auto_contrast_8bit_on_a_flat_image_uses_white_for_a_saturated_signal()
     {
         var result = TiffHandler.UpdateAutoContrast8Bit(new byte[] { 7, 7, 7 });
 
-        Assert.Equal(3, result.Length);
+        Assert.Equal(new byte[] { 255, 255, 255 }, result);
     }
 
     [Fact]
@@ -74,11 +74,11 @@ public class TiffHandlerTests
     }
 
     [Fact]
-    public void Contrast_and_histogram_values_on_a_flat_image_does_not_divide_by_zero()
+    public void Contrast_and_histogram_values_on_a_flat_image_keeps_non_zero_values_white()
     {
         var result = From16Bit(TiffHandler.UpdateContrastAndHistogramValues(To16Bit(42, 42), 0, 0, autocontrast: true));
 
-        Assert.Equal(new ushort[] { 0, 0 }, result);
+        Assert.Equal(new ushort[] { ushort.MaxValue, ushort.MaxValue }, result);
     }
 
     [Fact]

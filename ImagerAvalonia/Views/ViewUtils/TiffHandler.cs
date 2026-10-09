@@ -70,7 +70,17 @@ namespace ImagerAvalonia.Views.ViewUtils
             byte min_val = Convert.ToByte(min_image_val);
             byte max_val = Convert.ToByte(max_image_val);
 
+            if (max_val == min_val)
+            {
+                byte flatValue = max_val == byte.MaxValue ? byte.MaxValue : (byte)0;
 
+                for (int i = 0; i < image_array.Length; i++)
+                {
+                    image_array[i] = flatValue;
+                }
+
+                return image_array;
+            }
 
             unsafe
             {
@@ -78,9 +88,6 @@ namespace ImagerAvalonia.Views.ViewUtils
                 {
                     for (int i = 0; i < image_array.Length; i++)
                     {
-
-
-
                         if (ptr[i] <= min_val)
                         {
                             ptr[i] = 0;
@@ -106,15 +113,25 @@ namespace ImagerAvalonia.Views.ViewUtils
             byte[] contrast_adjusted = new byte[image_array.Length];
             Buffer.BlockCopy(image_array, 0, converted_array, 0, image_array.Length);
 
+            if (min_val == max_val)
+            {
+                ushort flatValue = max_val == ushort.MaxValue ? ushort.MaxValue : (ushort)0;
+
+                for (int i = 0; i < converted_array.Length; i++)
+                {
+                    converted_array[i] = flatValue;
+                }
+
+                Buffer.BlockCopy(converted_array, 0, contrast_adjusted, 0, converted_array.Length * 2);
+                return contrast_adjusted;
+            }
+
             unsafe
             {
                 fixed (ushort* ptr = converted_array)
                 {
                     for (int i = 0; i < converted_array.Length; i++)
                     {
-
-
-
                         if (ptr[i] <= min_val)
                         {
                             ptr[i] = 0;
@@ -145,8 +162,19 @@ namespace ImagerAvalonia.Views.ViewUtils
 
             ushort min_val = Convert.ToUInt16(min_image_val);
             ushort max_val = Convert.ToUInt16(max_image_val);
-            
 
+            if (min_val == max_val)
+            {
+                ushort flatValue = max_val == ushort.MaxValue ? ushort.MaxValue : (ushort)0;
+
+                for (int i = 0; i < converted_array.Length; i++)
+                {
+                    converted_array[i] = flatValue;
+                }
+
+                Buffer.BlockCopy(converted_array, 0, image_array, 0, converted_array.Length * 2);
+                return image_array;
+            }
 
             unsafe
             {
@@ -154,9 +182,6 @@ namespace ImagerAvalonia.Views.ViewUtils
                 {
                     for (int i = 0; i < converted_array.Length; i++)
                     {
-
-
-
                         if (ptr[i] < max_val && ptr[i] > min_val)
                         {
                             ptr[i] = (ushort)((float)((ptr[i] - min_val)) / (max_val - min_val) * ushort.MaxValue);
@@ -223,7 +248,19 @@ namespace ImagerAvalonia.Views.ViewUtils
 
             double min_image_val = converted_array.Min();
             double max_image_val = converted_array.Max();
-           
+
+            if (max_image_val == min_image_val)
+            {
+                int bin_position = min_image_val == 0 ? 0 : histogram_vals_x.Length - 1;
+                histogram_vals_y[bin_position] = converted_array.Length;
+
+                for (int hist_val = 0; hist_val < histogram_vals_x.Length; hist_val++)
+                {
+                    histogram_vals_x[hist_val] = hist_val;
+                }
+
+                return;
+            }
 
             double bin_size = (max_image_val - min_image_val) / 256;
 
@@ -277,8 +314,19 @@ namespace ImagerAvalonia.Views.ViewUtils
                 max_val = localMax;
             }
 
+            if (min_val == max_val)
+            {
+                for (int i = 0; i < pixelCount; i++)
+                {
+                    converted_array[i] = converted_array[i] == 0 ? (ushort)0 : ushort.MaxValue;
+                }
+
+                Buffer.BlockCopy(converted_array, 0, image_array, 0, image_array.Length);
+                return image_array;
+            }
+
             double range = max_val - min_val;
-            double scale = range > 0 ? (double)ushort.MaxValue / range : 0.0;
+            double scale = (double)ushort.MaxValue / range;
 
             unsafe
             {
@@ -396,9 +444,6 @@ namespace ImagerAvalonia.Views.ViewUtils
                 max_val = localMax;
             }
 
-            double range = max_val - min_val;
-            double scale = range > 0 ? (double)ushort.MaxValue / range : 0.0;
-
             if (existingBitmap == null || existingBitmap.Size != new Size(width, height))
             {
                 existingBitmap = new WriteableBitmap(
@@ -407,6 +452,31 @@ namespace ImagerAvalonia.Views.ViewUtils
                     Avalonia.Platform.PixelFormats.Rgba8888,
                     Avalonia.Platform.AlphaFormat.Premul);
             }
+
+            if (min_val == max_val)
+            {
+                ushort flatValue = max_val == ushort.MaxValue ? ushort.MaxValue : (ushort)0;
+
+                unsafe
+                {
+                    using (var lockedBitmap = existingBitmap.Lock())
+                    {
+                        byte* dest = (byte*)lockedBitmap.Address.ToPointer();
+
+                        for (int i = 0; i < pixels.Length; i++)
+                        {
+                            byte gray = (byte)(flatValue >> 8);
+                            uint packed = (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
+                            *(uint*)(dest + (i * 4)) = packed;
+                        }
+                    }
+                }
+
+                return existingBitmap!;
+            }
+
+            double range = max_val - min_val;
+            double scale = (double)ushort.MaxValue / range;
 
             unsafe
             {
