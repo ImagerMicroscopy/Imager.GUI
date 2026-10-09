@@ -263,6 +263,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 await channelWriter.WriteAsync(new MeasurementStartedEvent(), cancellationToken);
 
                 bool keepPolling = true;
+                var lastStatusPollTime = DateTime.UtcNow;
 
                 while (keepPolling && !cancellationToken.IsCancellationRequested) {
 
@@ -304,7 +305,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                         keepPolling = false;
                     }
 
-                    if (keepPolling)
+                    if (keepPolling && (DateTime.UtcNow - lastStatusPollTime >= TimeSpan.FromMilliseconds(250)))
                     {
                         var msgResponse =
                             await ConnectionHandler.SendRequestAsync(
@@ -317,6 +318,8 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                                 new MeasurementStatusTextEvent(msgs.Messages),
                                 cancellationToken);
                         }
+
+                        lastStatusPollTime = DateTime.UtcNow;
                     }
 
                     await Task.Delay(1, cancellationToken);
