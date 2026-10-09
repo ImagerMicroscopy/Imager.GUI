@@ -188,6 +188,41 @@
 	   <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</None>
    </ItemGroup>
+
+  <!-- Native measurement image storage library (Imager.TiffLib), checked in under
+       ../native/<rid>/. The file for the RID being built — or the build host's RID
+       when none is given — is copied next to the app and flows transitively to
+       referencing projects (Desktop, Tests). MISStorageProvider's DllImportResolver
+       loads it from there. The build fails if the file is missing. -->
+  <PropertyGroup>
+    <MISNativeDir>$(MSBuildThisFileDirectory)..\native\</MISNativeDir>
+    <MISNativeRID Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</MISNativeRID>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(MISNativeRID)' == ''">
+    <MISHostArch Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">arm64</MISHostArch>
+    <MISHostArch Condition="'$(MISHostArch)' == ''">x64</MISHostArch>
+    <MISHostIsMacOS>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</MISHostIsMacOS>
+    <MISNativeRID Condition="'$(OS)' == 'Windows_NT'">win-$(MISHostArch)</MISNativeRID>
+    <MISNativeRID Condition="'$(MISNativeRID)' == '' and '$(MISHostIsMacOS)' == 'True'">osx-$(MISHostArch)</MISNativeRID>
+    <MISNativeRID Condition="'$(MISNativeRID)' == ''">linux-$(MISHostArch)</MISNativeRID>
+  </PropertyGroup>
+  <PropertyGroup>
+    <MISNativeFileName Condition="$(MISNativeRID.StartsWith('win'))">MeasurementImageStorage.dll</MISNativeFileName>
+    <MISNativeFileName Condition="'$(MISNativeFileName)' == '' and $(MISNativeRID.StartsWith('osx'))">libMeasurementImageStorage.dylib</MISNativeFileName>
+    <MISNativeFileName Condition="'$(MISNativeFileName)' == ''">libMeasurementImageStorage.so</MISNativeFileName>
+    <MISNativeFile>$(MISNativeDir)$(MISNativeRID)\$(MISNativeFileName)</MISNativeFile>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(MISNativeFile)')">
+    <None Include="$(MISNativeFile)">
+      <Link>$(MISNativeFileName)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+  <Target Name="FailMissingNativeStorageLibrary" BeforeTargets="Build"
+          Condition="!Exists('$(MISNativeFile)')">
+    <Error Text="$(MISNativeFile) not found. Drop the Imager.TiffLib build output for RID '$(MISNativeRID)' into native\$(MISNativeRID)\ (see native\README.md); the build cannot continue without it." />
+  </Target>
 <!--	<Target Name="BuildAspNetProject" BeforeTargets="Build">
 		<MSBuild Projects="..\DagOrchestrator\DagOrchestrator.csproj" Targets="Build" Properties="Configuration=$(Configuration)" />
 	</Target> -->

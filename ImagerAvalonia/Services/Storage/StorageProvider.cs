@@ -81,7 +81,15 @@ namespace ImagerAvalonia.Services.Storage
     public class MISStorageProvider : IStorageProvider
     {
 
-        private const string DllName = "MeasurementImageStorageDLL";
+        private const string DllName = "MeasurementImageStorage";
+
+        /// <summary>
+        /// API version of the native storage library (Imager.TiffLib) this GUI is built
+        /// against. The P/Invoke signatures below only match that ABI.
+        /// </summary>
+        public const int ExpectedApiVersion = 2;
+
+        private static int? _apiVersion;
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISOpenFile(IntPtr outputFilePath, out int storerId);
@@ -91,6 +99,9 @@ namespace ImagerAvalonia.Services.Storage
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISClose(long storerID);
+
+        [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+        public static extern int MISAPIVersion();
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISAddNewImage(
@@ -139,12 +150,13 @@ namespace ImagerAvalonia.Services.Storage
             IntPtr acqTypeName,
             IntPtr detectorName,
             int imageIdx,
-            ushort** dataLocationPtr,
+            byte** dataLocationPtr,
             ref int nRows,
-            ref int nCols);
+            ref int nCols,
+            ref int pixelFormat);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
-        public static extern unsafe int MISReleaseImageData(ushort* dataPtr);
+        public static extern unsafe int MISReleaseImageData(byte* dataPtr);
 
         [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
         public static extern unsafe int MISGetTimePoint(
@@ -224,20 +236,48 @@ namespace ImagerAvalonia.Services.Storage
             string fullPath;
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                fullPath = Path.Combine(baseDir, "MeasurementImageStorageDLL.dll");
+                fullPath = Path.Combine(baseDir, "MeasurementImageStorage.dll");
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                fullPath = Path.Combine(baseDir, "libMeasurementImageStorageDLL.so");
+                fullPath = Path.Combine(baseDir, "libMeasurementImageStorage.so");
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                fullPath = Path.Combine(baseDir, "libMeasurementImageStorageDLL.dylib");
+                fullPath = Path.Combine(baseDir, "libMeasurementImageStorage.dylib");
             else
                 return IntPtr.Zero;
 
-            return NativeLibrary.Load(fullPath);
+            // Prefer the copy next to the app (dev builds and loose-file deployment). If it
+            // is not there, return zero and let the runtime's default probing resolve the
+            // library (e.g. bundled into a single-file app or on the system library path).
+            return NativeLibrary.TryLoad(fullPath, out IntPtr handle) ? handle : IntPtr.Zero;
         }
 
         private bool _isStorageEnabled  = true;
         private int _readPlane;
         private int _storageId;
+
+        /// <summary>
+        /// Bails out if the loaded native storage library does not report the API version
+        /// this GUI was built against. Runs once per process, on first use of the library.
+        /// </summary>
+        private static void EnsureApiVersion()
+        {
+            if (_apiVersion is { } cached)
+            {
+                if (cached != ExpectedApiVersion)
+                    throw new InvalidOperationException(ApiVersionMismatchMessage(cached));
+                return;
+            }
+
+            int version = MISAPIVersion();
+            _apiVersion = version;
+
+            if (version != ExpectedApiVersion)
+                throw new InvalidOperationException(ApiVersionMismatchMessage(version));
+        }
+
+        private static string ApiVersionMismatchMessage(int version) =>
+            $"The measurement image storage library reports API version {version}, but this GUI " +
+            $"expects version {ExpectedApiVersion}. Deploy a matching Imager.TiffLib build " +
+            $"(the library is ABI-incompatible across API versions).";
 
 
         public List<Tuple<string, string>> AcqDetPairs { get; set; }
@@ -245,6 +285,10 @@ namespace ImagerAvalonia.Services.Storage
 
         private int _width;
         private int _height;
+
+        // Pixel format of the plane most recently returned by ReadPlane; defaults to
+        // Mono16, which is what GetPlaneMetadata reports when no plane was read yet.
+        private ImagePixelFormat _pixelFormat = ImagePixelFormat.Mono16;
 
 
         public string _storagePath { get; private set; }
@@ -341,6 +385,7 @@ namespace ImagerAvalonia.Services.Storage
                     metadata.Height = (uint)_height;
                     metadata.TimePoint = timePoint;
                     metadata.DetectionIndex = (int)detectionIndex;
+                    metadata.Type = _pixelFormat;
                     metadata.CurrentStagePosition = new XYStagePosition(0, posx, posy, posz, false, positionName ?? string.Empty);
                 }
                 return metadata;
@@ -362,6 +407,8 @@ namespace ImagerAvalonia.Services.Storage
         {
             if (_storagePath != null && _isStorageEnabled)
             {
+                EnsureApiVersion();
+
                 IntPtr input_path_ptr = Marshal.StringToHGlobalAnsi(_storagePath);
                 try
                 {
@@ -397,6 +444,8 @@ namespace ImagerAvalonia.Services.Storage
         {
             if (_storagePath != null && _isStorageEnabled)
             {
+                EnsureApiVersion();
+
                 // If the library cannot create the file, it terminates the whole process
                 // (its writer thread is left un-joined), so make sure it can before calling it.
                 EnsureStorageFileIsWritable(_storagePath);
@@ -449,13 +498,13 @@ namespace ImagerAvalonia.Services.Storage
             {
                 unsafe
                 {
-                    ushort* data_buffer = null;
-                    int nRows = 0, nCols = 0;
+                    byte* data_buffer = null;
+                    int nRows = 0, nCols = 0, pixelFormat = 0;
 
-                    // The library reports rows first, then columns. On failure (no such image or
-                    // channel, or a pixel format the library cannot read back) return "no image",
+                    // The library reports rows first, then columns, and the pixel format of
+                    // the stored plane. On failure (no such image or channel) return "no image",
                     // which is what callers already handle, instead of reading a garbage pointer.
-                    if (MISGetImage(_storageId, acqTypeName, detectorName, time_position, &data_buffer, ref nRows, ref nCols) != 0
+                    if (MISGetImage(_storageId, acqTypeName, detectorName, time_position, &data_buffer, ref nRows, ref nCols, ref pixelFormat) != 0
                         || data_buffer == null)
                     {
                         return Array.Empty<byte>();
@@ -466,8 +515,13 @@ namespace ImagerAvalonia.Services.Storage
                         _height = nRows;
                         _width = nCols;
 
-                        // Mono16: two bytes per pixel, already in the byte order the GUI uses.
-                        byte[] byteArray = new byte[nRows * nCols * 2];
+                        // Raw bytes, row-major: nRows * nCols * bytesPerPixel for the plane's
+                        // pixel format. BytesPerPixel throws on an unknown format (hard error).
+                        var format = (ImagePixelFormat)pixelFormat;
+                        int bytesPerPixel = format.BytesPerPixel();
+                        _pixelFormat = format;
+
+                        byte[] byteArray = new byte[nRows * nCols * bytesPerPixel];
                         fixed (byte* dest = byteArray)
                         {
                             Buffer.MemoryCopy(data_buffer, dest, byteArray.Length, byteArray.Length);

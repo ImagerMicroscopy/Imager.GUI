@@ -6,7 +6,7 @@ namespace ImagerAvalonia.Tests.Storage;
 /// <summary>
 /// Locates the native MeasurementImageStorage library (built from Imager.TiffLib) for the
 /// integration tests. Set IMAGER_MIS_LIBRARY to the built file, e.g.
-///   IMAGER_MIS_LIBRARY=/path/to/builddir/libMeasurementImageStorageDLL.dll dotnet test
+///   IMAGER_MIS_LIBRARY=/path/to/builddir/libMeasurementImageStorage.so dotnet test
 /// It is copied next to the test assembly under the name MISStorageProvider's resolver
 /// expects on this platform. Without it, these tests are skipped.
 /// </summary>
@@ -19,9 +19,9 @@ internal static class NativeStorage
     public static string? UnavailableReason => _unavailableReason.Value;
 
     private static string ExpectedFileName =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "MeasurementImageStorageDLL.dll"
-        : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "libMeasurementImageStorageDLL.dylib"
-        : "libMeasurementImageStorageDLL.so";
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "MeasurementImageStorage.dll"
+        : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "libMeasurementImageStorage.dylib"
+        : "libMeasurementImageStorage.so";
 
     private static string? Prepare()
     {

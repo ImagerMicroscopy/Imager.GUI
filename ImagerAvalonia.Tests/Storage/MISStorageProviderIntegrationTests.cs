@@ -53,15 +53,37 @@ public sealed class MISStorageProviderIntegrationTests : IDisposable
         return bytes;
     }
 
+    /// <summary>A Mono8 image whose pixel at (row, col) is base + row * 100 + col.</summary>
+    private static byte[] Image8(int rows, int cols, byte @base = 0)
+    {
+        var pixels = new byte[rows * cols];
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+                pixels[r * cols + c] = (byte)(@base + r * 100 + c);
+        return pixels;
+    }
+
+    /// <summary>A Float64 image whose pixel at (row, col) is base + row * 100 + col.</summary>
+    private static byte[] ImageFloat64(int rows, int cols, double @base = 0)
+    {
+        var pixels = new double[rows * cols];
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+                pixels[r * cols + c] = @base + r * 100 + c;
+        var bytes = new byte[pixels.Length * 8];
+        Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
     private static TiffPlaneMetadata Meta(int rows, int cols, int detectionIndex, double time = 0,
         string acq = "Acq1", string det = "DummyCam1", string position = "pos1",
-        double x = 1, double y = 2, double z = 3) => new()
+        double x = 1, double y = 2, double z = 3, ImagePixelFormat format = ImagePixelFormat.Mono16) => new()
     {
         AcquisitionName = acq,
         DetectorName = det,
         Width = (uint)cols,
         Height = (uint)rows,
-        Type = ImagePixelFormat.Mono16,
+        Type = format,
         DetectionIndex = detectionIndex,
         TimePoint = time,
         PositionName = position,
@@ -155,6 +177,41 @@ public sealed class MISStorageProviderIntegrationTests : IDisposable
         Assert.Equal(1.5, second.TimePoint);
         Assert.Equal(1, second.DetectionIndex);
         Assert.Equal("well B2", second.CurrentStagePosition.Name);
+        Assert.Equal(ImagePixelFormat.Mono16, second.Type);
+    }
+
+    // ---------- Pixel formats / API version (MISGetImage v2 ABI) ----------
+
+    [NativeStorageFact]
+    public void Native_library_reports_the_expected_api_version()
+    {
+        Assert.Equal(MISStorageProvider.ExpectedApiVersion, MISStorageProvider.MISAPIVersion());
+    }
+
+    [NativeStorageFact]
+    public void Mono8_plane_reads_back_as_raw_bytes_with_its_format()
+    {
+        var image = Image8(3, 4, 7);
+        var provider = WriteAndReopen(PathFor("mono8.tif"),
+            new[] { (image, Meta(3, 4, 0, format: ImagePixelFormat.Mono8)) });
+
+        var read = provider.ReadPlane("Acq1", "DummyCam1", 0);
+
+        Assert.Equal(image, read); // one byte per pixel, not two
+        Assert.Equal(ImagePixelFormat.Mono8, provider.GetPlaneMetadata("Acq1", "DummyCam1", 0).Type);
+    }
+
+    [NativeStorageFact]
+    public void Float64_plane_reads_back_as_raw_bytes_with_its_format()
+    {
+        var image = ImageFloat64(2, 3, 0.5);
+        var provider = WriteAndReopen(PathFor("float64.tif"),
+            new[] { (image, Meta(2, 3, 0, format: ImagePixelFormat.Float64)) });
+
+        var read = provider.ReadPlane("Acq1", "DummyCam1", 0);
+
+        Assert.Equal(image, read); // eight bytes per pixel
+        Assert.Equal(ImagePixelFormat.Float64, provider.GetPlaneMetadata("Acq1", "DummyCam1", 0).Type);
     }
 
     [NativeStorageFact]

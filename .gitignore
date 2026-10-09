@@ -50,7 +50,7 @@ Thumbs.db
 *.exe
 *.war
 *.dll
-!MeasurementImageStorageDLL.dll
+!MeasurementImageStorage.dll
 
 
 # Large media files
