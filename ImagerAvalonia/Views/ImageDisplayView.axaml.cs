@@ -65,7 +65,16 @@ public partial class ImageDisplayView : UserControl
     public Dictionary<ValueTuple<int, int>, string> DetNames = new();
     public Dictionary<ValueTuple<int, int>, ValueTuple<int, int>> ImSizes = new();
 
-    private Channel<ImageUpdateArguments> ImageChannel = Channel.CreateUnbounded<ImageUpdateArguments>();
+    // Bounded with DropOldest so a stalled UI thread cannot accumulate an unbounded
+    // backlog of stale frames; UpdateViewer additionally renders only the newest
+    // update per display slot (see ImageUpdateCoalescer).
+    private Channel<ImageUpdateArguments> ImageChannel = Channel.CreateBounded<ImageUpdateArguments>(
+        new BoundedChannelOptions(32)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
 
 
     public ImageDisplayView()
@@ -131,7 +140,17 @@ public partial class ImageDisplayView : UserControl
     {
         while (await ImageChannel.Reader.WaitToReadAsync())
         {
+            var drained = new List<ImageUpdateArguments>();
             while (ImageChannel.Reader.TryRead(out ImageUpdateArguments im_args))
+            {
+                drained.Add(im_args);
+            }
+
+            // Live display shows only the newest frame per display slot: everything
+            // that queued up while the previous frame was still rendering is stale
+            // and discarded here. Saving is unaffected — it happens upstream in
+            // ImageHandler, before updates reach this channel.
+            foreach (var im_args in ImageUpdateCoalescer.KeepLatestPerSlot(drained))
             {
                 if (!_isMultiChannelEnabled)
                 {
@@ -439,5 +458,24 @@ public class ImageUpdateArguments
         CanUpdate = canupdate;
         TimePoint = timepoint;
         ElementID = elementid;
+    }
+}
+
+/// <summary>
+/// Reduces queued display updates to the newest one per display slot
+/// (acquisition x detector x element). When the UI cannot keep up with the
+/// acquisition, all frames except the latest are stale and dropped. Saving to
+/// disk is not affected — it happens upstream of the display queue.
+/// </summary>
+internal static class ImageUpdateCoalescer
+{
+    public static List<ImageUpdateArguments> KeepLatestPerSlot(IEnumerable<ImageUpdateArguments> updates)
+    {
+        var latestPerSlot = new Dictionary<(string Acquisition, string Detector, string ElementId), ImageUpdateArguments>();
+        foreach (var update in updates)
+        {
+            latestPerSlot[(update.Acquisition, update.Detector, update.ElementID)] = update;
+        }
+        return latestPerSlot.Values.ToList();
     }
 }

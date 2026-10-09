@@ -30,8 +30,6 @@ namespace ImagerAvalonia.Utils
         private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
 
         public bool ShowLiveView = true;
-        private System.Timers.Timer _throttleTimer = new System.Timers.Timer(10) { AutoReset = false };
-        private bool _canFire = true;
 
 
         public ImageHandler(IStorageProvider storageProvider)
@@ -50,7 +48,6 @@ namespace ImagerAvalonia.Utils
             _logger = logger;
             _acquisitionHandler = new MessagePackAcquisitionHandler(storageProvider, connectionHandler);
             _connectionHandler = connectionHandler;
-            _throttleTimer.Elapsed += (_, _) => _canFire = true;
         }
 
         public event EventHandler<ImageData>? UpdateImageDisplay;
@@ -79,10 +76,11 @@ namespace ImagerAvalonia.Utils
             UpdateFieldViewDisplay?.Invoke(this, imageData);
 
 
-            if (ShowLive && _canFire)
+            // The display loop coalesces to the newest frame (see ImageDisplayView),
+            // so every batch must be forwarded — throttling here could drop the
+            // newest image.
+            if (ShowLive)
             {
-                _canFire = false;
-                _throttleTimer.Start();
                 UpdateImageDisplay?.Invoke(this, imageData);
             }
         }
