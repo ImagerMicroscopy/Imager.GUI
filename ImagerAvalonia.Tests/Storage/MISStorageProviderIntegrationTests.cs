@@ -1,5 +1,6 @@
 using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Utils;
 using Xunit;
 
 namespace ImagerAvalonia.Tests.Storage;
@@ -12,7 +13,6 @@ namespace ImagerAvalonia.Tests.Storage;
 [Collection(NativeStorageCollection.Name)]
 public sealed class MISStorageProviderIntegrationTests : IDisposable
 {
-    private const int Mono16 = 0;
 
     private readonly string _dir = Directory.CreateTempSubdirectory("mis-tests-").FullName;
     private readonly List<MISStorageProvider> _open = new();
@@ -61,7 +61,7 @@ public sealed class MISStorageProviderIntegrationTests : IDisposable
         DetectorName = det,
         Width = (uint)cols,
         Height = (uint)rows,
-        Type = Mono16,
+        Type = ImagePixelFormat.Mono16,
         DetectionIndex = detectionIndex,
         TimePoint = time,
         PositionName = position,

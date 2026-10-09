@@ -303,7 +303,7 @@ public class ImagerConnectionHandlerTests
         Assert.Equal(image, first.Message.Data.ImageData);
         Assert.Equal(2, first.Message.Data.NRows);
         Assert.Equal(3, first.Message.Data.NCols);
-        Assert.Equal(2, first.Message.Data.PixelFormat);
+        Assert.Equal(ImagePixelFormat.Mono8, first.Message.Data.PixelFormat);
         Assert.Equal(1.25f, first.Message.Data.TimeStamp);
         Assert.Equal("Default", first.Message.MetaData.AcquisitionType);
         Assert.Equal("det-1", first.Message.MetaData.DetectionElementId);
@@ -311,6 +311,22 @@ public class ImagerConnectionHandlerTests
         Assert.Equal(3.0, first.Message.MetaData.StagePosition.Z);
 
         Assert.Equal(8UL, images.Messages[1].Index);
+    }
+
+    [Theory]
+    [InlineData(ImagePixelFormat.Mono16)]
+    [InlineData(ImagePixelFormat.Float64)]
+    [InlineData(ImagePixelFormat.Mono8)]
+    public async Task Binary_messagepack_decodes_the_pixel_format(ImagePixelFormat format)
+    {
+        var payload = ImagerCoreWire.AcquiredDataChannelMessage(index: 1, pixelFormat: format);
+
+        using var server = new FakeImagerCoreServer(_ => payload);
+
+        var response = await SendAsync(server, new FetchAsyncDataRequest());
+
+        var images = Assert.IsType<AsyncAcquiredImagesResponse>(response);
+        Assert.Equal(format, Assert.Single(images.Messages).Message.Data.PixelFormat);
     }
 
     [Fact]

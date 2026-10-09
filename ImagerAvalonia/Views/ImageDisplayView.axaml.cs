@@ -9,6 +9,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Storage;
+using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.ImageViews;
 using ImagerAvalonia.Views.MultiChannelView;
@@ -140,6 +141,7 @@ public partial class ImageDisplayView : UserControl
                         im_args.Acquisition,
                         im_args.Detector,
                         im_args.ImageData,
+                        im_args.PixelFormat,
                         im_args.Position,
                         im_args.CanUpdate,
                         im_args.TimePoint
@@ -150,7 +152,7 @@ public partial class ImageDisplayView : UserControl
                     try
                     {
                         await multiImageGrid.ReceiveChannelImage(im_args.Detector, im_args.Acquisition, im_args.ElementID,
-                            im_args.ImageSizeX, im_args.ImageSizeY, im_args.ImageData);
+                            im_args.ImageSizeX, im_args.ImageSizeY, im_args.ImageData, im_args.PixelFormat);
                     }
                     catch
                     {
@@ -278,6 +280,7 @@ public partial class ImageDisplayView : UserControl
             mt.DetectorName,
             mt.ElementID,
             image_data,
+            mt.Type,
             mt.CurrentStagePosition,
             canupdate,
             mt.TimePoint
@@ -286,7 +289,7 @@ public partial class ImageDisplayView : UserControl
 
     }
 
-    private async Task UpdateImageGrid(int im_size_x, int im_size_y, string acq, string det, byte[] image_data, XYStagePosition pos, bool canupdate, double timepoint)
+    private async Task UpdateImageGrid(int im_size_x, int im_size_y, string acq, string det, byte[] image_data, ImagePixelFormat format, XYStagePosition pos, bool canupdate, double timepoint)
     {
         if (canupdate)
         {
@@ -297,11 +300,11 @@ public partial class ImageDisplayView : UserControl
                     imageGrid.SelectedCanvasViewModel.AcqName == acq && imageGrid.SelectedCanvasViewModel.DetName == det)
                 {
 
-                    vm.UpdateHistogram(image_data);
+                    vm.UpdateHistogram(image_data, format);
                 }
 
 
-                imageGrid[acq, det].UpdateBitmap(im_size_x, im_size_y, image_data);
+                imageGrid[acq, det].UpdateBitmap(im_size_x, im_size_y, image_data, format);
                 imageGrid[acq, det].SetBitmap();
                 imageGrid[acq, det].InvalidateBitmap();
 
@@ -409,6 +412,7 @@ public class ImageUpdateArguments
     public string ElementID { get; }
     public string Detector { get; }
     public byte[] ImageData { get; }
+    public ImagePixelFormat PixelFormat { get; }
     public XYStagePosition Position { get; }
     public bool CanUpdate { get; }
     public double TimePoint { get; }
@@ -420,6 +424,7 @@ public class ImageUpdateArguments
         string det,
         string elementid,
         byte[] image_data,
+        ImagePixelFormat pixelFormat,
         XYStagePosition pos,
         bool canupdate,
         double timepoint)
@@ -429,6 +434,7 @@ public class ImageUpdateArguments
         Acquisition = acq;
         Detector = det;
         ImageData = image_data ?? throw new ArgumentNullException(nameof(image_data));
+        PixelFormat = pixelFormat;
         Position = pos ?? throw new ArgumentNullException(nameof(pos));
         CanUpdate = canupdate;
         TimePoint = timepoint;

@@ -219,7 +219,7 @@ public record AcquiredData(
     [property: Key("imagedata")] byte[] ImageData,
     [property: Key("ncols")] int NCols,
     [property: Key("nrows")] int NRows,
-    [property: Key("numtype")] int PixelFormat,
+    [property: Key("numtype")] ImagePixelFormat PixelFormat,
     [property: Key("timestamp")] float TimeStamp
 );
 

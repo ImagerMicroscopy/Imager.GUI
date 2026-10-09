@@ -3,6 +3,7 @@ using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Utils;
 using System;
 using System.Collections.Generic;
+using System.IO;
 
 public class ImagerData
 {
@@ -84,6 +85,13 @@ namespace ImagerAvalonia.Utils
                 var msg = message_data.Message;
 
                 if (msg.MetaData is not null && msg.Data is not null) {
+                    // An unknown pixel format is a hard error: never guess how to
+                    // interpret the pixel bytes.
+                    if (!Enum.IsDefined(msg.Data.PixelFormat))
+                        throw new InvalidDataException(
+                            $"Received image with unknown pixel format value {(int)msg.Data.PixelFormat} " +
+                            $"from detector '{msg.Data.DetectorName}'.");
+
                     var sp = msg.MetaData.StagePosition;
                     var tiffMeta = new TiffPlaneMetadata
                     {

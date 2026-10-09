@@ -75,7 +75,7 @@ namespace ImagerAvalonia.Views.MultiChannelView
         }
 
 
-        public async Task ReceiveChannelImage(string acq, string det, string elementid, int imageSizeX, int imageSizeY, byte[] image)
+        public async Task ReceiveChannelImage(string acq, string det, string elementid, int imageSizeX, int imageSizeY, byte[] image, ImagePixelFormat format)
         {
             var channels = _viewModel.GetChannel(det, acq, elementid);
             foreach(var channel in channels)
@@ -124,7 +124,8 @@ namespace ImagerAvalonia.Views.MultiChannelView
                       current_occupied_channels[4],
                       imageSizeX,
                       imageSizeY,
-                      _contrastViewModel
+                      _contrastViewModel,
+                      format
                       );
                     _multiImageCanvas.SetBitmap();
                     _multiImageCanvas.InvalidateBitmap();

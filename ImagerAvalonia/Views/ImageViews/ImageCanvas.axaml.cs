@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.ViewUtils;
 using System;
@@ -21,6 +22,7 @@ public partial class ImageCanvas : UserControl
     private int _lastWidth = 0;
     private int _lastHeight = 0;
     private byte[] _lastImage = new byte[4];
+    private ImagePixelFormat _lastFormat = ImagePixelFormat.Mono16;
     private WriteableBitmap _bitmap = new WriteableBitmap(
                     new Avalonia.PixelSize(1, 1),
                     new Vector(96, 96),
@@ -52,7 +54,7 @@ public partial class ImageCanvas : UserControl
      
             lock (_bitmapLock)
             {
-                UpdateBitmap(_lastWidth, _lastHeight, _lastImage);
+                UpdateBitmap(_lastWidth, _lastHeight, _lastImage, _lastFormat);
             }
             Dispatcher.UIThread.Invoke(() => { SetBitmap(); InvalidateBitmap(); });
 
@@ -79,13 +81,13 @@ public partial class ImageCanvas : UserControl
         return ef;
     }
 
-    internal void UpdateBitmap(int width, int height, byte[] image)
+    internal void UpdateBitmap(int width, int height, byte[] image, ImagePixelFormat format)
     {
         lock (_bitmapLock)
         {
             if (image != null)
             {
-                if (image.Length == width * height * 2)
+                if (image.Length == width * height * format.BytesPerPixel())
                 {
                     _lastImage = new byte[image.Length];
                     unsafe
@@ -99,20 +101,9 @@ public partial class ImageCanvas : UserControl
 
                     _lastWidth = width;
                     _lastHeight = height;
-                    double[] histogram_vals_y = new double[257];
-                    double[] histogram_vals_y_low = new double[257];
-                    double[] histogram_vals_x = new double[257];
+                    _lastFormat = format;
 
                     var settings = _viewModel.ContrastSettings;
-                    ushort min_val = (ushort)settings.Min_disp_val;
-                    ushort max_val = (ushort)settings.Max_disp_val;
-
-
-                    //byte[] contrast_adj_image = TiffHandler.UpdateContrastAndHistogramValues(
-                    //    image,
-                    //    min_val,
-                    //    max_val,
-                    //     _viewModel.ContrastSettings.IsAutoContrastEnabled);
 
                     if (_bitmap.Size != new Size(width, height))
                         _bitmap = new WriteableBitmap(
@@ -121,10 +112,9 @@ public partial class ImageCanvas : UserControl
                             Avalonia.Platform.PixelFormats.Rgba8888,
                             Avalonia.Platform.AlphaFormat.Premul);
 
-                    //TiffHandler.ReturnRGBABitmapFrom16BitByteArray(image, _bitmap);
-
-                    TiffHandler.UpdateContrastAndReturnBitmap(image, width, height, min_val, max_val, _viewModel.ContrastSettings.IsAutoContrastEnabled,
-                        _bitmap);
+                    TiffHandler.UpdateContrastAndReturnBitmap(image, width, height, format,
+                        settings.Min_disp_val, settings.Max_disp_val,
+                        settings.IsAutoContrastEnabled, _bitmap);
                 }
             }
         }

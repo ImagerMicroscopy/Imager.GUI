@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using ImagerAvalonia.Utils;
 using ImagerAvalonia.Views.ViewUtils;
 using System;
 
@@ -65,12 +66,12 @@ public partial class ContrastAdjViewModel : ViewModelBase
 
     }
 
-    internal void UpdateHistogram(byte[] imagedata)
+    internal void UpdateHistogram(byte[] imagedata, ImagePixelFormat format)
     {
         double[] histogram_vals_y = new double[257];
         double[] histogram_vals_y_low = new double[257];
         double[] histogram_vals_x = new double[257];
-        TiffHandler.UpdateHistogramValues(imagedata, ref histogram_vals_y, ref histogram_vals_y_low, ref histogram_vals_x );
+        TiffHandler.UpdateHistogramValues(imagedata, format, ref histogram_vals_y, ref histogram_vals_y_low, ref histogram_vals_x );
         OnHistogramUpdateRequested?.Invoke(histogram_vals_x, histogram_vals_y_low, histogram_vals_y);
     }
 }

@@ -1,5 +1,6 @@
 ﻿
 using ImagerAvalonia.Services.MeasurementControl;
+using ImagerAvalonia.Utils;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -509,7 +510,7 @@ namespace ImagerAvalonia.Services.Storage
                             // width first stored every non-square image transposed in the file.
                             MISAddNewImage(_storageId, acqTypeName, detectorName, meta.TimePoint,
                                            meta.PositionX, meta.PositionY, meta.PositionZ,
-                                           meta.DetectionIndex, posName, meta.Type,
+                                           meta.DetectionIndex, posName, (int)meta.Type,
                                            (int)meta.Height, (int)meta.Width, data_buf_ptr);
                         }
                     }
@@ -681,7 +682,8 @@ namespace ImagerAvalonia.Services.Storage
         public double TimePoint;
 
 
-        public int Type; 
+        // Defaults to Mono16: planes loaded back from disk are assumed to be Mono16.
+        public ImagePixelFormat Type = ImagePixelFormat.Mono16;
         public double PositionX;
         public double PositionY;
         public double PositionZ;

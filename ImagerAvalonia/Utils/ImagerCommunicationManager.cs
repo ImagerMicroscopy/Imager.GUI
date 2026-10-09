@@ -274,6 +274,15 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
                     if (dataResponse is AsyncAcquiredImagesResponse imgs) {
                         if (imgs.Messages.Length > 0) {
+                            foreach (var msg in imgs.Messages) {
+                                if (msg.Message.Data is { } imageData && msg.Message.MetaData is not null) {
+                                    Console.WriteLine(
+                                        $"[ImagerCommunicationManager] Received image from Imager: " +
+                                        $"index {msg.Index}, detector '{imageData.DetectorName}', " +
+                                        $"{imageData.NCols}x{imageData.NRows}, {imageData.ImageData.Length} bytes");
+                                }
+                            }
+
                             await channelWriter.WriteAsync(
                                 new MeasurementDataEvent(imgs.Messages),
                                 cancellationToken);

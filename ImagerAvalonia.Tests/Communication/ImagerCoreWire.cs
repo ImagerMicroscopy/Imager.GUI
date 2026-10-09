@@ -1,4 +1,5 @@
 using System.Buffers;
+using ImagerAvalonia.Utils;
 using MessagePack;
 
 namespace ImagerAvalonia.Tests.Communication;
@@ -117,7 +118,7 @@ internal static class ImagerCoreWire
         int nRows = 2,
         int nCols = 3,
         byte[]? imageData = null,
-        int pixelFormat = 2,
+        ImagePixelFormat pixelFormat = ImagePixelFormat.Mono8,
         double timestamp = 1.25,
         string acquisitionType = "Default",
         int detectionIndex = 0,
@@ -157,7 +158,7 @@ internal static class ImagerCoreWire
         w.Write("timestamp"); w.Write(timestamp);
         w.Write("detectorname"); w.Write(detectorName);
         w.Write("imagedata"); w.Write(imageData);
-        w.Write("numtype"); w.Write(pixelFormat);
+        w.Write("numtype"); w.Write((int)pixelFormat);
 
         w.Write("type"); w.Write("acquireddatamessage");
 

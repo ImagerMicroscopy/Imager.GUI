@@ -74,7 +74,7 @@ public sealed class ImagerWorkspaceTests : IDisposable
 
     private static ChannelMessage Image(ulong index) =>
         new(index, new AsyncMeasurementMessage("acquireddatamessage",
-            new AcquiredData("DummyCam1", new byte[] { 1, 2, 3, 4 }, 2, 1, 0, 0.5f),
+            new AcquiredData("DummyCam1", new byte[] { 1, 2, 3, 4 }, 2, 1, ImagePixelFormat.Mono16, 0.5f),
             new AcquisitionMetaData("Acq1", 0, "d", 1, new StagePosition(0, false, 1, 2, 3), "p1"),
             null!));
 

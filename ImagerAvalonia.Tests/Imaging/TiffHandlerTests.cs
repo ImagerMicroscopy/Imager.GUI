@@ -1,3 +1,4 @@
+using ImagerAvalonia.Utils;
 using ImagerAvalonia.Views.ViewUtils;
 using Xunit;
 
@@ -87,7 +88,7 @@ public class TiffHandlerTests
         var yLow = new double[257];
         var x = new double[257];
 
-        TiffHandler.UpdateHistogramValues(To16Bit(0, 0, 128, 256, 256, 256), ref y, ref yLow, ref x);
+        TiffHandler.UpdateHistogramValues(To16Bit(0, 0, 128, 256, 256, 256), ImagePixelFormat.Mono16, ref y, ref yLow, ref x);
 
         Assert.Equal(6, y.Sum());
         Assert.Equal(2, y[0]);
@@ -104,7 +105,7 @@ public class TiffHandlerTests
         var yLow = Enumerable.Repeat(99.0, 257).ToArray();
         var x = new double[257];
 
-        TiffHandler.UpdateHistogramValues(To16Bit(1, 2), ref y, ref yLow, ref x);
+        TiffHandler.UpdateHistogramValues(To16Bit(1, 2), ImagePixelFormat.Mono16, ref y, ref yLow, ref x);
 
         Assert.Equal(2, y.Sum());
         Assert.All(yLow, v => Assert.Equal(0, v));
@@ -117,7 +118,7 @@ public class TiffHandlerTests
         var yLow = new double[257];
         var x = new double[257];
 
-        TiffHandler.UpdateHistogramValues(Array.Empty<byte>(), ref y, ref yLow, ref x);
+        TiffHandler.UpdateHistogramValues(Array.Empty<byte>(), ImagePixelFormat.Mono16, ref y, ref yLow, ref x);
 
         Assert.Equal(0, y.Sum());
     }
@@ -129,7 +130,7 @@ public class TiffHandlerTests
         var yLow = new double[257];
         var x = new double[257];
 
-        TiffHandler.UpdateHistogramValues(To16Bit(500, 500, 500), ref y, ref yLow, ref x);
+        TiffHandler.UpdateHistogramValues(To16Bit(500, 500, 500), ImagePixelFormat.Mono16, ref y, ref yLow, ref x);
 
         Assert.Equal(3, y[0]);
     }
@@ -160,5 +161,68 @@ public class TiffHandlerTests
     {
         Assert.Equal(new byte[] { 0x12, 0xFF }, TiffHandler.Convert16BitTo8BitFast(To16Bit(0x12AB, 0xFF00)));
         Assert.Throws<ArgumentException>(() => TiffHandler.Convert16BitTo8BitFast(new byte[3]));
+    }
+
+    [Fact]
+    public void Bytes_per_pixel_matches_the_wire_format()
+    {
+        Assert.Equal(1, ImagePixelFormat.Mono8.BytesPerPixel());
+        Assert.Equal(2, ImagePixelFormat.Mono16.BytesPerPixel());
+        Assert.Equal(8, ImagePixelFormat.Float64.BytesPerPixel());
+        Assert.Throws<ArgumentOutOfRangeException>(() => ((ImagePixelFormat)99).BytesPerPixel());
+    }
+
+    [Fact]
+    public void Normalize_mono8_replicates_bits_so_255_maps_to_65535()
+    {
+        Assert.Equal(new ushort[] { 0x0000, 0x8080, 0xFFFF },
+            TiffHandler.NormalizeToUInt16(new byte[] { 0, 128, 255 }, ImagePixelFormat.Mono8));
+    }
+
+    [Fact]
+    public void Normalize_mono16_passes_pixels_through()
+    {
+        Assert.Equal(new ushort[] { 1, 256, 65535 },
+            TiffHandler.NormalizeToUInt16(To16Bit(1, 256, 65535), ImagePixelFormat.Mono16));
+    }
+
+    [Fact]
+    public void Normalize_float64_clamps_to_the_16bit_range()
+    {
+        var bytes = new byte[3 * 8];
+        Buffer.BlockCopy(new[] { -1.5, 0.5, 70000.0 }, 0, bytes, 0, bytes.Length);
+
+        Assert.Equal(new ushort[] { 0, 0, 65535 },
+            TiffHandler.NormalizeToUInt16(bytes, ImagePixelFormat.Float64));
+    }
+
+    [Fact]
+    public void Normalize_unknown_format_throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TiffHandler.NormalizeToUInt16(new byte[] { 1, 2 }, (ImagePixelFormat)99));
+    }
+
+    [Fact]
+    public void Normalize_to_mono16_bytes_converts_mono8_to_two_bytes_per_pixel()
+    {
+        var result = TiffHandler.NormalizeToMono16Bytes(new byte[] { 0, 255 }, ImagePixelFormat.Mono8);
+
+        Assert.Equal(new ushort[] { 0x0000, 0xFFFF }, From16Bit(result));
+    }
+
+    [Fact]
+    public void Histogram_bins_mono8_pixels_over_the_full_16bit_range()
+    {
+        var y = new double[257];
+        var yLow = new double[257];
+        var x = new double[257];
+
+        TiffHandler.UpdateHistogramValues(new byte[] { 0, 0, 128, 255, 255, 255 }, ImagePixelFormat.Mono8, ref y, ref yLow, ref x);
+
+        Assert.Equal(6, y.Sum());
+        Assert.Equal(2, y[0]);
+        Assert.Equal(1, y[128]);
+        Assert.Equal(3, y[256]);
     }
 }

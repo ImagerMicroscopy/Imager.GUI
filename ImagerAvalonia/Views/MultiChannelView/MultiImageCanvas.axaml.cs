@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
+using ImagerAvalonia.Views.ViewUtils;
 using System;
 using System.IO;
 
@@ -59,7 +60,8 @@ public partial class MultiImageCanvas : UserControl
         byte[] transmission16,
         int imwidth,
         int imheight,
-        MultiChannelContrastViewModel contrasVM)
+        MultiChannelContrastViewModel contrasVM,
+        ImagePixelFormat format)
     {
         if (_bitmap.PixelSize.Width != imwidth || _bitmap.PixelSize.Height != imheight)
         {
@@ -72,78 +74,70 @@ public partial class MultiImageCanvas : UserControl
 
         int pixelCount = imwidth * imheight;
 
+        // Normalize every channel to 16-bit pixels according to the wire pixel format.
+        ushort[] red = red16 != null ? TiffHandler.NormalizeToUInt16(red16, format) : Array.Empty<ushort>();
+        ushort[] green = green16 != null ? TiffHandler.NormalizeToUInt16(green16, format) : Array.Empty<ushort>();
+        ushort[] blue = blue16 != null ? TiffHandler.NormalizeToUInt16(blue16, format) : Array.Empty<ushort>();
+        ushort[] yellow = yellow16 != null ? TiffHandler.NormalizeToUInt16(yellow16, format) : Array.Empty<ushort>();
+        ushort[] transmission = transmission16 != null ? TiffHandler.NormalizeToUInt16(transmission16, format) : Array.Empty<ushort>();
 
         using (var fb = _bitmap.Lock())
         {
             byte* dst = (byte*)fb.Address.ToPointer();
 
-            fixed (byte* rPtr = red16)
-            fixed (byte* gPtr = green16)
-            fixed (byte* bPtr = blue16)
-            fixed (byte* yPtr = yellow16)
-            fixed (byte* tPtr = transmission16)
+            for (int i = 0; i < pixelCount; i++)
             {
-                ushort* rSrc = (ushort*)rPtr;
-                ushort* gSrc = (ushort*)gPtr;
-                ushort* bSrc = (ushort*)bPtr;
-                ushort* ySrc = (ushort*)yPtr;
-                ushort* tSrc = (ushort*)tPtr;
+                // Load raw 16-bit values
+                ushort r16 = i < red.Length ? red[i] : (ushort)0;
+                ushort g16 = i < green.Length ? green[i] : (ushort)0;
+                ushort b16 = i < blue.Length ? blue[i] : (ushort)0;
+                ushort y16 = i < yellow.Length ? yellow[i] : (ushort)0;
+                ushort tr16 = i < transmission.Length ? transmission[i] : (ushort)0;
 
-                for (int i = 0; i < pixelCount; i++)
+                // Clamp to UI-selected min/max
+                r16 = (ushort)Math.Clamp(r16, contrasVM.RedValueMin, contrasVM.RedValueMax);
+                g16 = (ushort)Math.Clamp(g16, contrasVM.GreenValueMin, contrasVM.GreenValueMax);
+                b16 = (ushort)Math.Clamp(b16, contrasVM.BlueValueMin, contrasVM.BlueValueMax);
+                y16 = (ushort)Math.Clamp(y16, contrasVM.YellowValueMin, contrasVM.YellowValueMax);
+                tr16 = (ushort)Math.Clamp(tr16, contrasVM.TransmissionValueMin, contrasVM.TransmissionValueMax);
+
+                // Normalize each channel to 0–255
+                byte r = NormalizeToByte(r16, contrasVM.RedValueMin, contrasVM.RedValueMax);
+                byte g = NormalizeToByte(g16, contrasVM.GreenValueMin, contrasVM.GreenValueMax);
+                byte b = NormalizeToByte(b16, contrasVM.BlueValueMin, contrasVM.BlueValueMax);
+                byte y = NormalizeToByte(y16, contrasVM.YellowValueMin, contrasVM.YellowValueMax);
+                byte tr = NormalizeToByte(tr16, contrasVM.TransmissionValueMin, contrasVM.TransmissionValueMax);
+
+                // Blend yellow
+                if (yellow16 != null)
                 {
-                    // Load raw 16-bit values
-                    ushort r16 = red16 != null ? rSrc[i] : (ushort)0;
-                    ushort g16 = green16 != null ? gSrc[i] : (ushort)0;
-                    ushort b16 = blue16 != null ? bSrc[i] : (ushort)0;
-                    ushort y16 = yellow16 != null ? ySrc[i] : (ushort)0;
-                    ushort tr16 = transmission16 != null ? tSrc[i] : (ushort)0;
-
-                    // Clamp to UI-selected min/max
-                    r16 = (ushort)Math.Clamp(r16, contrasVM.RedValueMin, contrasVM.RedValueMax);
-                    g16 = (ushort)Math.Clamp(g16, contrasVM.GreenValueMin, contrasVM.GreenValueMax);
-                    b16 = (ushort)Math.Clamp(b16, contrasVM.BlueValueMin, contrasVM.BlueValueMax);
-                    y16 = (ushort)Math.Clamp(y16, contrasVM.YellowValueMin, contrasVM.YellowValueMax);
-                    tr16 = (ushort)Math.Clamp(tr16, contrasVM.TransmissionValueMin, contrasVM.TransmissionValueMax);
-
-                    // Normalize each channel to 0–255
-                    byte r = NormalizeToByte(r16, contrasVM.RedValueMin, contrasVM.RedValueMax);
-                    byte g = NormalizeToByte(g16, contrasVM.GreenValueMin, contrasVM.GreenValueMax);
-                    byte b = NormalizeToByte(b16, contrasVM.BlueValueMin, contrasVM.BlueValueMax);
-                    byte y = NormalizeToByte(y16, contrasVM.YellowValueMin, contrasVM.YellowValueMax);
-                    byte tr = NormalizeToByte(tr16, contrasVM.TransmissionValueMin, contrasVM.TransmissionValueMax);
-
-                    // Blend yellow
-                    if (yellow16 != null)
-                    {
-                        int rr = r + (y >> 1);
-                        int gg = g + (y >> 1);
-                        if (rr > 255) rr = 255;
-                        if (gg > 255) gg = 255;
-                        r = (byte)rr;
-                        g = (byte)gg;
-                    }
-
-                    // Add transmission
-                    if (transmission16 != null)
-                    {
-                        int rr = r + tr;
-                        int gg = g + tr;
-                        int bb = b + tr;
-                        if (rr > 255) rr = 255;
-                        if (gg > 255) gg = 255;
-                        if (bb > 255) bb = 255;
-                        r = (byte)rr;
-                        g = (byte)gg;
-                        b = (byte)bb;
-                    }
-
-                    int offset = i * 4;
-                    dst[offset + 0] = r;   // R
-                    dst[offset + 1] = g;   // G
-                    dst[offset + 2] = b;   // B
-                    dst[offset + 3] = 255; // A
+                    int rr = r + (y >> 1);
+                    int gg = g + (y >> 1);
+                    if (rr > 255) rr = 255;
+                    if (gg > 255) gg = 255;
+                    r = (byte)rr;
+                    g = (byte)gg;
                 }
 
+                // Add transmission
+                if (transmission16 != null)
+                {
+                    int rr = r + tr;
+                    int gg = g + tr;
+                    int bb = b + tr;
+                    if (rr > 255) rr = 255;
+                    if (gg > 255) gg = 255;
+                    if (bb > 255) bb = 255;
+                    r = (byte)rr;
+                    g = (byte)gg;
+                    b = (byte)bb;
+                }
+
+                int offset = i * 4;
+                dst[offset + 0] = r;   // R
+                dst[offset + 1] = g;   // G
+                dst[offset + 2] = b;   // B
+                dst[offset + 3] = 255; // A
             }
         }
     }

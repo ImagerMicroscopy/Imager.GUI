@@ -1,8 +1,10 @@
 ﻿using Avalonia;
 using Avalonia.Media.Imaging;
+using ImagerAvalonia.Utils;
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 
@@ -209,12 +211,9 @@ namespace ImagerAvalonia.Views.ViewUtils
             return result;
         }
 
-        public static void UpdateHistogramValues(byte[] image_array, ref double[] histogram_vals_y, ref double[] histogram_vals_y_low, ref double[] histogram_vals_x  )
+        public static void UpdateHistogramValues(byte[] image_array, ImagePixelFormat format, ref double[] histogram_vals_y, ref double[] histogram_vals_y_low, ref double[] histogram_vals_x  )
         {
-            ushort[] converted_array = new ushort[image_array.Length / 2];
-
-            Buffer.BlockCopy(image_array, 0, converted_array, 0, image_array.Length);
-
+            ushort[] converted_array = NormalizeToUInt16(image_array, format);
 
             Array.Clear(histogram_vals_y);
             Array.Clear(histogram_vals_y_low);
@@ -311,35 +310,86 @@ namespace ImagerAvalonia.Views.ViewUtils
         }
 
 
+        /// <summary>
+        /// Normalizes raw image bytes of any supported pixel format to a 16-bit pixel
+        /// array. Mono8 values are bit-replicated so 255 maps to
+        /// 65535; Float64 values are clamped to the 16-bit range. Unknown formats throw.
+        /// </summary>
+        public static ushort[] NormalizeToUInt16(byte[] image, ImagePixelFormat format)
+        {
+            switch (format)
+            {
+                case ImagePixelFormat.Mono8:
+                {
+                    var pixels = new ushort[image.Length];
+                    for (int i = 0; i < image.Length; i++)
+                        pixels[i] = (ushort)(image[i] << 8 | image[i]);
+                    return pixels;
+                }
+                case ImagePixelFormat.Mono16:
+                {
+                    var pixels = new ushort[image.Length / 2];
+                    Buffer.BlockCopy(image, 0, pixels, 0, pixels.Length * 2);
+                    return pixels;
+                }
+                case ImagePixelFormat.Float64:
+                {
+                    var doubles = MemoryMarshal.Cast<byte, double>(image);
+                    var pixels = new ushort[doubles.Length];
+                    for (int i = 0; i < doubles.Length; i++)
+                    {
+                        double v = doubles[i];
+                        pixels[i] = v <= 0 ? (ushort)0 : v >= ushort.MaxValue ? ushort.MaxValue : (ushort)v;
+                    }
+                    return pixels;
+                }
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format.");
+            }
+        }
+
+        /// <summary>
+        /// Normalizes raw image bytes of any supported pixel format to a Mono16 byte
+        /// array (two bytes per pixel, little-endian), e.g. for the field viewer path.
+        /// </summary>
+        public static byte[] NormalizeToMono16Bytes(byte[] image, ImagePixelFormat format)
+        {
+            var pixels = NormalizeToUInt16(image, format);
+            var bytes = new byte[pixels.Length * 2];
+            Buffer.BlockCopy(pixels, 0, bytes, 0, bytes.Length);
+            return bytes;
+        }
+
         public static WriteableBitmap UpdateContrastAndReturnBitmap(
             byte[] image_array,
             int width,
             int height,
-            ushort min_val,
-            ushort max_val,
+            ImagePixelFormat format,
+            int min_val,
+            int max_val,
             bool autocontrast,
             WriteableBitmap? existingBitmap = null)
         {
-            int pixelCount = image_array.Length / 2;
+            ushort[] pixels = NormalizeToUInt16(image_array, format);
 
-            // Auto-contrast: compute min/max directly from byte array
+            // Mono8 contrast limits are expressed in the 0..255 range.
+            if (format == ImagePixelFormat.Mono8)
+            {
+                min_val = Math.Clamp(min_val, 0, 255) * 257;
+                max_val = Math.Clamp(max_val, 0, 255) * 257;
+            }
+
+            // Auto-contrast: compute min/max directly from the pixels
             if (autocontrast)
             {
                 ushort localMin = ushort.MaxValue;
                 ushort localMax = ushort.MinValue;
 
-                unsafe
+                for (int i = 0; i < pixels.Length; i++)
                 {
-                    fixed (byte* ptr = image_array)
-                    {
-                        ushort* src = (ushort*)ptr;
-                        for (int i = 0; i < pixelCount; i++)
-                        {
-                            ushort val = src[i];
-                            if (val < localMin) localMin = val;
-                            if (val > localMax) localMax = val;
-                        }
-                    }
+                    ushort val = pixels[i];
+                    if (val < localMin) localMin = val;
+                    if (val > localMax) localMax = val;
                 }
 
                 min_val = localMin;
@@ -360,15 +410,13 @@ namespace ImagerAvalonia.Views.ViewUtils
 
             unsafe
             {
-                fixed (byte* ptr = image_array)
+                fixed (ushort* src = pixels)
                 {
-                    ushort* src = (ushort*)ptr;
-
                     using (var lockedBitmap = existingBitmap.Lock())
                     {
                         byte* dest = (byte*)lockedBitmap.Address.ToPointer();
 
-                        for (int i = 0; i < pixelCount; i++)
+                        for (int i = 0; i < pixels.Length; i++)
                         {
                             ushort val = src[i];
 

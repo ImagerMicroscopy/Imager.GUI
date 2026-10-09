@@ -346,7 +346,8 @@ namespace ImagerAvalonia.Views
                             Avalonia.Platform.PixelFormats.Gray8,
                             Avalonia.Platform.AlphaFormat.Premul);
                         
-                        var contrast_adj_image = TiffHandler.UpdateContrastMinMaxIn16Bit(imageData.Images[i], minval, maxval);
+                        byte[] mono16 = TiffHandler.NormalizeToMono16Bytes(imageData.Images[i], metadata.Type);
+                        var contrast_adj_image = TiffHandler.UpdateContrastMinMaxIn16Bit(mono16, minval, maxval);
                         context._lastImage = TiffHandler.GetSubsampledImage(contrast_adj_image, (int)metadata.Width, (int)metadata.Height);
                         var new_bitmap = TiffHandler.ReturnBitmapFromByteArray(context._lastImage, bitmap);
 

@@ -1,6 +1,7 @@
 using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Utils;
 using Moq;
+using System.IO;
 using Xunit;
 
 namespace ImagerAvalonia.Tests.Workspace;
@@ -10,9 +11,10 @@ public class AcquisitionHandlerTests
     private static MessagePackAcquisitionHandler Handler() =>
         new(Mock.Of<IStorageProvider>(), Mock.Of<IImagerConnectionHandler>());
 
-    private static ChannelMessage Image(ulong index, string detector = "DummyCam1", string? positionName = "p1") =>
+    private static ChannelMessage Image(ulong index, string detector = "DummyCam1", string? positionName = "p1",
+        ImagePixelFormat format = ImagePixelFormat.Mono16) =>
         new(index, new AsyncMeasurementMessage("acquireddatamessage",
-            new AcquiredData(detector, new byte[] { 1, 2, 3, 4, 5, 6 }, 3, 1, 0, 2.5f),
+            new AcquiredData(detector, new byte[] { 1, 2, 3, 4, 5, 6 }, 3, 1, format, 2.5f),
             new AcquisitionMetaData("Acq1", 4, "elem-1", 1, new StagePosition(0.25, true, 1, 2, 3), positionName!),
             null!));
 
@@ -39,8 +41,31 @@ public class AcquisitionHandlerTests
         Assert.Equal((1.0, 2.0, 3.0), (meta.PositionX, meta.PositionY, meta.PositionZ));
         Assert.True(meta.CurrentStagePosition.Coordinates.usinghardwareautofocus);
         Assert.Equal(0.25, meta.CurrentStagePosition.Coordinates.hardwareautofocusoffset);
+        Assert.Equal(ImagePixelFormat.Mono16, meta.Type);
 
         Assert.Equal("DummyCam2", data.Metadata[1].DetectorName);
+    }
+
+    [Theory]
+    [InlineData(ImagePixelFormat.Mono16)]
+    [InlineData(ImagePixelFormat.Mono8)]
+    [InlineData(ImagePixelFormat.Float64)]
+    public void Pixel_format_is_propagated_to_plane_metadata(ImagePixelFormat format)
+    {
+        var data = Handler().ProcessMessages(new[] { Image(0, format: format) });
+
+        Assert.Equal(format, data.Metadata[0].Type);
+    }
+
+    [Fact]
+    public void Unknown_pixel_format_is_a_hard_error()
+    {
+        var bad = new ChannelMessage(0, new AsyncMeasurementMessage("acquireddatamessage",
+            new AcquiredData("DummyCam1", new byte[] { 1, 2 }, 2, 1, (ImagePixelFormat)99, 0.5f),
+            new AcquisitionMetaData("Acq1", 0, "elem-1", 1, new StagePosition(0, false, 1, 2, 3), "p1"),
+            null!));
+
+        Assert.Throws<InvalidDataException>(() => Handler().ProcessMessages(new[] { bad }));
     }
 
     [Fact]
