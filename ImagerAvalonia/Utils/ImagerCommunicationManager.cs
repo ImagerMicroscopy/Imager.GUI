@@ -263,46 +263,37 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 await channelWriter.WriteAsync(new MeasurementStartedEvent(), cancellationToken);
 
                 bool keepPolling = true;
+                var lastDataPollTime = DateTime.UtcNow;
                 var lastStatusPollTime = DateTime.UtcNow;
 
                 while (keepPolling && !cancellationToken.IsCancellationRequested) {
+                    if (keepPolling && (DateTime.UtcNow - lastDataPollTime >= TimeSpan.FromMilliseconds(10)))
+                    {
+                        var dataResponse =
+                            await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
 
-                   
-                    var dataResponse =
-                        await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
+                        if (dataResponse is AsyncAcquiredImagesResponse imgs) {
+                            if (imgs.Messages.Length > 0) {
+                                await channelWriter.WriteAsync(
+                                    new MeasurementDataEvent(imgs.Messages),
+                                    cancellationToken);
 
-
-
-                    if (dataResponse is AsyncAcquiredImagesResponse imgs) {
-                        if (imgs.Messages.Length > 0) {
-                            foreach (var msg in imgs.Messages) {
-                                if (msg.Message.Data is { } imageData && msg.Message.MetaData is not null) {
-                                    Console.WriteLine(
-                                        $"[ImagerCommunicationManager] Received image from Imager: " +
-                                        $"index {msg.Index}, detector '{imageData.DetectorName}', " +
-                                        $"{imageData.NCols}x{imageData.NRows}, {imageData.ImageData.Length} bytes");
-                                }
+                                ulong lastIndex = imgs.Messages[^1].Index;
+                                await SendAndValidateAsync<StatusOkResponse>(
+                                    new AcknowledgeDataReceiptRequest(lastIndex),
+                                    cancellationToken);
                             }
-
+                        } else if (dataResponse is StatusNoNewAsyncDataComingResponse) {
+                            keepPolling = false;
+                        } else if (dataResponse is StatusErrorResponse dataErr) {
                             await channelWriter.WriteAsync(
-                                new MeasurementDataEvent(imgs.Messages),
+                                new MeasurementErrorEvent($"Polling error: {dataErr.Error}"),
                                 cancellationToken);
 
-
-                            ulong lastIndex = imgs.Messages[^1].Index;
-                            await SendAndValidateAsync<StatusOkResponse>(
-                                new AcknowledgeDataReceiptRequest(lastIndex),
-                                cancellationToken);
-
+                            keepPolling = false;
                         }
-                    } else if (dataResponse is StatusNoNewAsyncDataComingResponse) {
-                        keepPolling = false;
-                    } else if (dataResponse is StatusErrorResponse dataErr) {
-                        await channelWriter.WriteAsync(
-                            new MeasurementErrorEvent($"Polling error: {dataErr.Error}"),
-                            cancellationToken);
 
-                        keepPolling = false;
+                        lastDataPollTime = DateTime.UtcNow;
                     }
 
                     if (keepPolling && (DateTime.UtcNow - lastStatusPollTime >= TimeSpan.FromMilliseconds(250)))
