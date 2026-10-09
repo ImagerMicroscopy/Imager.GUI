@@ -224,12 +224,6 @@ public partial class ImageDisplayViewModel : ViewModelBase
 
         for (int i = 0; i < images.Images.Count; i++)
         {
-
-            Int32 im_size_x = Convert.ToInt32(images.Sizes[i][0]);
-            Int32 im_size_y = Convert.ToInt32(images.Sizes[i][1]);
-
-
-
             if (i >= Math.Max(0, images.Images.Count - Acquisitions.Count * Detectors.Count))
             {
                 if (PinnedPosition != IStageControl.DefaultStagePosition)

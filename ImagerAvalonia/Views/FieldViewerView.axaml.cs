@@ -18,7 +18,6 @@ using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
@@ -338,8 +337,6 @@ namespace ImagerAvalonia.Views
 
                         int minval = contrastView.contrastSettings[row][col].Min_disp_val;
                         int maxval = contrastView.contrastSettings[row][col].Max_disp_val;
-                        Stopwatch stopWatch = new Stopwatch();
-                        stopWatch.Start();
                         var bitmap = new WriteableBitmap(
                             new Avalonia.PixelSize((int)metadata.Width / 8, (int)metadata.Height / 8),
                             new Vector(96, 96),
@@ -351,14 +348,10 @@ namespace ImagerAvalonia.Views
                         context._lastImage = TiffHandler.GetSubsampledImage(contrast_adj_image, (int)metadata.Width, (int)metadata.Height);
                         var new_bitmap = TiffHandler.ReturnBitmapFromByteArray(context._lastImage, bitmap);
 
-
-                        stopWatch.Stop();
-                        Console.WriteLine(stopWatch.ElapsedMilliseconds);
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
                             UpdateCanvasImage(key, metadata, new_bitmap);
                         });
-                        Console.WriteLine($"Detection index:{metadata.DetectionIndex}");
 
                         context.CenterX = metadata.PositionX;
                         context.CenterY = metadata.PositionY;

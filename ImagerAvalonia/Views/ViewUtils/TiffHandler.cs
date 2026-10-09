@@ -246,8 +246,14 @@ namespace ImagerAvalonia.Views.ViewUtils
             if (converted_array.Length == 0)
                 return;
 
-            double min_image_val = converted_array.Min();
-            double max_image_val = converted_array.Max();
+            double min_image_val = converted_array[0];
+            double max_image_val = converted_array[0];
+            for (int i = 1; i < converted_array.Length; i++)
+            {
+                ushort val = converted_array[i];
+                if (val < min_image_val) min_image_val = val;
+                if (val > max_image_val) max_image_val = val;
+            }
 
             if (max_image_val == min_image_val)
             {
