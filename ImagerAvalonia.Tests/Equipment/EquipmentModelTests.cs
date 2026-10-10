@@ -256,6 +256,85 @@ public class EquipmentModelTests
     }
 
     [Fact]
+    public void Reconcile_trims_saved_selection_to_a_single_channel_when_multiple_are_not_allowed()
+    {
+        var equipment = EquipmentFixtures.Workspace(sources: new[]
+        {
+            EquipmentFixtures.Laser(allowMultipleChannels: false),
+        });
+        var saved = EquipmentFixtures.Detection(irradiation: new[]
+        {
+            EquipmentFixtures.Laser(allowMultipleChannels: false, activeChannels: new[] { "ch1", "ch2" }),
+        });
+
+        var source = Assert.Single(EquipmentReconciler.Reconcile(saved, equipment).Irradiation);
+
+        Assert.Equal(new[] { "ch1" }, source.LightsourceChannel);
+        Assert.Single(source.LightsourcePower);
+        Assert.True(source.IsEnabled);
+    }
+
+    [Fact]
+    public void Reconcile_keeps_a_multi_channel_selection_when_multiple_are_allowed()
+    {
+        var equipment = EquipmentFixtures.Workspace(sources: new[] { EquipmentFixtures.Laser() });
+        var saved = EquipmentFixtures.Detection(irradiation: new[]
+        {
+            EquipmentFixtures.Laser(activeChannels: new[] { "ch1", "ch2" }),
+        });
+
+        var source = Assert.Single(EquipmentReconciler.Reconcile(saved, equipment).Irradiation);
+
+        Assert.Equal(new[] { "ch1", "ch2" }, source.LightsourceChannel);
+    }
+
+    // ---------- Light source channel exclusivity ----------
+
+    [Fact]
+    public void Activating_a_channel_deactivates_the_other_one_when_multiple_are_not_allowed()
+    {
+        var vm = new SourcesEquipmentViewModel(EquipmentFixtures.Laser(allowMultipleChannels: false));
+        var ch1 = vm.Channels.Single(c => c.Name == "ch1");
+        var ch2 = vm.Channels.Single(c => c.Name == "ch2");
+
+        ch1.IsEnabled = true;
+        ch2.IsEnabled = true;
+
+        Assert.False(ch1.IsEnabled);
+        Assert.True(ch2.IsEnabled);
+        Assert.Equal(new[] { "ch2" }, vm.LightSource.LightsourceChannel);
+        Assert.True(vm.LightSource.IsEnabled);
+    }
+
+    [Fact]
+    public void Activating_a_channel_keeps_others_when_multiple_are_allowed()
+    {
+        var vm = new SourcesEquipmentViewModel(EquipmentFixtures.Laser());
+        var ch1 = vm.Channels.Single(c => c.Name == "ch1");
+        var ch2 = vm.Channels.Single(c => c.Name == "ch2");
+
+        ch1.IsEnabled = true;
+        ch2.IsEnabled = true;
+
+        Assert.True(ch1.IsEnabled);
+        Assert.True(ch2.IsEnabled);
+        Assert.Equal(new[] { "ch1", "ch2" }, vm.LightSource.LightsourceChannel);
+    }
+
+    [Fact]
+    public void Constructor_trims_active_channels_to_one_when_multiple_are_not_allowed()
+    {
+        var source = EquipmentFixtures.Laser(allowMultipleChannels: false, activeChannels: new[] { "ch1", "ch2" });
+
+        var vm = new SourcesEquipmentViewModel(source);
+
+        Assert.Equal(new[] { "ch1" }, source.LightsourceChannel);
+        Assert.Single(source.LightsourcePower);
+        Assert.True(vm.Channels.Single(c => c.Name == "ch1").IsEnabled);
+        Assert.False(vm.Channels.Single(c => c.Name == "ch2").IsEnabled);
+    }
+
+    [Fact]
     public void Reconcile_applies_saved_filter_selection_onto_available_wheel()
     {
         var equipment = EquipmentFixtures.Workspace(filterWheels: new[] { EquipmentFixtures.FilterWheel(filter: "DAPI", slider: "0") });

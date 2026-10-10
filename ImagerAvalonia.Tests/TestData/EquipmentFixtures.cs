@@ -7,9 +7,9 @@ namespace ImagerAvalonia.Tests.TestData;
 /// <summary>Small, realistic equipment set shared by the model/serialization tests.</summary>
 internal static class EquipmentFixtures
 {
-    public static Source Laser(string equipment = "hello", string name = "ls", params string[] activeChannels)
+    public static Source Laser(string equipment = "hello", string name = "ls", bool allowMultipleChannels = true, params string[] activeChannels)
     {
-        var source = new Source(allowmultiplechannels: true, cancontrolpower: true,
+        var source = new Source(allowmultiplechannels: allowMultipleChannels, cancontrolpower: true,
             channels: new List<string> { "ch1", "ch2" }, name: name)
         {
             EquipmentName = equipment,

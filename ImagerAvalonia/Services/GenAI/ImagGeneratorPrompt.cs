@@ -46,6 +46,8 @@ namespace ImagerAvalonia.Services.GenAI
         **Invariant, everywhere a Source appears (here and in `irradiation` lists, section 4):
         `IsEnabled == (LightsourceChannel is non-empty)`.** Never emit one out of sync — a
         "not in use" light source is either omitted or has both `IsEnabled:false` and `[]`.
+        **When `allowmultiplechannels` is `false`, `LightsourceChannel` must contain at most
+        one entry (and `LightsourcePower` at most one matching value).**
 
         **DetectorEquipmentModel**, in `AvailableDetectors`:
         ```json

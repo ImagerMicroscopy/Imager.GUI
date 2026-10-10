@@ -41,6 +41,14 @@ namespace ImagerAvalonia.Services.Workspace
                 result.LightsourceChannel = new List<string>(selected.LightsourceChannel);
                 result.LightsourcePower = new List<int>(selected.LightsourcePower);
                 result.IsEnabled = true;
+
+                if (!result.allowmultiplechannels && result.LightsourceChannel.Count > 1)
+                {
+                    // Sources without multiple simultaneous channels may have
+                    // at most one active channel — keep the first saved one.
+                    result.LightsourceChannel.RemoveRange(1, result.LightsourceChannel.Count - 1);
+                    result.LightsourcePower.RemoveRange(1, result.LightsourcePower.Count - 1);
+                }
             }
             else
             {

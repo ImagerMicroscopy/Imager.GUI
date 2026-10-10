@@ -30,6 +30,14 @@ public partial class SourcesEquipmentViewModel : ViewModelBase
 
         Channels = new ObservableCollection<Channel>();
 
+        if (!src.allowmultiplechannels && src.LightsourceChannel.Count > 1)
+        {
+            // Sources without multiple simultaneous channels may have at most
+            // one active channel — keep the first, drop the rest.
+            src.LightsourceChannel.RemoveRange(1, src.LightsourceChannel.Count - 1);
+            src.LightsourcePower.RemoveRange(1, src.LightsourcePower.Count - 1);
+        }
+
 
         foreach (var available_channel in src.AvailableChannels)
         {
@@ -72,6 +80,18 @@ public partial class SourcesEquipmentViewModel : ViewModelBase
             {
                 if (changedChannel.IsEnabled)
                 {
+                    if (!LightSource.allowmultiplechannels)
+                    {
+                        // At most one channel may be active: activating one
+                        // deactivates the currently active channel.
+                        foreach (var other in Channels)
+                        {
+                            if (other != changedChannel && other.IsEnabled)
+                            {
+                                other.IsEnabled = false;
+                            }
+                        }
+                    }
                     if (!LightSource.LightsourceChannel.Contains(changedChannel.Name))
                     {
                         LightSource.LightsourceChannel.Add(changedChannel.Name);
