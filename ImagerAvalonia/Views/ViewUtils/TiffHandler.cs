@@ -590,16 +590,95 @@ namespace ImagerAvalonia.Views.ViewUtils
         /// </summary>
         private static uint StretchedGray(ushort val, int min_val, int max_val, double scale)
         {
-            if (val <= min_val)
-                val = 0;
-            else if (val >= max_val)
-                val = ushort.MaxValue;
-            else
-                val = (ushort)((val - min_val) * scale);
-
-            byte gray = (byte)(val >> 8);
+            byte gray = (byte)(StretchedValue(val, min_val, max_val, scale) >> 8);
 
             return (uint)(gray | (gray << 8) | (gray << 16) | (255 << 24));
+        }
+
+        /// <summary>
+        /// Contrast stretch of a 16-bit display-scale pixel: values at or below
+        /// min go to 0, values at or above max saturate to 65535, everything in
+        /// between is stretched linearly.
+        /// </summary>
+        private static ushort StretchedValue(ushort val, int min_val, int max_val, double scale)
+        {
+            if (val <= min_val)
+                return 0;
+            if (val >= max_val)
+                return ushort.MaxValue;
+            return (ushort)((val - min_val) * scale);
+        }
+
+        /// <summary>
+        /// Builds the field-viewer overview tile for an image: samples every 8th
+        /// pixel of the raw data, stretches the sampled pixels against the 16-bit
+        /// display-scale contrast limits, and returns the result as a Gray8
+        /// bitmap. Sampling commutes with the per-pixel stretch, so only 1/64th
+        /// of the image is decoded and stretched and no full-resolution
+        /// intermediate copy is made.
+        /// </summary>
+        public static WriteableBitmap SubsampleContrastToGray8(
+            byte[] image,
+            int width,
+            int height,
+            ImagePixelFormat format,
+            int min_val,
+            int max_val)
+        {
+            int newWidth = width / 8;
+            int newHeight = height / 8;
+
+            var bitmap = new WriteableBitmap(
+                new Avalonia.PixelSize(newWidth, newHeight),
+                new Vector(96, 96),
+                Avalonia.Platform.PixelFormats.Gray8,
+                Avalonia.Platform.AlphaFormat.Premul);
+
+            var bytes = image.AsSpan();
+            int pixelCount = bytes.Length / format.BytesPerPixel();
+            ReadOnlySpan<ushort> pixels16 = format == ImagePixelFormat.Mono16
+                ? MemoryMarshal.Cast<byte, ushort>(bytes.Slice(0, pixelCount * 2)) : default;
+            ReadOnlySpan<double> doubles = format == ImagePixelFormat.Float64
+                ? MemoryMarshal.Cast<byte, double>(bytes.Slice(0, pixelCount * 8)) : default;
+
+            unsafe
+            {
+                using (var fb = bitmap.Lock())
+                {
+                    byte* dst = (byte*)fb.Address.ToPointer();
+
+                    if (min_val == max_val)
+                    {
+                        // Flat image: saturated renders white, otherwise black —
+                        // same policy as the main display path.
+                        ushort flatValue = max_val == ushort.MaxValue ? ushort.MaxValue : (ushort)0;
+                        new Span<byte>(dst, newWidth * newHeight).Fill((byte)(flatValue >> 8));
+                        return bitmap;
+                    }
+
+                    double scale = (double)ushort.MaxValue / (max_val - min_val);
+
+                    for (int y = 0; y < newHeight; y++)
+                    {
+                        int row = (y * 8) * width;
+                        for (int x = 0; x < newWidth; x++)
+                        {
+                            int si = row + x * 8;
+                            ushort v16 = format switch
+                            {
+                                ImagePixelFormat.Mono8 => (ushort)(bytes[si] << 8 | bytes[si]),
+                                ImagePixelFormat.Mono16 => pixels16[si],
+                                ImagePixelFormat.Float64 => (ushort)ToDisplayScale(doubles[si], format),
+                                _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format."),
+                            };
+
+                            dst[y * newWidth + x] = (byte)(StretchedValue(v16, min_val, max_val, scale) >> 8);
+                        }
+                    }
+                }
+            }
+
+            return bitmap;
         }
 
         /// <summary>

@@ -325,8 +325,6 @@ namespace ImagerAvalonia.Views
 
                 if (xyDisplacement)
                 {
-                    byte[] bytes = new byte[imageData.Images[i].Length];
-
                     context.ScreenPosX = CalculateXScreenSpaceCoordinate(metadata, context.CenterX, context.ScreenPosX);
                     context.ScreenPosY = CalculateYScreenSpaceCoordinate(metadata, context.CenterY, context.ScreenPosY);
 
@@ -337,16 +335,14 @@ namespace ImagerAvalonia.Views
 
                         int minval = contrastView.contrastSettings[row][col].Min_disp_val;
                         int maxval = contrastView.contrastSettings[row][col].Max_disp_val;
-                        var bitmap = new WriteableBitmap(
-                            new Avalonia.PixelSize((int)metadata.Width / 8, (int)metadata.Height / 8),
-                            new Vector(96, 96),
-                            Avalonia.Platform.PixelFormats.Gray8,
-                            Avalonia.Platform.AlphaFormat.Premul);
-                        
-                        byte[] mono16 = TiffHandler.NormalizeToMono16Bytes(imageData.Images[i], metadata.Type);
-                        var contrast_adj_image = TiffHandler.UpdateContrastMinMaxIn16Bit(mono16, minval, maxval);
-                        context._lastImage = TiffHandler.GetSubsampledImage(contrast_adj_image, (int)metadata.Width, (int)metadata.Height);
-                        var new_bitmap = TiffHandler.ReturnBitmapFromByteArray(context._lastImage, bitmap);
+
+                        var new_bitmap = TiffHandler.SubsampleContrastToGray8(
+                            imageData.Images[i],
+                            (int)metadata.Width,
+                            (int)metadata.Height,
+                            metadata.Type,
+                            minval,
+                            maxval);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                         {
