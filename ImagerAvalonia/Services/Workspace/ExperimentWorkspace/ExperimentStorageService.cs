@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,30 +10,14 @@ namespace ImagerAvalonia.Services.Workspace;
 /// <summary>
 /// Handles file I/O for experiment output.
 /// Manages output folder, filename generation, and uniqueness checking.
+/// Raises change notifications so bound UI (e.g. the "Save path" display) stays
+/// in sync when the output folder is picked.
 /// </summary>
-public class ExperimentStorageService
+public partial class ExperimentStorageService : ObservableObject
 {
-    private string _outputFolder = string.Empty;
-    private string _fileName = string.Empty;
-    private bool _isExperimentStorageEnabled = true;
-
-    public string OutputFolder
-    {
-        get => _outputFolder;
-        set => _outputFolder = value;
-    }
-
-    public string FileName
-    {
-        get => _fileName;
-        set => _fileName = value;
-    }
-
-    public bool IsExperimentStorageEnabled
-    {
-        get => _isExperimentStorageEnabled;
-        set => _isExperimentStorageEnabled = value;
-    }
+    [ObservableProperty] private string _outputFolder = string.Empty;
+    [ObservableProperty] private string _fileName = string.Empty;
+    [ObservableProperty] private bool _isExperimentStorageEnabled = true;
 
     /// <summary>
     /// Gets the output folder after validating it exists.
@@ -128,14 +113,15 @@ public class ExperimentStorageService
 
             if (files.Count != 0)
             {
-                OutputFolder = files[0].Path.ToString();
-                OutputFolder = OutputFolder.Replace("file:///", "");
+                // TryGetLocalPath returns the decoded local path; Path.ToString() keeps
+                // percent-encoding, which would not match a folder with spaces on disk.
+                OutputFolder = files[0].TryGetLocalPath() ?? string.Empty;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            // Log or handle exception
-            OutputFolder = string.Empty;
+            // Keep the previously selected folder - a failed/cancelled picker must
+            // not silently wipe it.
         }
     }
 }

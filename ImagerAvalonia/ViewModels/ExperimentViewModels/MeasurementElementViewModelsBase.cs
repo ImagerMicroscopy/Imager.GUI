@@ -9,6 +9,7 @@ using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -202,7 +203,39 @@ public partial class RootNode : MeasurementElementViewModel
     public ExperimentStorageService? StorageService 
     { 
         get => _storageService;
-        set => _storageService = value;
+        set
+        {
+            if (_storageService != null)
+                _storageService.PropertyChanged -= StorageService_PropertyChanged;
+
+            _storageService = value;
+
+            if (_storageService != null)
+                _storageService.PropertyChanged += StorageService_PropertyChanged;
+
+            OnPropertyChanged(nameof(OutputFolder));
+            OnPropertyChanged(nameof(FileName));
+            OnPropertyChanged(nameof(IsExperimentStorageEnabled));
+        }
+    }
+
+    // The storage service is the source of truth for these values (the folder picker
+    // writes to it directly), so forward its change notifications to keep bound
+    // controls - e.g. the "Save path" display - in sync.
+    private void StorageService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        switch (e.PropertyName)
+        {
+            case nameof(ExperimentStorageService.OutputFolder):
+                OnPropertyChanged(nameof(OutputFolder));
+                break;
+            case nameof(ExperimentStorageService.FileName):
+                OnPropertyChanged(nameof(FileName));
+                break;
+            case nameof(ExperimentStorageService.IsExperimentStorageEnabled):
+                OnPropertyChanged(nameof(IsExperimentStorageEnabled));
+                break;
+        }
     }
 
     public string OutputFolder
