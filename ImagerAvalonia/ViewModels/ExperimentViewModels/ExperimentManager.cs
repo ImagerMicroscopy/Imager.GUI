@@ -63,6 +63,9 @@ public class ExperimentManager : IDisposable
         _factory = factory;
         _equipmentWorkspace = equipmentWorkspace;
         _experimentBuilderFactory = experimentBuilderFactory;
+
+        // Every run starts with one (selected) experiment to compose into.
+        AddExperiment();
     }
 
 
@@ -87,6 +90,10 @@ public class ExperimentManager : IDisposable
 
         Experiments.Add(exp);
         ExperimentAdded?.Invoke(exp);
+
+        // A newly added experiment is the one the user is working on - select it
+        // so the composition panel shows it right away.
+        SetSelectedExperiment(exp);
     }
 
     public async Task SaveExperiment()
