@@ -53,6 +53,16 @@ public sealed class ExperimentBuilderTests : IDisposable
     }
 
     [Fact]
+    public void New_do_times_element_starts_with_one_repeat()
+    {
+        var node = (DoTimesViewModel)_builder.AddNode(ExperimentElementType.DoTimes, _root);
+
+        Assert.Equal(1, node.NumRepeats);
+        Assert.Equal("(1 times)", node.DisplayedInfo);
+        Assert.Equal(1, ((DoTimesElement)node.ToModel()).NTotal);
+    }
+
+    [Fact]
     public void Remove_node_detaches_and_disposes_it()
     {
         var loop = _builder.AddNode(ExperimentElementType.DoTimes, _root);

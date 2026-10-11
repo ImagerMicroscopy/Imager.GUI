@@ -8,12 +8,12 @@ namespace ImagerAvalonia.ViewModels;
 
 public partial class DoTimesViewModel : MeasurementElementViewModel
 {
-    [ObservableProperty] int _NumRepeats = 0;
+    [ObservableProperty] int _NumRepeats = 1;
     public int num_frames { get { return NumRepeats; } set { NumRepeats = value; } }
 
     public DoTimesViewModel(GlobalDefinedSettingsViewModel settings)
     {
-        DisplayedInfo = "(0 times)";
+        DisplayedInfo = "(1 times)";
         Header = "Do Times";
     }
 
