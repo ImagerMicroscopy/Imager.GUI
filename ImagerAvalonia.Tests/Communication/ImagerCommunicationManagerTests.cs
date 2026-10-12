@@ -291,7 +291,7 @@ public class ImagerCommunicationManagerTests
 
         var manager = CreateManager(req => req switch
         {
-            UseSharedMemoryForTransferRequest => new SharedMemoryNameResponse("shm"),
+            UseSharedMemoryForTransferRequest => new StatusOkResponse(),
             ExecuteMeasurementProgramRequest => new StatusOkResponse(),
             FetchAsyncDataRequest => dataResponses.Dequeue(),
             FetchAsyncStatusMessagesRequest => statusResponses.Dequeue(),
@@ -316,7 +316,7 @@ public class ImagerCommunicationManagerTests
             handler.RequestsOf<AcknowledgeDataReceiptRequest>().Select(r => r.UpToAndIncluding));
 
         var shm = Assert.Single(handler.RequestsOf<UseSharedMemoryForTransferRequest>());
-        Assert.True(shm.UseSharedMemory);
+        Assert.False(shm.UseSharedMemory);
         Assert.IsType<UseSharedMemoryForTransferRequest>(handler.Requests.First());
         Assert.IsType<ExecuteMeasurementProgramRequest>(handler.Requests.ElementAt(1));
 
@@ -328,7 +328,7 @@ public class ImagerCommunicationManagerTests
     {
         var manager = CreateManager(req => req switch
         {
-            UseSharedMemoryForTransferRequest => new SharedMemoryNameResponse("shm"),
+            UseSharedMemoryForTransferRequest => new StatusOkResponse(),
             ExecuteMeasurementProgramRequest => new StatusErrorResponse("no detector enabled"),
             _ => throw new InvalidOperationException($"Unexpected {req.Action}")
         }, out var handler);
@@ -360,7 +360,7 @@ public class ImagerCommunicationManagerTests
     {
         var manager = CreateManager(req => req switch
         {
-            UseSharedMemoryForTransferRequest => new SharedMemoryNameResponse("shm"),
+            UseSharedMemoryForTransferRequest => new StatusOkResponse(),
             ExecuteMeasurementProgramRequest => new StatusOkResponse(),
             FetchAsyncDataRequest => new StatusErrorResponse("camera disconnected"),
             _ => throw new InvalidOperationException($"Unexpected {req.Action}")
@@ -379,7 +379,7 @@ public class ImagerCommunicationManagerTests
     {
         var manager = CreateManager(req => req switch
         {
-            UseSharedMemoryForTransferRequest => new SharedMemoryNameResponse("shm"),
+            UseSharedMemoryForTransferRequest => new StatusOkResponse(),
             ExecuteMeasurementProgramRequest => new StatusOkResponse(),
             _ => throw new IOException("connection reset")
         }, out _);
@@ -401,7 +401,7 @@ public class ImagerCommunicationManagerTests
 
             return req switch
             {
-                UseSharedMemoryForTransferRequest => new SharedMemoryNameResponse("shm"),
+                UseSharedMemoryForTransferRequest => new StatusOkResponse(),
                 ExecuteMeasurementProgramRequest => new StatusOkResponse(),
                 FetchAsyncDataRequest => new StatusNoNewAsyncDataResponse(),
                 _ => new AsyncStatusMessagesResponse(Array.Empty<string>()),

@@ -236,9 +236,9 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
         _ = Task.Run(async () => {
             try {
 
-                // Request the server to use shared memory for data transfer
-                await SendAndValidateAsync<SharedMemoryNameResponse>(
-                    new UseSharedMemoryForTransferRequest(true),
+                // Request the server to send data over the TCP socket instead of shared memory
+                await SendAndValidateAsync<StatusOkResponse>(
+                    new UseSharedMemoryForTransferRequest(false),
                     cancellationToken);
 
                 var startResponse =
