@@ -1,8 +1,11 @@
 ﻿
 using CommunityToolkit.Mvvm.ComponentModel;
+using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
+using ImagerAvalonia.Services.Workspace;
+using ImagerAvalonia.ViewModels.MeasurementViewModels;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
-using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
+using System.Threading.Tasks;
 
 
 namespace ImagerAvalonia.ViewModels;
@@ -16,12 +19,19 @@ public partial class SourcesEquipmentViewModel : ViewModelBase
 
     public Source LightSource;
 
+    private readonly ImagerWorkspace? _imagerWorkspace;
+    private readonly ExperimentManager? _experimentManager;
+    private int _channelPropertyChangedDepth;
 
 
 
 
-    public SourcesEquipmentViewModel(Source src)
+    public SourcesEquipmentViewModel(Source src, ImagerWorkspace? imagerWorkspace = null,
+        ExperimentManager? experimentManager = null)
     {
+        _imagerWorkspace = imagerWorkspace;
+        _experimentManager = experimentManager;
+
         Name = src.LightSourceName;
 
         LightSource = src;
@@ -61,8 +71,15 @@ public partial class SourcesEquipmentViewModel : ViewModelBase
 
     }
 
-    private void Channel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private async void Channel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // The single-channel exclusivity logic below changes another channel's
+        // IsEnabled, which raises this handler again while it is still running.
+        // Only the outermost change may restart the live view, otherwise one
+        // user action would stop and start the live program twice.
+        _channelPropertyChangedDepth++;
+        try
+        {
 
 
 
@@ -117,6 +134,34 @@ public partial class SourcesEquipmentViewModel : ViewModelBase
         {
             LightSource.IsEnabled = true;
         }
+
+        }
+        finally
+        {
+            _channelPropertyChangedDepth--;
+        }
+
+        if (_channelPropertyChangedDepth > 0)
+            return;
+
+        await RestartLiveIfAcquiringAsync();
+    }
+
+    // Light source settings are part of the detection configuration that was
+    // serialized when the live program started, so a change during a live view
+    // can only take effect by stopping and restarting the live program. A
+    // change while a restart is still stopping the previous program is picked
+    // up by that restart: StopLiveAsync has already left the acquiring state,
+    // so no second restart is started.
+    private async Task RestartLiveIfAcquiringAsync()
+    {
+        if (_imagerWorkspace == null || _experimentManager == null)
+            return;
+        if (_imagerWorkspace.CurrentState != WorkspaceState.Acquiring)
+            return;
+
+        await _imagerWorkspace.StopLiveAsync();
+        await _imagerWorkspace.StartLiveAsync(_experimentManager.SelectedDetection);
     }
     public override void Dispose()
     {

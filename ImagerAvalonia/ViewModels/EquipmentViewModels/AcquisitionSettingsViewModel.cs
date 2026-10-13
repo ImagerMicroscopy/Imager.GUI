@@ -47,7 +47,7 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
             if (_sources == null && DetectionSettings?.Settings.Irradiation != null)
             {
                 _sources = new ObservableCollection<SourcesEquipmentViewModel>(
-                    DetectionSettings.Settings.Irradiation.Select(x => new SourcesEquipmentViewModel(x)));
+                    DetectionSettings.Settings.Irradiation.Select(x => new SourcesEquipmentViewModel(x, _imagerWorkspace, _experimentManager)));
                 _sources.CollectionChanged += Sources_CollectionChanged;
             }
             return _sources;
@@ -69,7 +69,7 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
             if (_filterWheels == null && DetectionSettings?.Settings.MovableComponents != null)
             {
                 _filterWheels = new ObservableCollection<MovableEquipmentViewModel>(
-                    DetectionSettings.Settings.MovableComponents.Select(x => new MovableEquipmentViewModel(x)));
+                    DetectionSettings.Settings.MovableComponents.Select(x => new MovableEquipmentViewModel(x, _imagerWorkspace, _experimentManager)));
                 _filterWheels.CollectionChanged += Filter_CollectionChanged;
             }
             return _filterWheels;
