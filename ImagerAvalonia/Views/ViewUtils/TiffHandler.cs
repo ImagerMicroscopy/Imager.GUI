@@ -270,7 +270,11 @@ namespace ImagerAvalonia.Views.ViewUtils
 
             if (max_image_val == min_image_val)
             {
-                int bin_position = min_image_val == 0 ? 0 : histogram_vals_x.Length - 1;
+                // Flat frame: mirror the display's flat policy. A saturated
+                // frame renders white and spikes at the bright end; anything
+                // else renders black and spikes at the first bin.
+                bool saturated = ToDisplayScale(min_image_val, format) == ushort.MaxValue;
+                int bin_position = saturated ? histogram_vals_x.Length - 1 : 0;
                 histogram_vals_y[bin_position] = pixelCount;
 
                 for (int hist_val = 0; hist_val < histogram_vals_x.Length; hist_val++)

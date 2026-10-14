@@ -136,6 +136,18 @@ public class TiffHandlerTests
     }
 
     [Fact]
+    public void Histogram_of_a_saturated_flat_image_puts_everything_in_the_last_bin()
+    {
+        var y = new double[257];
+        var yLow = new double[257];
+        var x = new double[257];
+
+        TiffHandler.UpdateHistogramValues(To16Bit(65535, 65535, 65535), ImagePixelFormat.Mono16, ref y, ref yLow, ref x);
+
+        Assert.Equal(3, y[256]);
+    }
+
+    [Fact]
     public void Max_intensity_projection_takes_the_brighter_pixel()
     {
         Assert.Equal(new byte[] { 5, 9, 3 },
