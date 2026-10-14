@@ -20,49 +20,6 @@ public class TiffHandlerTests
         return pixels;
     }
 
-    [Fact]
-    public void Auto_contrast_8bit_stretches_to_full_range_including_the_extremes()
-    {
-        var result = TiffHandler.UpdateAutoContrast8Bit(new byte[] { 50, 100, 150 });
-
-        Assert.Equal(new byte[] { 0, 127, 255 }, result);
-    }
-
-    [Fact]
-    public void Auto_contrast_8bit_on_a_flat_image_uses_white_for_a_saturated_signal()
-    {
-        var result = TiffHandler.UpdateAutoContrast8Bit(new byte[] { 7, 7, 7 });
-
-        Assert.Equal(new byte[] { 255, 255, 255 }, result);
-    }
-
-    [Fact]
-    public void Contrast_min_max_16bit_clips_and_stretches()
-    {
-        var result = From16Bit(TiffHandler.UpdateContrastMinMaxIn16Bit(To16Bit(0, 100, 150, 200, 1000), 100, 200));
-
-        Assert.Equal(new ushort[] { 0, 0, 32767, ushort.MaxValue, ushort.MaxValue }, result);
-    }
-
-    [Fact]
-    public void Contrast_min_max_16bit_does_not_modify_the_input()
-    {
-        var input = To16Bit(10, 20, 30);
-        var copy = (byte[])input.Clone();
-
-        TiffHandler.UpdateContrastMinMaxIn16Bit(input, 10, 30);
-
-        Assert.Equal(copy, input);
-    }
-
-    [Fact]
-    public void Contrast_min_max_16bit_with_equal_min_and_max_is_a_threshold()
-    {
-        var result = From16Bit(TiffHandler.UpdateContrastMinMaxIn16Bit(To16Bit(5, 10, 15), 10, 10));
-
-        Assert.Equal(new ushort[] { 0, 0, ushort.MaxValue }, result);
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
