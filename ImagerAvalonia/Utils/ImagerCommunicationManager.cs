@@ -81,16 +81,32 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
 
     public bool IsInteractionEnabled { get; set; } = true;
 
-    private ImagerCommunicationManager() { }
+    private static readonly TimeSpan DefaultDataPollInterval = TimeSpan.FromMilliseconds(10);
+    private static readonly TimeSpan DefaultStatusPollInterval = TimeSpan.FromMilliseconds(250);
+
+    private readonly TimeSpan _dataPollInterval;
+    private readonly TimeSpan _statusPollInterval;
+
+    private ImagerCommunicationManager()
+    {
+        _dataPollInterval = DefaultDataPollInterval;
+        _statusPollInterval = DefaultStatusPollInterval;
+    }
 
     // Used by tests to run the manager against a fake connection handler
-    // instead of the one resolved from App.Container.
+    // instead of the one resolved from App.Container. The poll intervals
+    // rate-limit the measurement polling loop; tests can shorten them so
+    // the loop does not depend on real elapsed time.
     internal ImagerCommunicationManager(
         IImagerConnectionHandler connectionHandler,
-        ILogger<ImagerCommunicationManager>? logger = null)
+        ILogger<ImagerCommunicationManager>? logger = null,
+        TimeSpan? dataPollInterval = null,
+        TimeSpan? statusPollInterval = null)
     {
         _connectionHandler = connectionHandler;
         _logger = logger;
+        _dataPollInterval = dataPollInterval ?? DefaultDataPollInterval;
+        _statusPollInterval = statusPollInterval ?? DefaultStatusPollInterval;
     }
 
     private async Task<(TResponse? Result, StatusErrorResponse? Error)>
@@ -267,7 +283,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                 var lastStatusPollTime = DateTime.UtcNow;
 
                 while (keepPolling && !cancellationToken.IsCancellationRequested) {
-                    if (keepPolling && (DateTime.UtcNow - lastDataPollTime >= TimeSpan.FromMilliseconds(10)))
+                    if (keepPolling && (DateTime.UtcNow - lastDataPollTime >= _dataPollInterval))
                     {
                         var dataResponse =
                             await ConnectionHandler.SendRequestAsync(new FetchAsyncDataRequest(), cancellationToken);
@@ -296,7 +312,7 @@ public class ImagerCommunicationManager : IImagerCommunicationManager
                         lastDataPollTime = DateTime.UtcNow;
                     }
 
-                    if (keepPolling && (DateTime.UtcNow - lastStatusPollTime >= TimeSpan.FromMilliseconds(250)))
+                    if (keepPolling && (DateTime.UtcNow - lastStatusPollTime >= _statusPollInterval))
                     {
                         var msgResponse =
                             await ConnectionHandler.SendRequestAsync(

@@ -31,10 +31,17 @@ internal sealed class ScriptedConnectionHandler : IImagerConnectionHandler
 
 public class ImagerCommunicationManagerTests
 {
-    private static ImagerCommunicationManager CreateManager(Func<ImagerRequest, ImagerResponse> respond, out ScriptedConnectionHandler handler)
+    private static ImagerCommunicationManager CreateManager(
+        Func<ImagerRequest, ImagerResponse> respond,
+        out ScriptedConnectionHandler handler,
+        TimeSpan? dataPollInterval = null,
+        TimeSpan? statusPollInterval = null)
     {
         handler = new ScriptedConnectionHandler(respond);
-        return new ImagerCommunicationManager(handler);
+        return new ImagerCommunicationManager(
+            handler,
+            dataPollInterval: dataPollInterval,
+            statusPollInterval: statusPollInterval);
     }
 
     private static JToken PropertiesOf(string responseJson) => JObject.Parse(responseJson)["detectorproperties"]!;
@@ -297,7 +304,7 @@ public class ImagerCommunicationManagerTests
             FetchAsyncStatusMessagesRequest => statusResponses.Dequeue(),
             AcknowledgeDataReceiptRequest => new StatusOkResponse(),
             _ => throw new InvalidOperationException($"Unexpected {req.Action}")
-        }, out var handler);
+        }, out var handler, dataPollInterval: TimeSpan.Zero, statusPollInterval: TimeSpan.Zero);
 
         var events = await RunProgramAsync(manager);
 
