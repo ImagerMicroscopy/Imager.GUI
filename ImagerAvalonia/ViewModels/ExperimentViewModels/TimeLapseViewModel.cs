@@ -17,14 +17,14 @@ namespace ImagerAvalonia.ViewModels
 
         public TimeLapseViewModel()
         {
-            DisplayedInfo = $"({NTimes} times Δt = {TimeDelta}s)";
+            DisplayedInfo = $"{NTimes} times Δt = {TimeDelta}s";
             Header = "Time Lapse";
             PropertyChanged += TimeLapseViewModel_PropertyChanged;
         }
 
         private void TimeLapseViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            DisplayedInfo = $"({NTimes} times Δt = {TimeDelta}s)";
+            DisplayedInfo = $"{NTimes} times Δt = {TimeDelta}s";
         }
 
         public override void Dispose()

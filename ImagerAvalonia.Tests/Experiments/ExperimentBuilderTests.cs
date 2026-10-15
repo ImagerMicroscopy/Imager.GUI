@@ -58,7 +58,7 @@ public sealed class ExperimentBuilderTests : IDisposable
         var node = (DoTimesViewModel)_builder.AddNode(ExperimentElementType.DoTimes, _root);
 
         Assert.Equal(1, node.NumRepeats);
-        Assert.Equal("(1 times)", node.DisplayedInfo);
+        Assert.Equal("1 times", node.DisplayedInfo);
         Assert.Equal(1, ((DoTimesElement)node.ToModel()).NTotal);
     }
 

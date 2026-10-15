@@ -33,7 +33,7 @@ public partial class DetectionElementViewModel : MeasurementElementViewModel
 
         IsAquisitionEnabled = new ObservableCollection<EnabledAcquisition>(
             AvailableAcquisitions.Select(CreateEnabledAcquisition));
-        DisplayedInfo = "(" + string.Join(',', EnabledAcquisitions.Select(x => x.Name).Distinct()) + ")";
+        DisplayedInfo = string.Join(',', EnabledAcquisitions.Select(x => x.Name).Distinct());
 
     }
 
@@ -88,7 +88,7 @@ public partial class DetectionElementViewModel : MeasurementElementViewModel
 
     private void UpdateDisplayedInfo()
     {
-        DisplayedInfo = "(" + string.Join(',', EnabledAcquisitions.Select(x => x.Name).Distinct()) + ")";
+        DisplayedInfo = string.Join(',', EnabledAcquisitions.Select(x => x.Name).Distinct());
     }
 
     public override void Dispose()

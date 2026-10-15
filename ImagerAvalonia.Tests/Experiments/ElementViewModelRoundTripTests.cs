@@ -292,7 +292,7 @@ public sealed class ElementViewModelBehaviourTests : IDisposable
 
         _container.Settings.Acquisitions.RemoveAt(0);
         Assert.Equal(new[] { "B" }, ((DetectionElement)vm.ToModel()).DetectionNames);
-        Assert.Equal("(B)", vm.DisplayedInfo);
+        Assert.Equal("B", vm.DisplayedInfo);
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class ElementViewModelBehaviourTests : IDisposable
         Assert.Equal(-1, vm.CurrentSelectedIndex);
 
         vm.DeleteSelectedItem(); // nothing left, nothing happens
-        Assert.Equal("(0 positions)", vm.DisplayedInfo);
+        Assert.Equal("0 positions", vm.DisplayedInfo);
     }
 
     [Fact]
@@ -397,7 +397,7 @@ public sealed class ElementViewModelBehaviourTests : IDisposable
             TileNegativeX = 1, TilePositiveX = 2, TilePositiveZ = 3,
         };
 
-        Assert.Equal("(X=4,Y=1,Z=4) ", vm.DisplayedInfo);
+        Assert.Equal("X=4,Y=1,Z=4", vm.DisplayedInfo);
         Assert.Equal(3, vm.NumStepsX);
         Assert.Equal(3, vm.NumStepsZ);
     }

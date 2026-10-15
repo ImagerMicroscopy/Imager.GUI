@@ -13,14 +13,14 @@ public partial class DoTimesViewModel : MeasurementElementViewModel
 
     public DoTimesViewModel(GlobalDefinedSettingsViewModel settings)
     {
-        DisplayedInfo = "(1 times)";
-        Header = "Do Times";
+        DisplayedInfo = "1 times";
+        Header = "Do";
     }
 
 
     partial void OnNumRepeatsChanged(int value)
     {
-        DisplayedInfo = $"({NumRepeats} times)";
+        DisplayedInfo = $"{NumRepeats} times";
     }
 
     public override MeasurementElementBase ToModel()

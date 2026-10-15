@@ -31,7 +31,7 @@ public partial class IrradiationPanelViewModel  : MeasurementElementViewModel {
         var available_sources = SourcesViewModels.Select(x => x.Channels.Where(y => y.IsEnabled).Select(z => z.Name)).SelectMany(x => x).ToList();
         Header = "Irradiation";
 
-        DisplayedInfo = "(" + IrradiationTimes + " s with " + string.Join(',', available_sources) + ")";
+        DisplayedInfo = IrradiationTimes + " s with " + string.Join(',', available_sources);
         
         // Subscribe to collection changes in SourcesViewModels
         SourcesViewModels.CollectionChanged += SourcesViewModels_CollectionChanged;
@@ -79,7 +79,7 @@ public partial class IrradiationPanelViewModel  : MeasurementElementViewModel {
 
     private void UpdateDisplayedInfo() {
         var available_sources = SourcesViewModels.Select(x => x.Channels.Where(y => y.IsEnabled).Select(z => z.Name)).SelectMany(x => x).ToList();
-        DisplayedInfo = "(" + IrradiationTimes + " s with " + string.Join(',', available_sources) + ")";
+        DisplayedInfo = IrradiationTimes + " s with " + string.Join(',', available_sources);
     }
 
     [RelayCommand]

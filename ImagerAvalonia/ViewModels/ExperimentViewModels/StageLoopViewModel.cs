@@ -59,14 +59,14 @@ namespace ImagerAvalonia.ViewModels
 
 
             AvailableStages = StageControl.AvailableStages;
-            DisplayedInfo = "(0 positions)";
+            DisplayedInfo = "0 positions";
             XYPositions.CollectionChanged += XYPositions_CollectionChanged;
         }
 
 
         public void XYPositions_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            DisplayedInfo = $"({XYPositions.Count} positions)";
+            DisplayedInfo = $"{XYPositions.Count} positions";
         }
 
         public void DeleteSelectedItem()

@@ -90,7 +90,7 @@ public partial class RelStageViewModel : MeasurementElementViewModel
         _stageControl = stageControl;
         
         AvailableStages = _stageControl.AvailableStages;
-        DisplayedInfo = $"(X={TileNegativeX + TilePositiveX + 1},Y={TileNegativeY + TilePositiveY + 1},Z={TileNegativeZ + TilePositiveZ + 1}) ";
+        DisplayedInfo = $"X={TileNegativeX + TilePositiveX + 1},Y={TileNegativeY + TilePositiveY + 1},Z={TileNegativeZ + TilePositiveZ + 1}";
         Header = "Relative Stage Loop";
 
 
@@ -115,7 +115,7 @@ public partial class RelStageViewModel : MeasurementElementViewModel
             
 
             
-            DisplayedInfo = $"(X={TileNegativeX + TilePositiveX+1},Y={TileNegativeY + TilePositiveY+1},Z={TileNegativeZ + TilePositiveZ + 1}) ";
+            DisplayedInfo = $"X={TileNegativeX + TilePositiveX+1},Y={TileNegativeY + TilePositiveY+1},Z={TileNegativeZ + TilePositiveZ + 1}";
         };
     }
 

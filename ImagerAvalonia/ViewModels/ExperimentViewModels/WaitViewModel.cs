@@ -16,7 +16,7 @@ public partial class WaitViewModel : MeasurementElementViewModel
 
     public WaitViewModel()
     {
-        DisplayedInfo = $"({WaitPeriod} seconds)";
+        DisplayedInfo = $"{WaitPeriod} seconds";
         Header = "Wait";
     }
 
@@ -39,12 +39,12 @@ public partial class WaitViewModel : MeasurementElementViewModel
             Elementid = parsedId;
         }
 
-        DisplayedInfo = $"({WaitPeriod} seconds)";
+        DisplayedInfo = $"{WaitPeriod} seconds";
     }
 
     partial void OnWaitPeriodChanged(double value)
     {
-        DisplayedInfo = $"({WaitPeriod} seconds)";
+        DisplayedInfo = $"{WaitPeriod} seconds";
     }
 }
 
