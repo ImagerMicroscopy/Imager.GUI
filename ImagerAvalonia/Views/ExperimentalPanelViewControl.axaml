@@ -97,8 +97,9 @@
 					<Setter Property="BorderBrush" Value="#8a5bd0" />
 				</Style>
 
-				<!-- Selected node card gets the accent-colored border -->
-				<Style Selector="Border.node.selected">
+				<!-- The selected node card follows the tree view's real selection state,
+				     so programmatic selection updates highlight the right card too. -->
+				<Style Selector="TreeViewItem:selected Border.node">
 					<Setter Property="BorderBrush" Value="#ad76ea" />
 				</Style>
 				<Style Selector="TreeViewItem">
@@ -165,11 +166,6 @@
 					<Setter Property="BorderBrush" Value="#8a5bd0" />
 				</Style>
 
-				<!-- Selected node card gets the accent-colored border (class toggled in code-behind) -->
-				<Style Selector="Border.node.selected">
-					<Setter Property="BorderBrush" Value="#ad76ea" />
-				</Style>
-				
 			</TreeView.Styles>
 			<TreeView.ItemContainerTheme>
 				<ControlTheme TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
@@ -182,19 +178,14 @@
 
 			<TreeView.DataTemplates>
 				<TreeDataTemplate DataType="vm:MeasurementElementViewModel" ItemsSource="{Binding Children}">
-					<StackPanel ClipToBounds="False" Height="34">
-						<StackPanel Orientation="Horizontal"
-									Height="6"
-									HorizontalAlignment="Left"
-									Opacity="0"
-									DragDrop.AllowDrop="True"
-									DragDrop.DragOver="OnInsertBeforeDragOver"
-									DragDrop.DragLeave="OnInsertBeforeDragLeave"
-									DragDrop.Drop="OnInsertBeforeDrop">
-							<Ellipse Width="5" Height="5" Fill="#ad76ea" />
-							<Rectangle Margin="-1 0 0 0" Width="204" Height="3" Fill="#ad76ea" />
-						</StackPanel>
-						<Border Classes="node"
+					<Grid ClipToBounds="False" Height="34">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
+						</Grid.RowDefinitions>
+						<Border x:Name="InsertBeforeLine" Grid.Row="0" Height="3" Background="#ad76ea" Opacity="0" IsHitTestVisible="False" CornerRadius="2" />
+						<Border Classes="node" Grid.Row="1"
 								ClipToBounds="False"
 								DragDrop.AllowDrop="True"
 								PointerPressed="OnNodePointerPressed"
@@ -240,7 +231,8 @@
 								</StackPanel>
 							</Grid>
 						</Border>
-					</StackPanel>
+						<Border x:Name="InsertAfterLine" Grid.Row="2" Height="3" Background="#ad76ea" Opacity="0" IsHitTestVisible="False" CornerRadius="2" />
+					</Grid>
 				</TreeDataTemplate>
 				<TreeDataTemplate DataType="vm:RootNode" ItemsSource="{Binding Children}">
 					<Border Classes="node"

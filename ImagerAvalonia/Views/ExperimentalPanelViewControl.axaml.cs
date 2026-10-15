@@ -23,9 +23,6 @@ public partial class ExperimentalPanelViewControl : UserControl
     private Border? _pressedBorder;
     private MeasurementElementViewModel? _draggedNode;
 
-    // Tracks which node's Border currently has the "selected" class applied.
-    private Border? _selectedNodeBorder;
-
     public event EventHandler<MeasurementElementViewModel>? DetectionDoubleTapped;
 
     public ExperimentalPanelViewControl(ExperimentalPanelViewModel expViewModel)
@@ -65,12 +62,6 @@ public partial class ExperimentalPanelViewControl : UserControl
             return;
         }
 
-        // --- Selection highlight ---
-        _selectedNodeBorder?.Classes.Remove("selected");
-        border.Classes.Add("selected");
-        _selectedNodeBorder = border;
-        // ---------------------------
-
         _pressedBorder = border;
         _pointerPressedPosition = e.GetPosition(border);
     }
@@ -107,245 +98,297 @@ public partial class ExperimentalPanelViewControl : UserControl
         dragData.Set(DragFormat, node);
 
         border.Cursor = new Cursor(StandardCursorType.Hand);
-        await DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy | DragDropEffects.Move);
-        border.Cursor = Cursor.Default;
+        try
+        {
+            await DragDrop.DoDragDrop(e, dragData, DragDropEffects.Copy | DragDropEffects.Move);
+        }
+        catch (Exception)
+        {
+            // A failed drag must never take the application down.
+        }
+        finally
+        {
+            border.Cursor = Cursor.Default;
+        }
 
         _draggedNode = null;
     }
 
+    // =========================
+    // Drag and drop
+    //
+    // Every node card is a single drop target with three zones: dragging over
+    // the top quarter of the card inserts the dragged node before it, the
+    // bottom quarter inserts it after it, and the middle nests it inside (for
+    // containers). Leaves cannot contain anything, so their whole lower part
+    // means "insert after". The root only accepts nesting.
+    // =========================
 
+    private enum DropZone
+    {
+        InsertBefore,
+        InsertAfter,
+        Nest
+    }
 
     public void OnNodeDragOver(object sender, DragEventArgs e)
     {
-        if (!TryGetDropTarget(sender, e, out var destNode))
+        if (!TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
+            || !IsValidDrop(draggedNode, destNode, zone))
         {
             e.DragEffects = DragDropEffects.None;
-            HighlightDropTarget(null);
+            ShowDropFeedback(null, DropZone.Nest);
             return;
         }
 
         e.DragEffects = DragDropEffects.Move;
-        HighlightDropTarget(sender as Border);
+        ShowDropFeedback(card, zone);
     }
 
     public void OnNodeDragLeave(object sender, RoutedEventArgs e)
     {
-        HighlightDropTarget(null);
+        ShowDropFeedback(null, DropZone.Nest);
     }
 
     public void OnNodeDrop(object sender, DragEventArgs e)
     {
-        HighlightDropTarget(null);
+        ShowDropFeedback(null, DropZone.Nest);
 
-        if (!TryGetDropTarget(sender, e, out var destNode))
+        if (!TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
+            || !IsValidDrop(draggedNode, destNode, zone))
         {
             return;
         }
 
-        MoveNode(_draggedNode!, destNode);
-    }
-
-    // Drop zone rendered as a thin strip above each node; dropping here inserts the
-    // dragged node as a sibling immediately before the node instead of nesting into it.
-    public void OnInsertBeforeDragOver(object sender, DragEventArgs e)
-    {
-        if (!TryGetInsertBeforeTarget(sender, e, out _))
+        switch (zone)
         {
-            e.DragEffects = DragDropEffects.None;
-            HighlightInsertStrip(null);
-            return;
+            case DropZone.InsertBefore:
+                InsertBefore(draggedNode, destNode);
+                break;
+            case DropZone.InsertAfter:
+                InsertAfter(draggedNode, destNode);
+                break;
+            default:
+                NestInto(draggedNode, destNode);
+                break;
         }
-
-        e.DragEffects = DragDropEffects.Move;
-        HighlightInsertStrip(sender as Control);
     }
 
-    public void OnInsertBeforeDragLeave(object sender, RoutedEventArgs e)
+    private bool TryGetDrop(object? sender, DragEventArgs e,
+        out Border card, out MeasurementElementViewModel draggedNode,
+        out MeasurementElementViewModel destNode, out DropZone zone)
     {
-        HighlightInsertStrip(null);
-    }
-
-    public void OnInsertBeforeDrop(object sender, DragEventArgs e)
-    {
-        HighlightInsertStrip(null);
-
-        if (!TryGetInsertBeforeTarget(sender, e, out var destNode))
-        {
-            return;
-        }
-
-        InsertBefore(_draggedNode!, destNode);
-    }
-
-    private bool TryGetInsertBeforeTarget(object sender, DragEventArgs e, out MeasurementElementViewModel destNode)
-    {
+        card = null!;
+        draggedNode = null!;
         destNode = null!;
+        zone = DropZone.Nest;
 
-        if (!e.Data.Contains(DragFormat) || e.Data.Get(DragFormat) is not MeasurementElementViewModel draggedNode)
+        if (!e.Data.Contains(DragFormat) || e.Data.Get(DragFormat) is not MeasurementElementViewModel dragged)
         {
             return false;
         }
 
-        if (sender is not Control strip || strip.DataContext is not MeasurementElementViewModel candidate)
+        if (sender is not Border border || border.DataContext is not MeasurementElementViewModel dest)
         {
             return false;
         }
 
-        if (candidate is RootNode || candidate == draggedNode || candidate.Parent == draggedNode)
-        {
-            return false;
-        }
-
-        if (CheckIfNodeIsParentOfChild(draggedNode, candidate))
-        {
-            return false;
-        }
-
-        destNode = candidate;
+        card = border;
+        draggedNode = dragged;
+        destNode = dest;
+        zone = GetDropZone(border, e, dest);
         return true;
     }
 
-    private Control? _highlightedStrip;
-
-    private void HighlightInsertStrip(Control? strip)
+    private static DropZone GetDropZone(Border card, DragEventArgs e, MeasurementElementViewModel destNode)
     {
-        if (_highlightedStrip == strip)
+        if (destNode is RootNode)
         {
-            return;
+            return DropZone.Nest;
         }
 
-        if (_highlightedStrip != null)
+        double relativeY = e.GetPosition(card).Y / card.Bounds.Height;
+
+        if (!destNode.CanHaveChildren)
         {
-            _highlightedStrip.Opacity = 0;
+            // Leaves cannot nest anything, so only the top quarter means "before".
+            return relativeY < 0.25 ? DropZone.InsertBefore : DropZone.InsertAfter;
         }
 
-        if (strip != null)
+        if (relativeY < 0.25)
         {
-            strip.Opacity = 1;
+            return DropZone.InsertBefore;
         }
 
-        _highlightedStrip = strip;
+        if (relativeY > 0.75)
+        {
+            return DropZone.InsertAfter;
+        }
+
+        return DropZone.Nest;
     }
 
-    private void InsertBefore(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
+    private static bool IsValidDrop(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode, DropZone zone)
     {
-        var oldParent = draggedNode.Parent;
-        var newParent = destNode.Parent;
+        if (draggedNode == destNode)
+        {
+            return false;
+        }
 
-        oldParent.Children.Remove(draggedNode);
-        int insertIndex = newParent.Children.IndexOf(destNode);
+        // Never allow dropping a node into its own subtree, in any zone.
+        if (CheckIfNodeIsParentOfChild(draggedNode, destNode))
+        {
+            return false;
+        }
 
-        newParent.Children.Insert(insertIndex, draggedNode);
-        draggedNode.Parent = newParent;
+        if (zone == DropZone.Nest)
+        {
+            return destNode.CanHaveChildren;
+        }
+
+        // Inserting before or after requires the target to sit in a parent list.
+        return destNode.Parent != null;
     }
 
-    private bool TryGetDropTarget(object sender, DragEventArgs e, out MeasurementElementViewModel destNode)
+    private Border? _highlightedCard;
+    private Border? _highlightedBeforeLine;
+    private Border? _highlightedAfterLine;
+
+    // Draws the drop feedback: an accent border for nesting, or a purple
+    // insertion line at the top or bottom edge of the hovered card for sibling
+    // positions. A null card clears any previous feedback.
+    private void ShowDropFeedback(Border? card, DropZone zone)
     {
-        destNode = null!;
-
-        if (!e.Data.Contains(DragFormat) || e.Data.Get(DragFormat) is not MeasurementElementViewModel draggedNode)
-        {
-            return false;
-        }
-
-        if (sender is not Border border || border.DataContext is not MeasurementElementViewModel candidate)
-        {
-            return false;
-        }
-
-        if (candidate == draggedNode)
-        {
-            return false;
-        }
-
-        if (CheckIfNodeIsParentOfChild(draggedNode, candidate))
-        {
-            return false;
-        }
-
-        destNode = candidate;
-        return true;
-    }
-
-    private Border? _highlightedBorder;
-
-    private void HighlightDropTarget(Border? border)
-    {
-        if (_highlightedBorder == border)
-        {
-            return;
-        }
-
-        if (_highlightedBorder != null)
+        if (_highlightedCard != null)
         {
             // IMPORTANT: clear the local value instead of setting it back to a
             // hardcoded color. Setting it (even to the "default" color) leaves a
             // local value on this Border forever, which will permanently outrank
-            // any style setter (including the .selected class) for this element.
-            _highlightedBorder.ClearValue(Border.BorderBrushProperty);
+            // any style setter (including the selected-card style) for this element.
+            _highlightedCard.ClearValue(Border.BorderBrushProperty);
+            _highlightedCard = null;
         }
 
-        if (border != null)
+        if (_highlightedBeforeLine != null)
         {
-            border.BorderBrush = new SolidColorBrush(Color.Parse("#ad76ea"));
+            _highlightedBeforeLine.Opacity = 0;
+            _highlightedBeforeLine = null;
         }
 
-        _highlightedBorder = border;
-    }
-
-    private void SwapNodes(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
-    {
-        var draggedParent = draggedNode.Parent;
-        var destParent = destNode.Parent;
-
-        if (draggedParent == destParent)
+        if (_highlightedAfterLine != null)
         {
-            var siblings = draggedParent.Children;
-            int draggedIndex = siblings.IndexOf(draggedNode);
-            int destIndex = siblings.IndexOf(destNode);
-            (siblings[draggedIndex], siblings[destIndex]) = (siblings[destIndex], siblings[draggedIndex]);
+            _highlightedAfterLine.Opacity = 0;
+            _highlightedAfterLine = null;
+        }
+
+        if (card == null)
+        {
             return;
         }
 
-        int draggedInd = draggedParent.Children.IndexOf(draggedNode);
-        int destInd = destParent.Children.IndexOf(destNode);
+        switch (zone)
+        {
+            case DropZone.Nest:
+                card.BorderBrush = new SolidColorBrush(Color.Parse("#ad76ea"));
+                _highlightedCard = card;
+                break;
 
-        draggedParent.Children[draggedInd] = destNode;
-        destParent.Children[destInd] = draggedNode;
+            case DropZone.InsertBefore:
+                _highlightedBeforeLine = FindInsertLine(card, "InsertBeforeLine");
+                if (_highlightedBeforeLine != null)
+                {
+                    _highlightedBeforeLine.Opacity = 1;
+                }
+                break;
 
-        destNode.Parent = draggedParent;
-        draggedNode.Parent = destParent;
+            case DropZone.InsertAfter:
+                _highlightedAfterLine = FindInsertLine(card, "InsertAfterLine");
+                if (_highlightedAfterLine != null)
+                {
+                    _highlightedAfterLine.Opacity = 1;
+                }
+                break;
+        }
     }
 
-    private void MoveNode(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
+    private static Border? FindInsertLine(Border card, string name)
     {
-        if (destNode is RootNode)
+        if (card.Parent is not Grid grid)
         {
-            if (!draggedNode.MeasurementElement.CanHaveChildren() && destNode.MeasurementElement.CanHaveChildren())
+            return null;
+        }
+
+        foreach (var child in grid.Children)
+        {
+            if (child is Border b && b.Name == name)
             {
-                draggedNode.Parent.Children.Remove(draggedNode);
-                destNode.Children.Add(draggedNode);
-                draggedNode.Parent = destNode;
+                return b;
             }
+        }
+
+        return null;
+    }
+
+    // =========================
+    // Move operations (all through ExperimentBuilder.MoveNode, which validates
+    // ancestors, container capability and index bounds)
+    // =========================
+
+    private void NestInto(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
+    {
+        if (draggedNode.FindRoot() is not RootNode root || root.Builder is not { } builder)
+        {
             return;
         }
 
-        bool destCanHaveChildren = destNode.MeasurementElement.CanHaveChildren();
-        bool draggedCanHaveChildren = draggedNode.MeasurementElement.CanHaveChildren();
-
-        if ((destCanHaveChildren && !draggedCanHaveChildren) || (destCanHaveChildren && draggedCanHaveChildren))
-        {
-            draggedNode.Parent.Children.Remove(draggedNode);
-            destNode.Children.Add(draggedNode);
-            draggedNode.Parent = destNode;
-        }
-        else if (!destCanHaveChildren && !draggedCanHaveChildren)
-        {
-            SwapNodes(draggedNode, destNode);
-        }
+        // Nest at the end. The builder counts the index against the list after
+        // the dragged node is removed, so a node that already lives in this
+        // container appends at Count - 1 instead of Count.
+        int appendIndex = destNode.Children.Count - (draggedNode.Parent == destNode ? 1 : 0);
+        builder.MoveNode(draggedNode, destNode, appendIndex);
     }
 
-    private bool CheckIfNodeIsParentOfChild(MeasurementElementViewModel node, MeasurementElementViewModel child)
+    private void InsertBefore(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
+    {
+        if (draggedNode.FindRoot() is not RootNode root || root.Builder is not { } builder)
+        {
+            return;
+        }
+
+        var newParent = destNode.Parent!;
+        int insertIndex = newParent.Children.IndexOf(destNode);
+
+        // The builder validates the index against the list as it will look after
+        // the dragged node is removed, so a node taken from before the target
+        // shifts the index down by one.
+        if (draggedNode.Parent == newParent && newParent.Children.IndexOf(draggedNode) < insertIndex)
+        {
+            insertIndex--;
+        }
+
+        builder.MoveNode(draggedNode, newParent, insertIndex);
+    }
+
+    private void InsertAfter(MeasurementElementViewModel draggedNode, MeasurementElementViewModel destNode)
+    {
+        if (draggedNode.FindRoot() is not RootNode root || root.Builder is not { } builder)
+        {
+            return;
+        }
+
+        var newParent = destNode.Parent!;
+        int insertIndex = newParent.Children.IndexOf(destNode) + 1;
+
+        // Same post-removal adjustment as InsertBefore.
+        if (draggedNode.Parent == newParent && newParent.Children.IndexOf(draggedNode) < newParent.Children.IndexOf(destNode))
+        {
+            insertIndex--;
+        }
+
+        builder.MoveNode(draggedNode, newParent, insertIndex);
+    }
+
+    private static bool CheckIfNodeIsParentOfChild(MeasurementElementViewModel node, MeasurementElementViewModel child)
     {
         foreach (MeasurementElementViewModel child_node in node.Children)
         {
