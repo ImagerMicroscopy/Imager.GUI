@@ -65,7 +65,11 @@ public partial class ImageDisplayViewModel : ViewModelBase
     [ObservableProperty] ObservableCollection<XYStagePosition> _availableStagePositions  = new();
 
     public CancellationTokenSource source { get; set; } = new();
-    public ImageHandler ImageHanlder { get; internal set; }
+
+    // The ImageHandler this view model is currently wired up to. Tracked here (rather
+    // than asking the workspace) so DetachHandler always unsubscribes the exact instance
+    // that was subscribed, even if the workspace has already moved on to another session.
+    private ImageHandler? _attachedHandler;
 
 
 
@@ -113,6 +117,50 @@ public partial class ImageDisplayViewModel : ViewModelBase
     {
         LiveViewDisabled?.Invoke(this, new EventArgs());
 
+    }
+
+    /// <summary>
+    /// Routes the given handler's display events into this view model. When
+    /// enableFrameRequests is set, slider frame requests are also routed back into the
+    /// handler, so saved frames can be browsed (measurements and opened files; live
+    /// acquisition does not support that). Any previously attached handler is detached
+    /// first, so subscriptions never accumulate.
+    /// </summary>
+    public void AttachHandler(ImageHandler handler, bool enableFrameRequests)
+    {
+        DetachHandler();
+        _attachedHandler = handler;
+
+        handler.UpdateImageDisplay += ProcessImages;
+        handler.UpdateImageElements += ProcessImageElements;
+        handler.UpdateCurrentPositions += ProcessPositions;
+        LiveViewDisabled += handler.EnableDisableLiveView;
+
+        if (enableFrameRequests)
+        {
+            OnDetectionRequested += handler.LoadImage;
+            handler.UpdateAsyncProgress += ProcessProgress;
+        }
+    }
+
+    /// <summary>
+    /// Detaches the handler previously attached with <see cref="AttachHandler"/>. Safe to
+    /// call when nothing is attached.
+    /// </summary>
+    public void DetachHandler()
+    {
+        if (_attachedHandler == null) return;
+        var handler = _attachedHandler;
+        _attachedHandler = null;
+
+        handler.UpdateImageDisplay -= ProcessImages;
+        handler.UpdateImageElements -= ProcessImageElements;
+        handler.UpdateCurrentPositions -= ProcessPositions;
+        LiveViewDisabled -= handler.EnableDisableLiveView;
+
+        // No-ops if they were never added (display-only attachments).
+        OnDetectionRequested -= handler.LoadImage;
+        handler.UpdateAsyncProgress -= ProcessProgress;
     }
 
     partial void OnShowLiveViewChanged(bool value)

@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,11 +29,21 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     [ObservableProperty] private ImageDisplayViewModel _liveView;
     [ObservableProperty] private FieldViewerViewModel _fieldView;
     [ObservableProperty] private ImageDisplayViewModel? _selectedView;
+    [ObservableProperty] private ImageTabViewModel? _selectedTab;
     [ObservableProperty] private bool _isExperimentEnabled = false;
-    [ObservableProperty] private bool _isStageAvailable = true;
     [ObservableProperty] private bool _isLiveEnabled = false;
 
-    [ObservableProperty] private string _tifDataPath = String.Empty;
+    /// <summary>
+    /// All tabs of the center panel: the three fixed tabs (Live view, Field view, Smart
+    /// Program) followed by one closable tab per measurement or opened file. Every
+    /// measurement runs in its own tab, so its images stay visible after the run while
+    /// later runs get new tabs.
+    /// </summary>
+    public ObservableCollection<ImageTabViewModel> Tabs { get; } = new();
+
+    // The tab created for the measurement that is being started; claimed by
+    // Workspace_SessionStarted when its session begins acquiring.
+    private ImageTabViewModel? _activeMeasurementTab;
 
     private readonly ILogger _logger;
     private readonly IImagerConnectionHandler _connectionHandler;
@@ -41,24 +52,14 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     private readonly ExperimentManager _experimentManager;
     public GlobalDefinedSettingsViewModel? DefinedAcquisitions;
 
-    // The ImageHandler currently wired up to LiveView/FieldView events.
-    // This is the ONLY source of truth for what we're subscribed to — never
-    // rely on _workspace.ActiveImageHandler at unsubscribe time, since by
-    // then it may already point to a different (or null) instance.
-    private ImageHandler? _subscribedHandler;
-
-    public ImageHandler? LiveImageHandler => _workspace.ActiveImageHandler;
-
     public event EventHandler<ILifetimeScope>? OnInitializeExperiment;
-    public event EventHandler<ILifetimeScope>? OnInitializeLive;
-    public event EventHandler<ILifetimeScope>? OnInitializeTifReader;
-
     public event EventHandler? OnFinishExperiment;
 
     public ImageControlPanelViewModel(
         ILoggerFactory loggerFactory,
         ImageDisplayViewModel liveView,
         FieldViewerViewModel fieldView,
+        SmartProcessingRegisterViewModel smartPrograms,
         IImagerConnectionHandler connectionHandler,
         IImageDisplayViewModelFactory imageVmFactory,
         ImagerWorkspace workspace,
@@ -72,75 +73,31 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         _workspace = workspace;
         _experimentManager = experimentManager;
 
-
+        // The fixed tabs are never closed; measurements and opened files join them.
+        Tabs.Add(new ImageTabViewModel("Live view", liveView, isFixed: true));
+        Tabs.Add(new ImageTabViewModel("Field view", fieldView, isFixed: true));
+        Tabs.Add(new ImageTabViewModel("Smart Program", smartPrograms, isFixed: true));
+        SelectedTab = Tabs[0];
 
         // Wire up to workspace events
-        _workspace.LiveScopeCreated += Workspace_LiveHandlerCreated;
-        _workspace.ExperimentScopeCreated += Workspace_ExperimentHandlerCreated;
-        _workspace.HandlerDestroyed += Workspace_HandlerDestroyed;
-        _workspace.ExperimentFinished += Workspace_ExperimentFinished;
+        _workspace.SessionStarted += Workspace_SessionStarted;
+        _workspace.SessionStopped += Workspace_SessionStopped;
+        _workspace.SessionFinished += Workspace_SessionFinished;
 
         IsLiveEnabled = _workspace.IsLiveEnabled;
         IsExperimentEnabled = _workspace.IsExperimentEnabled;
     }
 
-    private async void OnEndLiveRequested(object? sender, EventArgs e)
+    partial void OnSelectedTabChanged(ImageTabViewModel? value)
     {
-        await EnableLive();
-    }
-    private async void OnStartLiveRequested(object? sender, EventArgs e)
-    {
-        await EnableLive();
+        // Keep the last measurement/file view while a fixed tab is active; MainView
+        // reads SelectedView when splitting the current file.
+        if (value is { IsFixed: false, ViewModel: { } viewModel })
+            SelectedView = viewModel;
     }
 
     protected virtual void InitializeExperiment(ILifetimeScope scope) =>
         OnInitializeExperiment?.Invoke(this, scope);
-
-    protected virtual void InitializeLive(ILifetimeScope scope) =>
-        OnInitializeLive?.Invoke(this, scope);
-
-    protected virtual void InitializeTifReader(ILifetimeScope scope) =>
-        OnInitializeTifReader?.Invoke(this, scope);
-
-    public void LoadTifData(ImageDisplayViewModel tifViewer, string path)
-    {
-        var scope = App.Container.BeginLifetimeScope();
-        var storageProvider = scope.Resolve<IStorageProvider>();
-
-        storageProvider.SetStoragePath(path);
-        storageProvider.OpenReadStream();
-        string program = storageProvider.GetImagerProgram();
-        var loader   = new ExperimentLoaderService();
-        var programTree = loader.GetProgramTree(program);
-
-
-        var detections = programTree.Detections;
-        var acqdetpairs = detections.Select(x => x.Value.Detectors.Select(y => new Tuple<string,string>(x.Key, y.Detectorname)))
-            .SelectMany(x => x)
-            .ToList();
-
-
-        var stagePositions = new List<XYStagePosition>();
-        ExperimentManager.ReturnStagePositions(programTree.Program, ref stagePositions);    
-
-        InitializeTifReader(scope);
-
-        var tifHandler = new ImageHandler(storageProvider, _logger, _connectionHandler);
-
-
-
-        storageProvider.SetAcqDetPairs(acqdetpairs);
-        tifViewer.SetOpenID(storageProvider.GetOpenID());
-        tifViewer.SetGridData(acqdetpairs);
-        tifViewer.SetAvailableXYPositions(stagePositions);
-
-
-        tifViewer.OnDetectionRequested += tifHandler.LoadImage;
-        tifViewer.MaxFrameCount = storageProvider.LoadMaxFrameNumber();
-        tifHandler.UpdateImageDisplay += tifViewer.ProcessImages;
-        tifHandler.UpdateCurrentPositions += tifViewer.ProcessPositions;
-        tifViewer.LoadFirstImage();
-    }
 
     [RelayCommand]
     public async Task EnableLive()
@@ -160,17 +117,29 @@ public partial class ImageControlPanelViewModel : ViewModelBase
     [RelayCommand]
     public async Task StartExperiment()
     {
+        // The button doubles as the stop button: when a measurement is running, this
+        // call stops it and must not create a tab.
+        var willStop = _workspace.IsExperimentEnabled;
+
+        ImageTabViewModel? tab = null;
         try
         {
-
             var experiment = _experimentManager.ReturnMeasurementTree();
             var storagepath = _experimentManager.GetStoragePath();
             var isstorageenabeld = _experimentManager.IsStorageEnabled();
             if (storagepath == null) throw new InvalidOperationException("Storage path is not set.");
             var detections = _experimentManager.ReturnUsedDetections();
             var stagePositions = ExperimentManager.ReturnUsedStagePositions(experiment);
-            LiveView.SetAvailableXYPositions(stagePositions);
             var fullEquipmentStateJson = _experimentManager.BuildFullEquipmentStateJson();
+
+            if (!willStop)
+            {
+                // Every measurement runs in its own tab; the session started below attaches to it.
+                tab = CreateImageTab(Path.GetFileNameWithoutExtension(storagepath));
+                tab.ViewModel!.SetAvailableXYPositions(stagePositions);
+                _activeMeasurementTab = tab;
+            }
+
             await _workspace.ToggleExperimentAsync(
                 experiment,
                 storagepath,
@@ -182,135 +151,157 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            if (tab != null && tab.Session == null)
+            {
+                // The run never started - don't leave a stray tab behind.
+                CloseImageTab(tab);
+            }
             IsExperimentEnabled = _workspace.IsExperimentEnabled;
             await ExceptionWindowHandler.ShowExceptionAsync(ex);
         }
     }
 
-    /// <summary>
-    /// Wires up all LiveView/FieldView <-> ImageHandler event subscriptions for the given
-    /// handler instance, and records that instance so it can be correctly unsubscribed later
-    /// regardless of what _workspace.ActiveImageHandler points to at that time.
-    /// </summary>
-    /// <param name="handler">The handler instance to subscribe to.</param>
-    /// <param name="isExperiment">
-    /// True to also wire the experiment-only subscriptions (progress reporting and
-    /// detection-request routing from LiveView into the handler).
-    /// </param>
-    private void SubscribeToHandler(ImageHandler handler, bool isExperiment)
+    /// <summary>Opens a saved measurement file in a new closable tab.</summary>
+    public void OpenFileInNewTab(string filePath)
     {
-        // Defensive: if something is already wired (shouldn't normally happen), tear it
-        // down first so we never end up with duplicate subscriptions.
-        UnsubscribeFromHandler();
+        var localPath = new Uri(filePath).LocalPath.Replace("\\\\", "/");
+        var fileName = Path.GetFileName(localPath);
 
-        _subscribedHandler = handler;
-
-        handler.UpdateImageDisplay += LiveView.ProcessImages;
-        handler.UpdateImageElements += LiveView.ProcessImageElements;
-        handler.UpdateFieldViewDisplay += FieldView.ProcessImages;
-        handler.UpdateCurrentPositions += LiveView.ProcessPositions;
-        LiveView.LiveViewDisabled += handler.EnableDisableLiveView;
-
-        if (isExperiment)
+        var scope = App.Container.BeginLifetimeScope();
+        try
         {
-            LiveView.OnDetectionRequested += handler.LoadImage;
-            handler.UpdateAsyncProgress += LiveView.ProcessProgress;
+            var storageProvider = scope.Resolve<IStorageProvider>();
+            storageProvider.SetStoragePath(localPath);
+            storageProvider.OpenReadStream();
+            string program = storageProvider.GetImagerProgram();
+            var loader   = new ExperimentLoaderService();
+            var programTree = loader.GetProgramTree(program);
+
+            var detections = programTree.Detections;
+            var acqdetpairs = detections.Select(x => x.Value.Detectors.Select(y => new Tuple<string,string>(x.Key, y.Detectorname)))
+                .SelectMany(x => x)
+                .ToList();
+
+            var stagePositions = new List<XYStagePosition>();
+            ExperimentManager.ReturnStagePositions(programTree.Program, ref stagePositions);
+
+            var session = new AcquisitionSession(
+                AcquisitionSessionKind.File,
+                scope,
+                storageProvider,
+                new ImageHandler(storageProvider, _logger, _connectionHandler),
+                new CancellationTokenSource());
+
+            var tab = CreateImageTab(fileName);
+            tab.AttachSession(session);
+            tab.ViewModel!.SetOpenID(storageProvider.GetOpenID());
+            tab.ViewModel!.SetGridData(acqdetpairs);
+            tab.ViewModel!.SetAvailableXYPositions(stagePositions);
+            tab.ViewModel!.MaxFrameCount = storageProvider.LoadMaxFrameNumber();
+            tab.ViewModel!.LoadFirstImage();
+        }
+        catch (Exception ex)
+        {
+            scope.Dispose();
+            _ = ExceptionWindowHandler.ShowExceptionAsync(ex);
         }
     }
 
     /// <summary>
-    /// Tears down all event subscriptions previously wired by <see cref="SubscribeToHandler"/>,
-    /// using the captured <see cref="_subscribedHandler"/> instance rather than the (possibly
-    /// stale or null) <see cref="LiveImageHandler"/> property. Safe to call multiple times.
+    /// Closes a tab. Returns false (tab kept) for the fixed tabs and while its
+    /// measurement is running.
     /// </summary>
-    private void UnsubscribeFromHandler()
+    public bool CloseImageTab(ImageTabViewModel tab)
     {
-        if (_subscribedHandler is null) return;
-
-        var handler = _subscribedHandler;
-
-        handler.UpdateImageDisplay -= LiveView.ProcessImages;
-        handler.UpdateImageElements -= LiveView.ProcessImageElements;
-        handler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-        handler.UpdateCurrentPositions -= LiveView.ProcessPositions;
-        LiveView.LiveViewDisabled -= handler.EnableDisableLiveView;
-
-        // These are no-ops if they were never added (experiment-only subscriptions),
-        // which is fine — event -= is safe against handlers that were never attached.
-        LiveView.OnDetectionRequested -= handler.LoadImage;
-        handler.UpdateAsyncProgress -= LiveView.ProcessProgress;
-
-        _subscribedHandler = null;
+        if (!tab.IsClosable) return false;
+        tab.Dispose();
+        Tabs.Remove(tab);
+        return true;
     }
 
-    private void Workspace_LiveHandlerCreated(object? sender, ILifetimeScope scope)
+    private ImageTabViewModel CreateImageTab(string name)
     {
-        IsLiveEnabled = true;
-        InitializeLive(scope);
+        var scope = App.Container.BeginLifetimeScope();
+        var viewModel = _imageVmFactory.Create(scope);
+        var tab = new ImageTabViewModel(name, viewModel, viewModelScope: scope);
+        Tabs.Add(tab);
+        SelectedTab = tab; // showing a new tab selects it
+        return tab;
+    }
 
-        if (LiveImageHandler != null && _workspace.ActiveStorageProvider != null)
+    private ImageTabViewModel? FindTab(AcquisitionSession session) =>
+        Tabs.FirstOrDefault(t => ReferenceEquals(t.Session, session));
+
+    private void Workspace_SessionStarted(object? sender, AcquisitionSession session)
+    {
+        if (session.Kind == AcquisitionSessionKind.File) return; // file tabs attach themselves
+
+        session.Handler.UpdateFieldViewDisplay += FieldView.ProcessImages;
+        FieldView.SetGridData(session.StorageProvider.GetStorageSchema());
+
+        if (session.Kind == AcquisitionSessionKind.Live)
         {
-            SubscribeToHandler(LiveImageHandler, isExperiment: false);
+            IsLiveEnabled = true;
+            // Show the Live view tab when live starts, so the acquisition is visible.
+            SelectedTab = Tabs.First(t => t.Content == LiveView);
+            LiveView.AttachHandler(session.Handler, enableFrameRequests: false);
             LiveView.SetAvailableXYPositions(new List<XYStagePosition>() { });
-
-            //LiveView.SetExperimentSerializer(_workspace.ActiveExperimentSerializer);
-            LiveView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
-            FieldView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
-
+            LiveView.SetGridData(session.StorageProvider.GetStorageSchema());
             LiveView.IsExperimentRunning = false;
             LiveView.IsDataStreaming = true;
-            LiveView.MaxFrameCount = _workspace.ActiveStorageProvider.GetMaxNumberOfFrames();
+            LiveView.MaxFrameCount = session.StorageProvider.GetMaxNumberOfFrames();
+        }
+        else
+        {
+            IsExperimentEnabled = true;
+            var tab = _activeMeasurementTab;
+            _activeMeasurementTab = null;
+            if (tab == null) return;
+
+            tab.AttachSession(session);
+            tab.ViewModel!.ShowLiveView = true;
+            tab.ViewModel!.SetGridData(session.StorageProvider.GetStorageSchema());
+            tab.ViewModel!.IsDataStreaming = true;
+            tab.ViewModel!.IsExperimentRunning = true;
+            tab.ViewModel!.MaxFrameCount = session.StorageProvider.GetMaxNumberOfFrames();
+
+            InitializeExperiment(session.Scope);
         }
     }
 
-    private void Workspace_ExperimentHandlerCreated(object? sender, ILifetimeScope scope)
+    private void Workspace_SessionStopped(object? sender, AcquisitionSession session)
     {
-        IsExperimentEnabled = true;
-        InitializeExperiment(scope);
+        session.Handler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
 
-        if (LiveImageHandler != null && _workspace.ActiveStorageProvider != null)
+        if (session.Kind == AcquisitionSessionKind.Live)
         {
-            SubscribeToHandler(LiveImageHandler, isExperiment: true);
-
-            //LiveView.SetAvailableXYitions(_workspace.ActiveExperimentSerializer.ExperimentPositions);
-            LiveView.ShowLiveView = true;
-            //LiveView.SetExperimentSerializer(_workspace.ActiveExperimentSerializer);
-            LiveView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
-            FieldView.SetGridData(_workspace.ActiveStorageProvider.GetStorageSchema());
-
-            LiveView.IsDataStreaming = true;
-            LiveView.IsExperimentRunning = true;
-
-            LiveView.MaxFrameCount = _workspace.ActiveStorageProvider.GetMaxNumberOfFrames();
-        }
-    }
-
-    private void Workspace_HandlerDestroyed(object? sender, EventArgs e)
-    {
-        IsLiveEnabled = false;
-        IsExperimentEnabled = false;
-
-        if (LiveView != null)
-        {
+            IsLiveEnabled = false;
+            LiveView.DetachHandler();
             LiveView.IsExperimentRunning = false;
             LiveView.IsDataStreaming = false;
         }
-
-        // Uses the captured _subscribedHandler internally, so this correctly detaches
-        // from the handler we actually subscribed to — even if _workspace.ActiveImageHandler
-        // has already changed to null or a new instance by the time this fires.
-        UnsubscribeFromHandler();
+        else if (session.Kind == AcquisitionSessionKind.Experiment)
+        {
+            IsExperimentEnabled = false;
+            // The tab stays attached to the session so the partially saved measurement
+            // remains browsable once SessionFinished reopens the file for reading.
+            var tab = FindTab(session);
+            if (tab?.ViewModel != null)
+            {
+                tab.ViewModel.IsExperimentRunning = false;
+                tab.ViewModel.IsDataStreaming = false;
+            }
+        }
     }
 
-    private void Workspace_ExperimentFinished(object? sender, EventArgs e)
+    private void Workspace_SessionFinished(object? sender, AcquisitionSession session)
     {
-        IsExperimentEnabled = false;
-        LiveView.IsDataStreaming = false;
+        if (session.Kind != AcquisitionSessionKind.Experiment) return;
 
-        if (_subscribedHandler != null)
-        {
-            _subscribedHandler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
-        }
+        IsExperimentEnabled = false;
+        session.Handler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
+
+        FindTab(session)?.SessionFinished();
 
         OnFinishExperiment?.Invoke(this, EventArgs.Empty);
     }

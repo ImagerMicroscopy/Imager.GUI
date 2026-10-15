@@ -96,7 +96,7 @@ public sealed class ImagerWorkspaceTests : IDisposable
     {
         var states = new List<WorkspaceState>();
         int finished = 0;
-        _workspace.ExperimentFinished += (_, _) =>
+        _workspace.SessionFinished += (_, _) =>
         {
             finished++;
             states.Add(_workspace.CurrentState);
@@ -108,6 +108,25 @@ public sealed class ImagerWorkspaceTests : IDisposable
         Assert.Equal(new[] { WorkspaceState.Idle }, states);
         Assert.Equal(WorkspaceState.Idle, _workspace.CurrentState);
         Assert.False(_workspace.IsExperimentEnabled);
+    }
+
+    [Fact]
+    public async Task Experiment_session_is_handed_out_and_survives_the_run_for_its_tab()
+    {
+        AcquisitionSession? started = null;
+        _workspace.SessionStarted += (_, s) => started = s;
+
+        await RunExperimentAsync();
+
+        Assert.NotNull(started);
+        Assert.Equal(AcquisitionSessionKind.Experiment, started!.Kind);
+        Assert.Same(Storage.Object, started.StorageProvider);
+        Assert.NotNull(started.Handler);
+        Assert.NotNull(started.Scope);
+        // After the run the workspace releases its reference; the tab that showed the
+        // measurement owns the session and disposes it when the tab is closed.
+        Assert.Null(_workspace.ActiveSession);
+        Assert.False(started.IsDisposed);
     }
 
     [Fact]
@@ -230,7 +249,7 @@ public sealed class ImagerWorkspaceTests : IDisposable
             w.TryComplete();
         };
         int finished = 0;
-        _workspace.ExperimentFinished += (_, _) => finished++;
+        _workspace.SessionFinished += (_, _) => finished++;
 
         await RunExperimentAsync();
 
@@ -243,7 +262,7 @@ public sealed class ImagerWorkspaceTests : IDisposable
     {
         Storage.Setup(s => s.SetStoragePath(It.IsAny<string>())).Throws(new IOException("disk full"));
         int finished = 0;
-        _workspace.ExperimentFinished += (_, _) => finished++;
+        _workspace.SessionFinished += (_, _) => finished++;
 
         await Assert.ThrowsAsync<IOException>(() => RunExperimentAsync());
 
@@ -267,7 +286,9 @@ public sealed class ImagerWorkspaceTests : IDisposable
             w.TryComplete();
         };
         bool destroyed = false;
-        _workspace.HandlerDestroyed += (_, _) => destroyed = true;
+        _workspace.SessionStopped += (_, _) => destroyed = true;
+        AcquisitionSession? stoppedSession = null;
+        _workspace.SessionStarted += (_, s) => stoppedSession = s;
 
         var run = RunExperimentAsync();
         await WaitUntilAsync(() => _workspace.CurrentState == WorkspaceState.Acquiring);
@@ -284,6 +305,12 @@ public sealed class ImagerWorkspaceTests : IDisposable
         // Regression: Stop cleared ActiveStorageProvider before the run's finally block,
         // which then skipped closing the write stream.
         Storage.Verify(s => s.CloseReadWriteStream(), Times.Once);
+
+        // The workspace releases its reference, but the session itself stays alive so
+        // the tab showing the measurement can keep browsing the saved data.
+        Assert.NotNull(stoppedSession);
+        Assert.Null(_workspace.ActiveSession);
+        Assert.False(stoppedSession!.IsDisposed);
     }
 
     [Fact]
@@ -318,15 +345,18 @@ public sealed class ImagerWorkspaceTests : IDisposable
     public async Task Live_starts_acquiring_and_stops_back_to_idle()
     {
         _backend = RunUntilCancelled;
-        ILifetimeScope? liveScope = null;
-        _workspace.LiveScopeCreated += (_, s) => liveScope = s;
+        AcquisitionSession? liveSession = null;
+        _workspace.SessionStarted += (_, s) => liveSession = s;
 
         var live = _workspace.StartLiveAsync(Detection());
-        await WaitUntilAsync(() => liveScope != null);
+        await WaitUntilAsync(() => liveSession != null);
 
         Assert.True(_workspace.IsLiveEnabled);
         Assert.Equal(WorkspaceState.Acquiring, _workspace.CurrentState);
         Assert.NotNull(_workspace.ActiveImageHandler);
+        Assert.Equal(AcquisitionSessionKind.Live, liveSession!.Kind);
+        Assert.Same(Storage.Object, liveSession.StorageProvider);
+        Assert.NotNull(liveSession.Scope);
 
         await _workspace.StopLiveAsync();
         await live;
@@ -335,6 +365,9 @@ public sealed class ImagerWorkspaceTests : IDisposable
         Assert.Equal(WorkspaceState.Idle, _workspace.CurrentState);
         Assert.Null(_workspace.ActiveImageHandler);
         _comm.Verify(c => c.CancelMeasurementProgramAsync(It.IsAny<CancellationToken>()));
+
+        // Live data is not saved, so the session is disposed when live stops.
+        Assert.True(liveSession.IsDisposed);
     }
 
     [Fact]

@@ -33,22 +33,30 @@ public class ImagerWorkspace : IDisposable {
     public WorkspaceState CurrentState { get; private set; } = WorkspaceState.Idle;
     public event EventHandler<WorkspaceState>? StateChanged;
 
-    public ImageHandler? ActiveImageHandler { get; private set; }
-    public IStorageProvider? ActiveStorageProvider { get; private set; }
+    /// <summary>
+    /// The session currently acquiring, if any. The workspace releases its reference when
+    /// the session stops or finishes; Experiment sessions stay alive afterwards, owned by
+    /// the UI tab that shows their data.
+    /// </summary>
+    public AcquisitionSession? ActiveSession { get; private set; }
+    public ImageHandler? ActiveImageHandler => ActiveSession?.Handler;
+    public IStorageProvider? ActiveStorageProvider => ActiveSession?.StorageProvider;
 
-    public event EventHandler<ILifetimeScope>? LiveScopeCreated;
-    public event EventHandler<ILifetimeScope>? ExperimentScopeCreated;
-    public event EventHandler? HandlerDestroyed;
-    public event EventHandler? ExperimentFinished;
+    /// <summary>Raised when a live or experiment session starts acquiring.</summary>
+    public event EventHandler<AcquisitionSession>? SessionStarted;
+    /// <summary>Raised when the user stops a session.</summary>
+    public event EventHandler<AcquisitionSession>? SessionStopped;
+    /// <summary>
+    /// Raised when an experiment run ends (completed or stopped), after the measurement
+    /// file has been finalized and reopened for reading.
+    /// </summary>
+    public event EventHandler<AcquisitionSession>? SessionFinished;
 
     public bool IsLiveEnabled { get; private set; }
     public bool IsExperimentEnabled { get; private set; }
 
-    private CancellationTokenSource? _cancelToken;
-
     /// <summary>How long to wait after closing the write stream before reopening it for reading.</summary>
     internal TimeSpan StorageReleaseDelay { get; set; } = TimeSpan.FromSeconds(2);
-    private ILifetimeScope? _activeScope;
 
     public ImagerWorkspace(
 
@@ -87,7 +95,6 @@ public class ImagerWorkspace : IDisposable {
     public async Task StartLiveAsync(DefinedDetection selectedDetection) {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsLiveEnabled = true;
-        //_acquisitionState.SetLiveState();
         CurrentState = WorkspaceState.Acquiring;
 
         try {
@@ -100,53 +107,66 @@ public class ImagerWorkspace : IDisposable {
     }
 
     private async Task RunLiveAsync(DefinedDetection selectedDetection) {
-        _activeScope = _lifetimeScope.BeginLifetimeScope();
-        ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
+        var scope = _lifetimeScope.BeginLifetimeScope();
+        AcquisitionSession? session = null;
+        try {
+            var storageProvider = scope.Resolve<IStorageProvider>();
 
 
-        var experiment =  new DoTimesElement() { ElementId = Guid.NewGuid().ToString(), NTotal = 10000000,
-            Elements = new List<MeasurementElementBase>() {
-                new DetectionElement() { ElementId = Guid.NewGuid().ToString(),DetectionNames =
-                new List<string>(){ selectedDetection.Name } }
-            }
-        };
+            var experiment =  new DoTimesElement() { ElementId = Guid.NewGuid().ToString(), NTotal = 10000000,
+                Elements = new List<MeasurementElementBase>() {
+                    new DetectionElement() { ElementId = Guid.NewGuid().ToString(),DetectionNames =
+                    new List<string>(){ selectedDetection.Name } }
+                }
+            };
 
-        var acq_det_pairs = ResolveAcqDetPairs(selectedDetection);
-        ActiveStorageProvider.SetAcqDetPairs(acq_det_pairs);
-        
-        var smartprograms =  new SmartProgramRegistry();
-        var detections =     new Dictionary<string,DetectionParams>() { { selectedDetection.Name, selectedDetection.Settings } };
-        ActiveImageHandler = new ImageHandler(ActiveStorageProvider, _logger, _connectionHandler, _communicationManager);
-        _cancelToken =       new CancellationTokenSource();
+            var acq_det_pairs = ResolveAcqDetPairs(selectedDetection);
+            storageProvider.SetAcqDetPairs(acq_det_pairs);
 
+            var smartprograms =  new SmartProgramRegistry();
+            var detections =     new Dictionary<string,DetectionParams>() { { selectedDetection.Name, selectedDetection.Settings } };
+            var handler = new ImageHandler(storageProvider, _logger, _connectionHandler, _communicationManager);
 
-        var program = new MeasurementProgram(experiment,
-            detections
-        );
+            session = new AcquisitionSession(
+                AcquisitionSessionKind.Live, scope, storageProvider, handler, new CancellationTokenSource());
+            ActiveSession = session;
 
-        LiveScopeCreated?.Invoke(this, _activeScope);
+            var program = new MeasurementProgram(experiment,
+                detections
+            );
 
-        await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, smartprograms);
+            SessionStarted?.Invoke(this, session);
+
+            await session.Handler.ParseProgramAndShowData(session.Cancellation, program, smartprograms);
+        } finally {
+            // Live data is not saved, so the session has no reason to outlive live mode.
+            // Disposed here - after the run has unwound - rather than in StopLiveInternalAsync,
+            // whose cancellation-token disposal would race the run still using the token.
+            if (session != null) session.Dispose();
+            else scope.Dispose();
+        }
     }
 
     public async Task StopLiveAsync() {
-
-        if (CurrentState!=WorkspaceState.Acquiring) return;
+        if (CurrentState != WorkspaceState.Acquiring) return;
         CurrentState = WorkspaceState.Idle;
         await StopLiveInternalAsync();
     }
 
     private async Task StopLiveInternalAsync() {
         IsLiveEnabled = false;
-        _cancelToken?.Cancel();
+        var session = ActiveSession;
+        ActiveSession = null;
 
+        if (session == null) return;
+
+        if (!session.IsDisposed) session.Cancellation.Cancel();
         try {
             await _communicationManager.CancelMeasurementProgramAsync();
         } catch {}
 
-        HandlerDestroyed?.Invoke(this, EventArgs.Empty);
-        
-        CleanUpActiveSession();
+        SessionStopped?.Invoke(this, session);
+        // The session itself is disposed by RunLiveAsync once the run has unwound.
     }
 
     public async Task ToggleExperimentAsync(MeasurementElementBase experiment,
@@ -172,14 +192,18 @@ public class ImagerWorkspace : IDisposable {
         if (IsLiveEnabled || IsExperimentEnabled) return;
         IsExperimentEnabled = true;
 
-        // Keep our own reference: StopExperimentAsync clears ActiveStorageProvider while
-        // this method is still awaiting, and the stream must be closed either way.
-        IStorageProvider? storageProvider = null;
+        var scope = _lifetimeScope.BeginLifetimeScope();
+        var storageProvider = scope.Resolve<IStorageProvider>();
+        var session = new AcquisitionSession(
+            AcquisitionSessionKind.Experiment,
+            scope,
+            storageProvider,
+            new ImageHandler(storageProvider, _logger, _connectionHandler, _communicationManager),
+            new CancellationTokenSource());
 
+        var sessionStarted = false;
         try
         {
-            _activeScope = _lifetimeScope.BeginLifetimeScope();
-            storageProvider = ActiveStorageProvider = _activeScope.Resolve<IStorageProvider>();
             var acq_det_pairs = detections.Select(x => ResolveAcqDetPairs(x))
                 .SelectMany(list => list)
                 .Distinct()
@@ -194,19 +218,15 @@ public class ImagerWorkspace : IDisposable {
             storageProvider.SetEnabledStorage(isstorageenabeld);
             storageProvider.SetMeasurementProgram(fullEquipmentStateJson);
             storageProvider.SetMaxFrameNumber((int)experiment.CountTotalDetections());
-
             storageProvider.SetAcqDetPairs(acq_det_pairs);
             storageProvider.SetStoragePath(storagepath);
-            // The write stream is opened by ImageHandler.ParseProgramAndShowData; opening it
-            // here as well created a second storage for the same path.
 
-            ActiveImageHandler = new ImageHandler(storageProvider, _logger, _connectionHandler, _communicationManager);
-            _cancelToken = new CancellationTokenSource();
-
-            ExperimentScopeCreated?.Invoke(this, _activeScope);
+            ActiveSession = session;
+            SessionStarted?.Invoke(this, session);
+            sessionStarted = true;
             CurrentState = WorkspaceState.Acquiring;
 
-            await ActiveImageHandler.ParseProgramAndShowData(_cancelToken, program, _smartProgramRegistry);
+            await session.Handler.ParseProgramAndShowData(session.Cancellation, program, _smartProgramRegistry);
         }
         catch (Exception)
         {
@@ -220,15 +240,25 @@ public class ImagerWorkspace : IDisposable {
         {
             IsExperimentEnabled = false;
             CurrentState = WorkspaceState.Idle;
-            ExperimentFinished?.Invoke(this, EventArgs.Empty);
+            if (ReferenceEquals(ActiveSession, session)) ActiveSession = null;
 
-            if (storageProvider != null) {
-                storageProvider.CloseReadWriteStream();
+            if (!sessionStarted)
+            {
+                // The session never reached a tab (startup failure) - nothing will dispose it.
+                session.Dispose();
+            }
+            else
+            {
+                // Finalize the measurement file so the owning tab can browse what was
+                // saved, whether the run completed or was stopped by the user.
+                session.StorageProvider.CloseReadWriteStream();
                 await Task.Delay(StorageReleaseDelay);
-                if(isstorageenabeld) {
-                    storageProvider.OpenReadStream();
+                if (isstorageenabeld) {
+                    session.StorageProvider.OpenReadStream();
                 }
             }
+
+            SessionFinished?.Invoke(this, session);
         }
     }
 
@@ -236,22 +266,20 @@ public class ImagerWorkspace : IDisposable {
         if (!IsExperimentEnabled) return;
         IsExperimentEnabled = false;
         CurrentState = WorkspaceState.Idle;
-        _cancelToken?.Cancel();
+
+        var session = ActiveSession;
+        ActiveSession = null;
+        session?.Cancellation.Cancel();
 
         try {
             await _communicationManager.CancelMeasurementProgramAsync();
         } catch {}
 
-        HandlerDestroyed?.Invoke(this, EventArgs.Empty);
-        
-        CleanUpActiveSession();
-    }
-
-    private void CleanUpActiveSession() {
-        ActiveImageHandler = null;
-        ActiveStorageProvider = null;
-        _activeScope?.Dispose();
-        _activeScope = null;
+        if (session != null) {
+            // The workspace releases its reference; the session itself stays alive,
+            // owned by the tab that shows the measurement.
+            SessionStopped?.Invoke(this, session);
+        }
     }
 
     public async Task LoadHistoricalDataAsync(string directoryPath) {
@@ -262,7 +290,7 @@ public class ImagerWorkspace : IDisposable {
 
 
     public void Dispose() {
-        _cancelToken?.Dispose();
-        _activeScope?.Dispose();
+        ActiveSession?.Cancellation.Dispose();
+        ActiveSession?.Scope.Dispose();
     }
 }

@@ -40,7 +40,6 @@ public partial class ImageDisplayView : UserControl
     private TranslateTransform? _translateTransform;
     public static volatile bool _isImageProcessing = false; // Flag to prevent redundant calls
 
-    private bool _showLiveView = true;
     private bool _isMultiChannelEnabled = false;
     private bool _isDotSelectionEnabled = true;
     //private RectangelBorder _cropBorder;
@@ -48,7 +47,6 @@ public partial class ImageDisplayView : UserControl
     private readonly object _lockObj = new object();
 
     private Canvas imageCanvas;
-    private StackPanel im_progress;
     private MultiChannelContrastView multiChannelContrast;
     private ContrastPanelView contrastPanel;
     private ImageRegionCollectionPropertiesView regionCollectionProperties;
@@ -100,7 +98,6 @@ public partial class ImageDisplayView : UserControl
         multiChannelConfigView = new MultiChannelConfigView(scope);
         multichannelPanel.Content = multiChannelConfigView;
 
-        im_progress = this.FindControl<Avalonia.Controls.StackPanel>("ImageProgress")!;
         var imageContainer = this.FindControl<Avalonia.Controls.Grid>("ImageContainer")!;
         imageContainer.Width = ScreenHelper.ScreenSize.Width / ScreenHelper.Scaling;
         imageContainer.Height = ScreenHelper.ScreenSize.Height / ScreenHelper.Scaling;
@@ -183,11 +180,6 @@ public partial class ImageDisplayView : UserControl
         }
     }
 
-    public void SetImProgress(bool ison)
-    {
-        im_progress.IsEnabled = ison;
-    }
-
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (DataContext is ImageDisplayViewModel vm)
@@ -197,7 +189,6 @@ public partial class ImageDisplayView : UserControl
             imageDisplayViewM.UpdateImage += UpdateCurrentImageFromStream;
             imageDisplayViewM.UpdateRegionProperties += UpdateRegionPropertiesFromStream;
             imageDisplayViewM.GridValuesInitialized += InitializeGrid;
-            imageDisplayViewM.PropertyChanged += OnShowLiveChanged;
             imageDisplayViewM.SliderPropertyChanged += OnSliderValChanged;
         }
         imageGrid.OnSelectedItemChanged += ImageGrid_OnSelectedItemChanged;
@@ -223,20 +214,6 @@ public partial class ImageDisplayView : UserControl
         }
         contrastPanel.DataContext = imageGrid.SelectedCanvasViewModel.ContrastSettings;
         contrastPanel.ContrastPanelView_DataContextChanged(sender, e);
-    }
-
-
-    private void OnShowLiveChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (sender is ImageDisplayViewModel vm)
-        {
-            if (e.PropertyName == nameof(vm.ShowLiveView))
-            {
-
-                imageSlider.IsEnabled = vm.ShowLiveView;
-                _showLiveView = vm.ShowLiveView;
-            }
-        }
     }
 
 
@@ -336,7 +313,6 @@ public partial class ImageDisplayView : UserControl
     private void InitializeGrid(object? sender, EventArgs e)
     {
 
-        _showLiveView = true;
         _isDotSelectionEnabled = true;
         _isMultiChannelEnabled = false;
         imageDisplayViewM.MultiViewEnabled = false;

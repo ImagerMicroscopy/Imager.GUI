@@ -24,11 +24,6 @@ public partial class MainViewModel : ViewModelBase
 
 
     public IImagerCommunicationManager _communicationManager;
-    public ImageDisplayViewModel? ImageView { get; private set; }
-
-    public bool IsLiveEnabled = false;
-
-
 
     [ObservableProperty] ImageControlPanelViewModel _ImageControlPanel;
 

@@ -42,7 +42,10 @@ public static class CompositionRoot
         builder.RegisterType<ImageDisplayViewModel>().InstancePerDependency().AsSelf().PropertiesAutowired();
         builder.RegisterType<FieldViewerViewModel>().InstancePerDependency().AsSelf().PropertiesAutowired();
         builder.RegisterType<ExperimentalPanelViewModel>().AsSelf().PropertiesAutowired();
-        builder.RegisterType<ImageControlPanelViewModel>().AsSelf().PropertiesAutowired();
+        // No PropertiesAutowired here: the panel's LiveView/FieldView are set from
+        // constructor-injected instances and must not be overwritten by property
+        // injection, or they no longer match the fixed tabs built from them.
+        builder.RegisterType<ImageControlPanelViewModel>().AsSelf();
         builder.RegisterType<StatusWindowViewModel>().AsSelf().PropertiesAutowired();
         builder.RegisterType<ImageRegionDisplayViewModel>().AsSelf().InstancePerLifetimeScope();
 

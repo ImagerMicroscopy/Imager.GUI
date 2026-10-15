@@ -18,96 +18,77 @@
         <StreamGeometry x:Key="record_regular">M12 18C15.3137 18 18 15.3137 18 12C18 8.68629 15.3137 6 12 6C8.68629 6 6 8.68629 6 12C6 15.3137 8.68629 18 12 18Z M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM3.5 12C3.5 7.30558 7.30558 3.5 12 3.5C16.6944 3.5 20.5 7.30558 20.5 12C20.5 16.6944 16.6944 20.5 12 20.5C7.30558 20.5 3.5 16.6944 3.5 12Z</StreamGeometry>
         <StreamGeometry x:Key="stop_regular">M19.25 4.5C19.3881 4.5 19.5 4.61193 19.5 4.75V19.25C19.5 19.3881 19.3881 19.5 19.25 19.5H4.75C4.61193 19.5 4.5 19.3881 4.5 19.25V4.75C4.5 4.61193 4.61193 4.5 4.75 4.5H19.25ZM4.75 3C3.7835 3 3 3.7835 3 4.75V19.25C3 20.2165 3.7835 21 4.75 21H19.25C20.2165 21 21 20.2165 21 19.25V4.75C21 3.7835 20.2165 3 19.25 3H4.75Z</StreamGeometry>
 
+        <!-- Builds each tab's content view once and reuses it across tab switches. -->
+        <views:ImageTabContentTemplate x:Key="ImageTabContentTemplate"/>
+
+        <ControlTheme x:Key="ImageTabItemTheme" TargetType="TabItem">
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="ZIndex" Value="0"/>
+            <Setter Property="ClipToBounds" Value="False"/>
+            <!-- Clicks anywhere on the tab must select it. Without a background the
+                 unselected tab is click-through everywhere except its header text,
+                 so clicks next to the label fall through to the TabControl. -->
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border x:Name="TabBorder"
+                                BorderBrush="Gray"
+                                Height="20"
+                                CornerRadius="5 5 0 0"
+                                Background="{TemplateBinding Background}">
+                            <Border BorderThickness="0,0,0,1" BorderBrush="#454545">
+                                <ContentPresenter Content="{TemplateBinding Header}" HorizontalAlignment="Center"/>
+                            </Border>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <!-- BorderThickness comes from styles (not a local value) so the selected
+                 style below can remove the bottom border. -->
+            <Style Selector="^ /template/ Border#TabBorder">
+                <Setter Property="BorderThickness" Value="0.5,0.5,0.5,0.5"/>
+            </Style>
+            <Style Selector="^:selected">
+                <Setter Property="ZIndex" Value="100"/>
+                <Setter Property="Background" Value="#454545"/>
+            </Style>
+            <Style Selector="^:selected /template/ Border#TabBorder">
+                <Setter Property="BorderThickness" Value="0.5,0.5,0.5,0"/>
+            </Style>
+        </ControlTheme>
+
     </UserControl.Resources>
-    
+
+    <!-- Header of a tab strip item: the tab title and its close button. Found by the
+         header ContentPresenter in ImageTabItemTheme via the DataTemplates lookup. -->
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="vm:ImageTabViewModel">
+            <Grid ColumnDefinitions="120,20" DoubleTapped="OnTabPointerDoubleTapped">
+                <TextBlock FontSize="13" Grid.Column="0"
+                           FontWeight="Bold"
+                           Margin="0 0 0 0"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Text="{Binding Header}"/>
+                <Button x:Name="CloseButton"
+                        Grid.Column="1"
+                        Content="❌"
+                        Width="20" Height="20"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0" Margin="0"
+                        IsVisible="{Binding IsClosable}"
+                        IsEnabled="{Binding IsClosable}"
+                        Click="OnTabCloseButtonClicked"/>
+            </Grid>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
 	<UserControl.Styles>
     <Style Selector="TabControl /template/ ItemsPresenter">
         <Setter Property="ZIndex" Value="1" />
-    </Style>
-
-    <Style Selector="TabItem.LocalTabItem">
-        <Setter Property="Width" Value="150"/>
-        <Setter Property="Height" Value="20"/>
-        <Setter Property="ZIndex" Value="0"/> 
-        <Setter Property="Tag" Value="True"/>
-        <Setter Property="ClipToBounds" Value="False"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate>
-                    <Border BorderThickness="0.5,0.5,0.5,0.5" 
-                            BorderBrush="Gray" 
-                            Height="20" 
-                            CornerRadius="5 5 0 0" 
-                            Background="{TemplateBinding Background}">
-                        <Border BorderThickness="0,0,0,1" BorderBrush="#454545">
-                            <Grid HorizontalAlignment="Center" ColumnDefinitions="120,20">
-                                <TextBlock FontSize="13" Grid.Column="0"
-                                           FontWeight="Bold"
-                                           Margin="0 0 0 0"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Center" 
-                                           Text="{TemplateBinding Header}"/>
-                            
-                                <Button x:Name="CloseButton"
-                                        Grid.Column="1"
-                                        Content="❌"
-                                        Width="20" Height="20"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="0" Margin="0"
-                                        IsVisible="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
-                                        IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
-                                        Click="OnTabCloseButtonClicked"/>
-                            </Grid>
-                        </Border>
-                    </Border>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <Style Selector="TabItem.LocalTabItem:selected">
-        <Setter Property="ZIndex" Value="100"/> 
-        <Setter Property="Background" Value="#454545"/> 
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate>
-                    <Border BorderThickness="0.5,0.5,0.5,0" 
-                            BorderBrush="Gray" 
-                            Height="20" 
-                            CornerRadius="5 5 0 0" 
-                            Background="{TemplateBinding Background}">
-                        <Border BorderThickness="0,0,0,1" BorderBrush="#454545">
-                            <Grid HorizontalAlignment="Center" ColumnDefinitions="120,20">
-                                <TextBlock FontSize="13" Grid.Column="0"
-                                           Margin="0 0 0 0"
-                                           FontWeight="Bold"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Center" 
-                                           Text="{TemplateBinding Header}"/>
-                            
-                                <Button x:Name="CloseButton"
-                                        Grid.Column="1"
-                                        Content="❌"
-                                        HorizontalContentAlignment="Center"
-                                        Width="20" Height="20"
-                                        Background="Transparent"
-                                        BorderThickness="0"
-                                        Padding="0" Margin="0"
-                                        IsVisible="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
-                                        IsEnabled="{Binding RelativeSource={RelativeSource AncestorType=TabItem} Path=Tag}"
-                                        Click="OnTabCloseButtonClicked"/>
-                            </Grid>
-                        </Border>
-                    </Border>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-    
-    <Style Selector="TabItem.LocalTabItem:selected">
-        <Setter Property="ZIndex" Value="100"/>
-        <Setter Property="Background" Value="#454545"/> 
     </Style>
 
 </UserControl.Styles>
@@ -201,49 +182,12 @@
 
 		
 		
-		<TabControl Grid.Row="1" SelectionChanged="OnSelectionChanged" DragDrop.AllowDrop="True"   Grid.Column="0"   x:Name="TabLiveFocus" TabStripPlacement="Top" Padding="0" Margin="5 0 5 0" >
-            <TabControl.Styles>
-                <Style Selector="TabItem > ContentControl">
-                    <Setter Property="BorderThickness" Value="0.5"/>
-                    <Setter Property="Margin" Value="2 -3 0 0"/>
-                    <Setter Property="BorderBrush" Value="Gray"/>
-                </Style>
-
-            </TabControl.Styles>
-			<TabControl.Items>
-
-
-				<TabItem Classes="LocalTabItem" x:Name="LiveView" Header="Live view" HorizontalAlignment="Center" VerticalAlignment="Center" IsSelected="True" Tag="False" >
-					<ContentControl  ZIndex="0" BorderBrush="Gray"  >
-
-						<views:ImageDisplayView  x:Name="ImagePanel" DragDrop.AllowDrop="True" DataContext="{Binding LiveView}"/>
-					</ContentControl>
-
-				</TabItem>
-
-				<TabItem Classes="LocalTabItem"  Header="Field view" HorizontalAlignment="Center" VerticalAlignment="Center" IsSelected="False"  Tag="False" >
-					<ContentControl ZIndex="0" BorderBrush="Gray" >
-					
-						<views:FieldViewerView x:Name="FieldViewer" DragDrop.AllowDrop="True" DataContext="{Binding FieldView}"/>
-					
-					</ContentControl>
-
-				</TabItem>
-
-				<TabItem Classes="LocalTabItem"   Header="Smart Program" IsSelected="False"  Tag="False" >
-	
-					<ContentControl ZIndex="0" BorderBrush="Gray" >
-						<views:SmartProgramView x:Name="SmartProgramViewer">
-
-						</views:SmartProgramView>
-					</ContentControl>
-				</TabItem>
-
-
-			</TabControl.Items>
-
-
-
+		<TabControl Grid.Row="1" Grid.Column="0" x:Name="TabLiveFocus" TabStripPlacement="Top" Padding="0" Margin="5 0 5 0"
+                    DragDrop.AllowDrop="True"
+                    ItemsSource="{Binding Tabs}"
+                    SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                    ItemContainerTheme="{StaticResource ImageTabItemTheme}"
+                    ContentTemplate="{StaticResource ImageTabContentTemplate}">
 		</TabControl>
 
 	</Grid> 
