@@ -1,6 +1,7 @@
 using Autofac;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Workspace;
@@ -168,6 +169,42 @@ public sealed class UserFlowReproTests : IDisposable
         // The tree must have realized a container for the root and its two children.
         var treeItems = view.GetVisualDescendants().OfType<TreeViewItem>().ToList();
         Assert.Equal(3, treeItems.Count);
+    }
+
+    [AvaloniaFact]
+    public void Resizing_the_divider_changes_the_program_tree_height()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var view = ShowInWindow(new ExperimentalPanelViewControl { DataContext = exp });
+
+        var tree = view.FindControl<TreeView>("ExperimentTreeView");
+        Assert.NotNull(tree);
+        // Layout rounding can shave a pixel off the row height, hence the tolerance.
+        AssertHeight(tree.Bounds.Height, 400);
+
+        // Shrinking and growing via the divider's resize path both take effect.
+        view.ResizeTree(250);
+        Dispatcher.UIThread.RunJobs();
+        AssertHeight(tree.Bounds.Height, 250);
+
+        view.ResizeTree(600);
+        Dispatcher.UIThread.RunJobs();
+        AssertHeight(tree.Bounds.Height, 600);
+
+        // The resize is clamped so the tree can never disappear (one pixel
+        // of layout rounding is tolerated around the 120px minimum).
+        view.ResizeTree(10);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(tree.Bounds.Height >= 118,
+            $"Tree height should be clamped to a minimum, got {tree.Bounds.Height}.");
+    }
+
+    private static void AssertHeight(double actual, double expected)
+    {
+        Assert.True(Math.Abs(actual - expected) <= 2,
+            $"Expected tree height near {expected}, got {actual}.");
     }
 
     [AvaloniaFact]

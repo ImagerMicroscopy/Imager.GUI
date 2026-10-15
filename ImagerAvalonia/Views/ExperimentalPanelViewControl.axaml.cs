@@ -115,6 +115,85 @@ public partial class ExperimentalPanelViewControl : UserControl
     }
 
     // =========================
+    // Tree / settings divider
+    //
+    // The divider between the program tree and the element settings is a
+    // drag handle: dragging it resizes the tree row, so the user can give the
+    // tree as much or as little room as the current program needs.
+    // =========================
+
+    private const double MinTreeHeight = 120;
+    private const double MaxTreeHeight = 4000;
+
+    private bool _isDraggingTreeDivider;
+    private double _treeDividerDragStartY;
+    private double _treeDividerDragStartHeight;
+
+    /// <summary>The control's root grid, as declared in ExperimentalPanelViewControl.axaml.</summary>
+    private Grid RootGrid => (Grid)Content;
+
+    /// <summary>
+    /// The grid row holding the program tree, i.e. the row the divider resizes.
+    /// Row 1 of the root grid (row 0 is the hover hint above the tree).
+    /// </summary>
+    private RowDefinition TreeRowDefinition => RootGrid.RowDefinitions[1];
+
+    private TreeView ProgramTree => (TreeView)RootGrid.Children[1];
+
+    /// <summary>Sets the program tree height in pixels, clamped to sane bounds.</summary>
+    public void ResizeTree(double newHeight)
+    {
+        newHeight = Math.Clamp(newHeight, MinTreeHeight, MaxTreeHeight);
+        TreeRowDefinition.Height = new GridLength(newHeight, GridUnitType.Pixel);
+    }
+
+    public void OnTreeDividerPointerPressed(object sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(sender as Visual).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _isDraggingTreeDivider = true;
+        // Positions are taken in the control's frame so the growing/shrinking
+        // tree above the divider cannot feed back into the drag delta.
+        _treeDividerDragStartY = e.GetPosition(this).Y;
+        _treeDividerDragStartHeight = ProgramTree.Bounds.Height;
+
+        if (sender is InputElement element)
+        {
+            e.Pointer.Capture(element);
+        }
+
+        e.Handled = true;
+    }
+
+    public void OnTreeDividerPointerMoved(object sender, PointerEventArgs e)
+    {
+        if (!_isDraggingTreeDivider)
+        {
+            return;
+        }
+
+        ResizeTree(_treeDividerDragStartHeight + e.GetPosition(this).Y - _treeDividerDragStartY);
+    }
+
+    public void OnTreeDividerPointerReleased(object sender, PointerReleasedEventArgs e)
+    {
+        if (!_isDraggingTreeDivider)
+        {
+            return;
+        }
+
+        _isDraggingTreeDivider = false;
+
+        if (sender is InputElement element)
+        {
+            e.Pointer.Capture(null);
+        }
+    }
+
+    // =========================
     // Drag and drop
     //
     // Every node card is a single drop target with three zones: dragging over
