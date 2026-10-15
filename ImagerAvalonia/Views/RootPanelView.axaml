@@ -43,13 +43,13 @@
 
 	
 	<StackPanel ClipToBounds="False" Orientation="Vertical"
-				Width="600"
+				Width="280"
 			    HorizontalAlignment="Left"
 				Background="#454545"
 				Margin="6 0 0 0">
 		<StackPanel  Orientation="Vertical"
 					Spacing="4">
-			<TextBlock Margin="0 0 0 0" Text="Root" Classes="header" />
+			<TextBlock Margin="0 0 0 0" Text="Output location" Classes="header" />
 		</StackPanel>
 		
 
@@ -73,11 +73,11 @@
 
 				<Grid  Grid.Row="1" ColumnDefinitions="90,170">
 					<TextBlock Width="90"  VerticalAlignment="Center"   Grid.Column="0" Margin="0,0,0,0"
-										 Text="Output name"
+										 Text="Base file name"
 										 FontSize="12"
 										 TextTrimming="CharacterEllipsis" />
 					
-					<TextBox VerticalAlignment="Center" HorizontalAlignment="Left"    Grid.Column="1" Height="23" MinHeight="10"  Width="174" Watermark="Output name"  Text="{Binding FileName}"/>
+					<TextBox VerticalAlignment="Center" HorizontalAlignment="Left"    Grid.Column="1" Height="23" MinHeight="10"  Width="174" Watermark="Base file name"  Text="{Binding FileName}"/>
 
 
 				</Grid>
@@ -85,7 +85,7 @@
 				
 				<Grid  Grid.Row="2" ColumnDefinitions="90,100,60">
 					<TextBlock VerticalAlignment="Center"   Grid.Column="0" Margin="0,0,0,0"
-										 Text="Save output?"
+										 Text="Save file?"
 										 FontSize="12"
 										 TextTrimming="CharacterEllipsis" />
 					

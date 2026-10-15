@@ -169,4 +169,47 @@ public sealed class UserFlowReproTests : IDisposable
         var treeItems = view.GetVisualDescendants().OfType<TreeViewItem>().ToList();
         Assert.Equal(3, treeItems.Count);
     }
+
+    [AvaloniaFact]
+    public void Storage_settings_stay_available_whichever_element_is_selected()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        // The storage panel is pinned at the bottom of the Experiments pane,
+        // outside the scrollable element tree and settings area.
+        var view = ShowInWindow(new MainView { DataContext = mainVM });
+
+        // The root is selected initially: the storage panel must already be visible.
+        AssertSavePathBoxVisible(view);
+
+        exp.AddElementCommand(ExperimentElementType.Detection);
+        exp.SelectedTreeItem = exp.Root.Children[0];
+
+        // Selecting another element must not hide the storage panel.
+        AssertSavePathBoxVisible(view);
+    }
+
+    private static void AssertSavePathBoxVisible(MainView view)
+    {
+        _ = view.GetVisualDescendants()
+            .OfType<TextBox>()
+            .First(t => t.Watermark == "Save path");
+    }
+
+    [AvaloniaFact]
+    public void Selecting_the_root_shows_no_editable_element_settings()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+
+        var view = ShowInWindow(new ExperimentalPanelViewControl { DataContext = exp });
+
+        // The root carries no editable settings anymore; the settings area just says so.
+        var hint = view.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .FirstOrDefault(t => t.Text?.StartsWith("The root element cannot be modified") == true);
+
+        Assert.NotNull(hint);
+    }
 }

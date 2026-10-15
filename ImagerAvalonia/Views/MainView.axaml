@@ -133,7 +133,14 @@
 													Text="Experiments"/>
 									</Grid>								
 								</Expander.Header>
-								<ScrollViewer x:Name="ExperimentsScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+								<!-- The output location settings are pinned below the scroller so
+						     they stay put when the selected element's settings change height. -->
+						<Grid>
+							<Grid.RowDefinitions>
+								<RowDefinition Height="*" />
+								<RowDefinition Height="Auto" />
+							</Grid.RowDefinitions>
+						<ScrollViewer Grid.Row="0" x:Name="ExperimentsScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
 							<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}" Width="270">
 								<Border
 									CornerRadius="5"
@@ -203,6 +210,11 @@
 											 DataContext="{Binding SelectedExperiment}"/>
 							</StackPanel>
 							</ScrollViewer>
+							<Border Grid.Row="1" Margin="6 5 6 5"
+												 IsEnabled="{Binding IsEnableExperimentalPanel}">
+								<views:RootPanelView DataContext="{Binding SelectedExperiment.Root}"/>
+							</Border>
+						</Grid>
 							</Expander>
 
 

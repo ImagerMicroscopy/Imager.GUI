@@ -75,7 +75,6 @@
 
 		</Grid.RowDefinitions>
 
-		
 		<StackPanel Grid.Row="0" Margin="2 2 2 0">
 			<TextBlock FontSize="10" FontStyle="Italic" Foreground="Gray" Margin="0 0 0 2" Text="Hover an element to add or delete it; + adds an element inside that node"/>
 			<TreeView Height="400" x:Name="ExperimentTreeView" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
@@ -275,7 +274,11 @@
 			<TransitioningContentControl.DataTemplates>
 
 				<DataTemplate DataType="vm:RootNode">
-					<views:RootPanelView />
+					<!-- The root element itself carries no editable settings; its
+					     output location options live in the panel pinned at the
+					     bottom of the Experiments pane. -->
+					<TextBlock Margin="0 4 0 8" FontSize="10" FontStyle="Italic" Foreground="Gray"
+							   Text="The root element cannot be modified; use + to add top-level elements." />
 				</DataTemplate>
 
 				<DataTemplate DataType="vm:DoTimesViewModel">
@@ -317,7 +320,7 @@
 
 			</TransitioningContentControl.DataTemplates>
 
-</TransitioningContentControl>
+		</TransitioningContentControl>
 	</Grid>
 
 </UserControl>
