@@ -35,7 +35,9 @@ public partial class ExperimentalPanelViewModel : ViewModelBase
         _experimentBuilder = experimentBuilder;
         Root = new RootNode
         {
-            StorageService = experimentBuilder.StorageService
+            StorageService = experimentBuilder.StorageService,
+            Builder = experimentBuilder,
+            OwningPanel = this
         };
 
         if (user_acq.Acquisitions.Any() && user_acq.Acquisitions.First().Sources.Count == 0)
@@ -47,6 +49,9 @@ public partial class ExperimentalPanelViewModel : ViewModelBase
         {
             AreStagesAvailable = false;
         }
+
+        Root.AreStagesAvailable = AreStagesAvailable;
+        Root.AreSourcesAvailable = AreSourcesAvailable;
 
         AcquisitionSettings = user_acq;
         Root.UserAcquisitionSettings = AcquisitionSettings;

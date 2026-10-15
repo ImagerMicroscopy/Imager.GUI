@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.Services;
 using ImagerAvalonia.Services.MeasurementControl;
@@ -28,6 +29,61 @@ public abstract partial class MeasurementElementViewModel : ObservableObject, ID
     [ObservableProperty] ObservableCollection<SmartProgramInput?> _smartProgramBindings = new();
     [ObservableProperty] ObservableCollection<MeasurementElementViewModel> _children = new();
     [ObservableProperty] string _Header = string.Empty;
+    [ObservableProperty] bool _areStagesAvailable = true;
+    [ObservableProperty] bool _areSourcesAvailable = true;
+
+    /// <summary>Whether the UI should offer adding child elements inside this node.</summary>
+    public bool CanHaveChildren => this is RootNode || ToModel().CanHaveChildren();
+
+    /// <summary>Finds the root of the element tree this node belongs to.</summary>
+    public MeasurementElementViewModel FindRoot()
+    {
+        var current = this;
+        while (current.Parent != null)
+            current = current.Parent;
+        return current;
+    }
+
+    /// <summary>
+    /// Adds a new element inside this node, as offered by the "+" action on the
+    /// tree view card. The new element becomes selected so its settings show.
+    /// </summary>
+    [RelayCommand]
+    private void AddChildElement(ExperimentElementType elementType)
+    {
+        if (!CanHaveChildren)
+            return;
+
+        if (FindRoot() is not RootNode root || root.Builder is not { } builder)
+            return;
+
+        var newNode = builder.AddNode(elementType, this);
+        newNode.AreStagesAvailable = AreStagesAvailable;
+        newNode.AreSourcesAvailable = AreSourcesAvailable;
+
+        if (root.OwningPanel is { } panel)
+            panel.SelectedTreeItem = newNode;
+    }
+
+    /// <summary>
+    /// Removes this element from the tree, as offered by the "x" action on the
+    /// tree view card. The parent becomes selected so no deleted element lingers
+    /// in the settings pane.
+    /// </summary>
+    [RelayCommand]
+    private void DeleteElement()
+    {
+        if (Parent is not { } parent)
+            return;
+
+        if (FindRoot() is not RootNode root || root.Builder is not { } builder)
+            return;
+
+        if (root.OwningPanel is { } panel)
+            panel.SelectedTreeItem = parent;
+
+        builder.RemoveNode(this);
+    }
     
     public event EventHandler<MeasurementElementViewModel?>?  OnNodeDeleted; 
     public MeasurementElementViewModel? Parent { get; set; }
@@ -196,6 +252,14 @@ public partial class RootNode : MeasurementElementViewModel
     [ObservableProperty] bool _canBeDeleted = false;
 
     public GlobalDefinedSettingsViewModel? UserAcquisitionSettings { get; set; }
+
+    /// <summary>The builder that owns this experiment's element tree; set by the owning panel view model.</summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public ExperimentBuilder? Builder { get; set; }
+
+    /// <summary>The panel view model that displays this experiment's element tree.</summary>
+    [Newtonsoft.Json.JsonIgnore]
+    public ExperimentalPanelViewModel? OwningPanel { get; set; }
 
     // Storage properties - stored via StorageService reference
     private ExperimentStorageService? _storageService;

@@ -39,6 +39,29 @@
 				</ControlTemplate>
 			</Setter>
 		</Style>
+		<!-- Tree node action mock-up styles -->
+		<Style Selector="Button.nodeActionBtn">
+			<Setter Property="FontSize" Value="13" />
+			<Setter Property="Width" Value="22" />
+			<Setter Property="Height" Value="22" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="Margin" Value="1 0 0 0" />
+			<Setter Property="CornerRadius" Value="3" />
+			<Setter Property="HorizontalContentAlignment" Value="Center" />
+			<Setter Property="VerticalContentAlignment" Value="Center" />
+			<Setter Property="Foreground" Value="White" />
+			<Setter Property="Background" Value="Transparent" />
+			<Setter Property="BorderThickness" Value="0" />
+		</Style>
+		<Style Selector="Button.nodeActionBtn:pointerover">
+			<Setter Property="Background" Value="#5d4a87" />
+		</Style>
+		<Style Selector="StackPanel.nodeActions">
+			<Setter Property="Opacity" Value="0" />
+		</Style>
+		<Style Selector="Border.node:pointerover StackPanel.nodeActions">
+			<Setter Property="Opacity" Value="1" />
+		</Style>
 	</UserControl.Styles>
 
 
@@ -46,15 +69,16 @@
 
 		<Grid.RowDefinitions>
 
-			<RowDefinition Height="400" />
-			<RowDefinition Height="20" />
+			<RowDefinition Height="Auto" />
 			<RowDefinition Height="20" />
 			<RowDefinition Height="Auto" />
 
 		</Grid.RowDefinitions>
 
 		
-		<TreeView Margin="2 2 0 0" Grid.Row="0" x:Name="ExperimentTreeView" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
+		<StackPanel Grid.Row="0" Margin="2 2 2 0">
+			<TextBlock FontSize="10" FontStyle="Italic" Foreground="Gray" Margin="0 0 0 2" Text="Hover an element to add or delete it; + adds an element inside that node"/>
+			<TreeView Height="400" x:Name="ExperimentTreeView" ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedTreeItem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" >
 			<TreeView.Resources>
 				<x:Double x:Key="TreeViewItemExpandCollapseChevronSize">24</x:Double>
 			</TreeView.Resources>
@@ -158,7 +182,7 @@
 
 			<TreeView.DataTemplates>
 				<TreeDataTemplate DataType="vm:MeasurementElementViewModel" ItemsSource="{Binding Children}">
-					<StackPanel ClipToBounds="False" Height="24">
+					<StackPanel ClipToBounds="False" Height="34">
 						<StackPanel Orientation="Horizontal"
 									Height="6"
 									HorizontalAlignment="Left"
@@ -181,28 +205,40 @@
 								DoubleTapped="OnElementDoubleTapped"
 								Cursor="Hand"
 								HorizontalAlignment="Left"
-								Height="18"
+								Height="28"
 								CornerRadius="3"
 								Width="210"
 								Background="Gray">
-							<StackPanel Orientation="Horizontal">
-								<ItemsControl ItemsSource="{Binding SmartProgramBindings}">
-									<ItemsControl.ItemsPanel>
-										<ItemsPanelTemplate>
-											<StackPanel Orientation="Horizontal" />
-										</ItemsPanelTemplate>
-									</ItemsControl.ItemsPanel>
-									<ItemsControl.ItemTemplate>
-										<DataTemplate DataType="service_vm:SmartProgramInput">
-											<Rectangle Width="6" Margin="0 0 1 0" Fill="{Binding SmartProgramColor}" />
-										</DataTemplate>
-									</ItemsControl.ItemTemplate>
-								</ItemsControl>
-								<StackPanel Width="200" Orientation="Horizontal">
-									<TextBlock Foreground="White" Margin="3 0 0 0" VerticalAlignment="Center" FontSize="10" Text="{Binding Header}" />
-									<TextBlock Margin="5 0 0 0" TextTrimming="CharacterEllipsis" Width="100" VerticalAlignment="Center" Foreground="White" FontSize="10" Text="{Binding DisplayedInfo, Mode=TwoWay}" />
+							<Grid ColumnDefinitions="*,Auto">
+								<StackPanel Grid.Column="0" Orientation="Horizontal">
+									<ItemsControl ItemsSource="{Binding SmartProgramBindings}">
+										<ItemsControl.ItemsPanel>
+											<ItemsPanelTemplate>
+												<StackPanel Orientation="Horizontal" />
+											</ItemsPanelTemplate>
+										</ItemsControl.ItemsPanel>
+										<ItemsControl.ItemTemplate>
+											<DataTemplate DataType="service_vm:SmartProgramInput">
+												<Rectangle Width="6" Margin="0 0 1 0" Fill="{Binding SmartProgramColor}" />
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+									<StackPanel Width="150" Orientation="Horizontal">
+										<TextBlock Foreground="White" Margin="3 0 0 0" VerticalAlignment="Center" FontSize="12" Text="{Binding Header}" />
+										<TextBlock Margin="5 0 0 0" TextTrimming="CharacterEllipsis" Width="70" VerticalAlignment="Center" Foreground="White" FontSize="12" Text="{Binding DisplayedInfo, Mode=TwoWay}" />
+									</StackPanel>
 								</StackPanel>
-							</StackPanel>
+								<StackPanel Grid.Column="1" Classes="nodeActions" Orientation="Horizontal" VerticalAlignment="Center">
+									<Button Classes="nodeActionBtn" Content="+" IsVisible="{Binding CanHaveChildren}" ToolTip.Tip="Add an element inside this one">
+										<Button.Flyout>
+											<Flyout Placement="Right">
+												<views:ElementPickerView FooterText="Adds inside this element"/>
+											</Flyout>
+										</Button.Flyout>
+									</Button>
+									<Button Classes="nodeActionBtn" Content="×" Command="{Binding DeleteElementCommand}" ToolTip.Tip="Delete this element"/>
+								</StackPanel>
+							</Grid>
 						</Border>
 					</StackPanel>
 				</TreeDataTemplate>
@@ -215,75 +251,34 @@
 							DragDrop.DragLeave="OnNodeDragLeave"
 							DragDrop.Drop="OnNodeDrop"
 							HorizontalAlignment="Left"
-							Height="20"
+							Height="30"
 							CornerRadius="3"
 							Width="120"
 							Background="Gray">
-						<TextBlock Margin="3 0 0 0" VerticalAlignment="Center" FontSize="10" Foreground="White" Text="{Binding Header}" />
+						<Grid ColumnDefinitions="*,Auto">
+							<TextBlock Grid.Column="0" Margin="3 0 0 0" VerticalAlignment="Center" FontSize="12" Foreground="White" Text="{Binding Header}" />
+							<StackPanel Grid.Column="1" Classes="nodeActions" Orientation="Horizontal" VerticalAlignment="Center">
+								<Button Classes="nodeActionBtn" Content="+" ToolTip.Tip="Add an element at the top level">
+									<Button.Flyout>
+										<Flyout Placement="Right">
+											<views:ElementPickerView FooterText="Adds at the top level"/>
+										</Flyout>
+									</Button.Flyout>
+								</Button>
+							</StackPanel>
+						</Grid>
 					</Border>
 				</TreeDataTemplate>
 			</TreeView.DataTemplates>
 		</TreeView>
-		<StackPanel Grid.Row="1" Margin="2 0 0 0" Orientation="Horizontal" VerticalAlignment="Bottom">
-		<Button Width="105" HorizontalContentAlignment="Center"  BorderBrush="#2e2e2e"  Content="Add element" VerticalAlignment="Bottom">
-			<Button.Flyout>
-				<MenuFlyout Placement="Top">
-					<MenuItem Header="Detection"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.Detection}"/>
-
-					<MenuItem Header="RelativeStageLoop"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.RelativeStageLoop}"
-								IsEnabled="{Binding AreStagesAvailable}"/>
-
-					<MenuItem Header="StageLoop"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.StageLoop}"
-								IsEnabled="{Binding AreStagesAvailable}"/>
-
-					<MenuItem Header="WaitForTime"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.WaitForTime}"/>
-
-					<MenuItem Header="Irradiation"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.Irradiation}"
-								IsEnabled="{Binding AreSourcesAvailable}"/>
-
-					<MenuItem Header="DoTimes"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.DoTimes}"/>
-
-					<MenuItem Header="TimeLapse"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.TimeLapse}"/>
-
-					<MenuItem Header="UpdateAcquisition"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.UpdateAcquisition}"/>
-
-					<MenuItem Header="Robot"
-								Command="{Binding AddElementCommand}"
-								CommandParameter="{x:Static measurement_elem:ExperimentElementType.Robot}"/>
-						<!--		Command="{Binding Root.AppendNextItemToNode}"
-								CommandParameter="{Binding RelativeSource={RelativeSource Self}}" />-->
-				</MenuFlyout>
-			</Button.Flyout>
-		</Button>
-
-		<Button Width="105" HorizontalContentAlignment="Center" BorderBrush="#2e2e2e"  Margin="55 -7 0 0" Content="Delete element"
-		  HorizontalAlignment="Right"  Command="{Binding DeleteNode}" CommandParameter="True">			
-		</Button>
 		</StackPanel>
-
-		<Border Grid.Row="2" Height="10" Margin="0 5 2 0" BorderThickness="0 1 0 0" Width="250" BorderBrush="Gray">
+		<Border Grid.Row="1" Height="10" Margin="0 5 2 0" BorderThickness="0 1 0 0" Width="250" BorderBrush="Gray">
 									
 		</Border>
 		<TransitioningContentControl
 			Margin="4 -8 0 0"
 			Content="{Binding SelectedTreeItem}"
-			Grid.Row="3">
+			Grid.Row="2">
 
 			<TransitioningContentControl.DataTemplates>
 
