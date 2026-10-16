@@ -1,6 +1,7 @@
 ﻿using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Utils;
+using ImagerAvalonia.ViewModels;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,14 +27,17 @@ public class EquipmentCoordinator
     private IStageControl _stageControl;
     private IImagerCommunicationManager _communicationManager;
     private EquipmentState _equipmentState;
+    private readonly StageControlPanelViewModel _stagePanel;
 
     public EquipmentCoordinator(IStageControl stageControl,
         IImagerCommunicationManager communicationManager,
-        EquipmentState state)
+        EquipmentState state,
+        StageControlPanelViewModel stagePanel)
     {
         _stageControl = stageControl;
         _communicationManager = communicationManager;
         _equipmentState = state;
+        _stagePanel = stagePanel;
     }
 
     private async Task<EquipmentInitResult> FetchAsync(
@@ -45,6 +49,7 @@ public class EquipmentCoordinator
         var detectors = (await comm.ListAvailableDetectorsAsync()).ToList();
         var eq = await comm.ListAvailableEquipmentAsync();
         await _stageControl.InitializeStageInfo();
+        _stagePanel.RefreshStageAvailability();
         return new EquipmentInitResult(
             Detectors: detectors,
             Sources: state.ParseAvailableLightSources(eq),

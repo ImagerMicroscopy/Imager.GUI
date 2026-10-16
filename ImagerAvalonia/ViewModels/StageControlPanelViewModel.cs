@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using ImagerAvalonia.Services.ImagerModels.MeasurementElementsModels;
 using ImagerAvalonia.Services.MeasurementControl;
 
 
@@ -53,12 +54,17 @@ public partial class StageControlPanelViewModel : ViewModelBase
 
     // Events
    
-    public StageControlPanelViewModel(IStageControl stageController) 
-    { 
-        _stageController = stageController; 
+    public StageControlPanelViewModel(IStageControl stageController)
+    {
+        _stageController = stageController;
         IsStageAvailable = _stageController.IsStageAvailable;
 
     }
+
+    // Hardware is determined once at startup and never changes during a run;
+    // EquipmentCoordinator calls this after InitializeStageInfo has run, so
+    // the panel does not depend on view-construction order.
+    public void RefreshStageAvailability() => IsStageAvailable = _stageController.IsStageAvailable;
 
     #region Movement Controls
     public void MoveNorth() => MoveStage(0, (float)(XYStep ?? 0), 0);
@@ -72,10 +78,16 @@ public partial class StageControlPanelViewModel : ViewModelBase
         var pos = _stageController.ReadStagePosition();
         if (pos != null)
         {
-            pos.Coordinates.x += xDelta;
-            pos.Coordinates.y += yDelta;
-            pos.Coordinates.z += zDelta;
-            _stageController.SetStagePosition(pos);
+            // Build a new position instead of mutating the one handed back by
+            // ReadStagePosition; it may be shared state.
+            var moved = new XYStagePosition(
+                pos.Coordinates.hardwareautofocusoffset,
+                pos.Coordinates.x + xDelta,
+                pos.Coordinates.y + yDelta,
+                pos.Coordinates.z + zDelta,
+                pos.Coordinates.usinghardwareautofocus,
+                pos.Name);
+            _stageController.SetStagePosition(moved);
         }
     }
 

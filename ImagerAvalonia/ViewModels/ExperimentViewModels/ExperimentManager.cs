@@ -335,11 +335,20 @@ public class ExperimentManager : IDisposable
 
     public string? GetStoragePath()
     {
-        if (SelectedExperiment != null)
+        if (SelectedExperiment == null)
         {
-            return SelectedExperiment.GetStoragePath();
+            return null;
         }
-        return null;    
+
+        // With storage disabled no file is written; the path is only used to
+        // title the run's tab, so skip folder/filename validation.
+        if (!IsStorageEnabled())
+        {
+            var fileName = SelectedExperiment.Root.FileName;
+            return string.IsNullOrEmpty(fileName) ? "Unsaved experiment" : fileName;
+        }
+
+        return SelectedExperiment.GetStoragePath();
     }
 
     public bool IsStorageEnabled()

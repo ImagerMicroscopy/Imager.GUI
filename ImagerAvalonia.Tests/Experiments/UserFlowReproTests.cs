@@ -103,6 +103,25 @@ public sealed class UserFlowReproTests : IDisposable
         Assert.EndsWith(".tif", path);
     }
 
+    [Fact]
+    public void Storage_path_is_not_validated_when_storage_is_disabled()
+    {
+        var mainVM = _container.Resolve<MainViewModel>();
+        var exp = mainVM.SelectedExperiment!;
+        var manager = _container.Resolve<ExperimentManager>();
+
+        // No output folder or file name set - with saving on, this must throw.
+        exp.Root.IsExperimentStorageEnabled = false;
+        Assert.Equal("Unsaved experiment", manager.GetStoragePath());
+
+        // A configured base name is still used to title the run's tab.
+        exp.Root.FileName = "exp";
+        Assert.Equal("exp", manager.GetStoragePath());
+
+        exp.Root.IsExperimentStorageEnabled = true;
+        Assert.Throws<Exception>(() => manager.GetStoragePath());
+    }
+
     [AvaloniaFact]
     public void Open_button_on_root_panel_has_a_working_command()
     {
