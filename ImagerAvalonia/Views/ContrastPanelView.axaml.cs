@@ -21,8 +21,6 @@ public partial class ContrastPanelView : UserControl
 
    
     private AvaPlot histogram_plot;
-    private int selected_row = 0;
-    private int selected_col = 0;
     private DispatcherTimer _refreshTimer;
     private ContrastAdjViewModel _viewModel;
 
@@ -33,13 +31,12 @@ public partial class ContrastPanelView : UserControl
 
 
 
-    public Dictionary<int, WriteableBitmap> GridImages;
-    public Dictionary<ValueTuple<int, int>, int> FlattenedGrid;
-
-
-
     public event EventHandler? UpdateContrastOnCurrentImage;
 
+    /// <summary>
+    /// Contrast settings per grid cell, addressed by row/column. Used by the field
+    /// viewer, which addresses its cells by index (see GridContrastEventArgs).
+    /// </summary>
     public List<List<ContrastAdjViewModel>> contrastSettings = new();
 
 
@@ -136,9 +133,6 @@ public partial class ContrastPanelView : UserControl
         DataContext = contrastSettings[row_col_ind.row][row_col_ind.col];
 
         contrastSettings[row_col_ind.row][row_col_ind.col].PropertyChanged += OnContrastValuesChanged;
-
-        selected_row = row_col_ind.row;
-        selected_col = row_col_ind.col;
     }
 
     public void OnContrastValuesChanged(object? sender, PropertyChangedEventArgs e)
@@ -190,103 +184,6 @@ public partial class ContrastPanelView : UserControl
 
 
 
-
-    //public byte[] UpdateContrastAndHistogramValues(byte[] image_array, ref double[] histogram_vals_y, ref double[] histogram_vals_y_low, ref double[] histogram_vals_x, int row, int col)
-    //{
-
-
-
-    //    ushort min_val = (ushort)_contrastSettings[row][col].Min_disp_val;
-    //    ushort max_val = (ushort)_contrastSettings[row][col].Max_disp_val;
-
-    //    ushort[] converted_array = new ushort[image_array.Length / 2];
-
-    //    //double[] histogram_vals_y = new double[257];
-    //    for (int hist_val = 0; hist_val < histogram_vals_y.Length; hist_val++)
-    //    {
-    //        histogram_vals_y[hist_val] = 0;
-    //    }
-
-    //    //double[] histogram_vals_y_low = new double[257];
-    //    for (int hist_val = 0; hist_val < histogram_vals_y.Length; hist_val++)
-    //    {
-    //        histogram_vals_y[hist_val] = 0;
-    //    }
-
-
-
-    //    Buffer.BlockCopy(image_array, 0, converted_array,0, image_array.Length);
-
-
-    //    double min_image_val = converted_array.Min();
-    //    double max_image_val = converted_array.Max();
-    //    if (_contrastSettings[row][col].IsAutoContrastEnabled)
-    //    {
-    //        min_val = Convert.ToUInt16(min_image_val);
-    //        max_val = Convert.ToUInt16(max_image_val);
-    //    }
-
-    //    double bin_size = (max_image_val - min_image_val) / 256;
-
-
-    //    //double[] histogram_vals_x = new double[257];
-    //    for (int hist_val = 0; hist_val < histogram_vals_x.Length; hist_val++)
-    //    {
-    //        histogram_vals_x[hist_val] = min_image_val + hist_val * bin_size;
-    //    }
-
-    //    //var timer = new System.Diagnostics.Stopwatch();
-    //    //timer.Start();
-
-
-    //    unsafe
-    //    {
-    //        fixed (ushort* ptr = converted_array)
-    //        {
-    //            for (int i = 0; i < converted_array.Length; i++)
-    //            {
-    //                double bin_value = (double)ptr[i] - min_image_val;
-    //                int bin_position = 0;
-
-    //                if (bin_value != 0)
-    //                {
-    //                    bin_position = (int)(bin_value / bin_size);
-    //                }
- 
-    //                histogram_vals_y[bin_position] += 1;
-
-    //                if (ptr[i] < max_val && ptr[i] > min_val)
-    //                {
-    //                    ptr[i] = (ushort)((float)((ptr[i] - min_val))/(max_val-min_val)*ushort.MaxValue);
-    //                }
-    //                else if (ptr[i] < min_val)
-    //                {
-    //                    ptr[i] = 0;
-    //                }
-    //                else if (ptr[i] > max_val)
-    //                {
-    //                    ptr[i] = ushort.MaxValue;
-    //                }
-    //            }
-    //        }
-    //    }
-
-
-
-
-
-    //    Buffer.BlockCopy(converted_array, 0, image_array, 0, converted_array.Length * 2);
-
-
-    //    return image_array;
-    //}
-
-
-
-
-
-
-
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);
@@ -300,3 +197,24 @@ public partial class ContrastPanelView : UserControl
 
 
 
+
+/// <summary>
+/// Addresses a contrast-settings grid cell by row and column. Used by the field
+/// viewer, whose cells are index-based rather than acquisition/detector-keyed.
+/// </summary>
+public class GridContrastEventArgs : EventArgs
+{
+    public int row { get; }
+    public int col { get; }
+    public string? acquistion { get; }
+    public string? detector { get; }
+
+    public GridContrastEventArgs(int value1, int value2, string? acq, string? det)
+    {
+        row = value1;
+        col = value2;
+
+        acquistion = acq;
+        detector = det;
+    }
+}

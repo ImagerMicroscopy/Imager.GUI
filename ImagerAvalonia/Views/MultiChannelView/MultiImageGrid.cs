@@ -1,23 +1,39 @@
-﻿using Avalonia.Controls;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace ImagerAvalonia.Views.MultiChannelView
 {
-    internal class MultiImageGrid : ImageGrid, IImageGridInitializable
+    /// <summary>
+    /// The multi-channel composite view: one canvas blending the configured
+    /// channels. Unlike the tile grid, this is a single image on a free pan/zoom
+    /// surface (wheel zoom anchored at the cursor, middle-drag pan), because there
+    /// are no tiles to fit. Channel frames are synchronized per instance (see
+    /// ChannelFrameBuffer), so two simultaneously active views each build their
+    /// composite from their own frames only.
+    /// </summary>
+    internal class MultiImageGrid : ImageGrid
     {
         private MultiChannelViewModel _viewModel;
         private MultiChannelContrastViewModel _contrastViewModel;
-        private const int NUM_CHANNELS = 5;
         private MultiImageCanvas _multiImageCanvas;
+
+        /// <summary>This view's channel frames; per instance, see the class comment.</summary>
+        private readonly ChannelFrameBuffer _frameBuffer = new();
+
+        private readonly ScaleTransform _scaleTransform = new(1, 1);
+        private readonly TranslateTransform _translateTransform = new(0, 0);
+        private bool _isPanning;
+        private Point _lastPanPosition;
+
         private static readonly Dictionary<string, int> _channelMaps = new Dictionary<string, int>()
         {
             {"Red", 0 },
@@ -27,22 +43,12 @@ namespace ImagerAvalonia.Views.MultiChannelView
             {"Transmission",4 }
         };
 
-        private static readonly List<byte[][]> _imageChannels = new();
-
 
         public MultiImageGrid(MultiChannelViewModel multiChannelConfigViewModel, MultiChannelContrastViewModel contrastVM)
         {
             DataContext = multiChannelConfigViewModel;
             _viewModel = multiChannelConfigViewModel;
             _contrastViewModel = contrastVM;
-            _imageChannels.Add(new byte[5][] );
-            SetupRenderTransform();
-
-        }
-
-        private void SetupRenderTransform()
-        {
-
 
             RenderTransform = new TransformGroup
             {
@@ -50,94 +56,122 @@ namespace ImagerAvalonia.Views.MultiChannelView
                 {
                     _scaleTransform,
                     _translateTransform,
-
                 }
             };
+            // Avalonia's default render transform origin is (0.5, 0.5), which would
+            // pivot the pan/zoom around the control's center and break the
+            // cursor-anchored zoom math; pin it to the top-left corner.
+            RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Relative);
+
+            PointerWheelChanged += OnPointerWheelChanged;
+            PointerPressed += OnPointerPressed;
+            PointerMoved += OnPointerMoved;
+            PointerReleased += OnPointerReleased;
         }
 
 
-        public new void Initialize(List<string> acquisitions, List<string> detectors)
+        public void Initialize(List<string> acquisitions, List<string> detectors)
         {
             RowDefinitions.Clear();
             ColumnDefinitions.Clear();
             Children.Clear();
 
 
-
             _multiImageCanvas = new MultiImageCanvas();
-            _imageChannels.Clear();
-            _imageChannels.Add(new byte[5][]);
+            _frameBuffer.Clear();
 
             Grid.SetColumn(_multiImageCanvas, 0);
             Grid.SetRow(_multiImageCanvas, 0);
             Children.Add(_multiImageCanvas);
 
+            // Reset the pan/zoom surface for the new measurement.
+            _scaleTransform.ScaleX = 1;
+            _scaleTransform.ScaleY = 1;
+            _translateTransform.X = 0;
+            _translateTransform.Y = 0;
         }
 
+        private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
+        {
+            var position = e.GetPosition(this);
+            double oldScale = _scaleTransform.ScaleX;
+            double factor = e.Delta.Y > 0 ? 1.1 : 1.0 / 1.1;
+            double newScale = Math.Clamp(oldScale * factor, 0.1, 32);
+            if (newScale == oldScale) return;
+
+            // Anchor the zoom at the cursor.
+            _scaleTransform.ScaleX = newScale;
+            _scaleTransform.ScaleY = newScale;
+            _translateTransform.X = position.X - (newScale / oldScale) * (position.X - _translateTransform.X);
+            _translateTransform.Y = position.Y - (newScale / oldScale) * (position.Y - _translateTransform.Y);
+            e.Handled = true;
+        }
+
+        private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+            {
+                _isPanning = true;
+                _lastPanPosition = e.GetPosition(this);
+                e.Handled = true;
+            }
+        }
+
+        private void OnPointerMoved(object? sender, PointerEventArgs e)
+        {
+            if (!_isPanning) return;
+
+            var position = e.GetPosition(this);
+            _translateTransform.X += position.X - _lastPanPosition.X;
+            _translateTransform.Y += position.Y - _lastPanPosition.Y;
+            _lastPanPosition = position;
+            e.Handled = true;
+        }
+
+        private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+        {
+            if (_isPanning)
+            {
+                _isPanning = false;
+                e.Handled = true;
+            }
+        }
 
         public async Task ReceiveChannelImage(string acq, string det, string elementid, int imageSizeX, int imageSizeY, byte[] image, ImagePixelFormat format)
         {
             var channels = _viewModel.GetChannel(det, acq, elementid);
-            foreach(var channel in channels)
+            foreach (var channel in channels)
             {
-                if(_channelMaps.TryGetValue(channel, out int channel_ind))
+                if (_channelMaps.TryGetValue(channel, out int channelIndex))
                 {
-                    foreach(var img_queue in _imageChannels)
-                    {
-                        if (img_queue[channel_ind] is null)
-                        {
-                            img_queue[channel_ind] = image;
-                            break;
-                        }
-                    }
+                    _frameBuffer.Add(channelIndex, image);
                 }
             }
-            var userdefinedchannels = _viewModel.GetUserChannels();
-            var current_occupied_channels = _imageChannels[0];
-            bool are_all_channels_occupied = true;
 
-            List<int> bitmap_lengths = new();
-            foreach(var ch_ind in userdefinedchannels)
+            // The composite is rendered only once every enabled channel has a
+            // frame (see ChannelFrameBuffer); until then, this image stays
+            // pending.
+            if (!_frameBuffer.TryTakeCompleted(_viewModel.GetUserChannels().ToList(), out var frames))
             {
-                if (current_occupied_channels[ch_ind] is null)
-                {
-                    are_all_channels_occupied = false;
-                    break;
-                }
-                else 
-                {
-                   bitmap_lengths.Add( current_occupied_channels[ch_ind].Length );
-                } 
-                    
+                return;
             }
-            if(are_all_channels_occupied) 
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                //&& bitmap_lengths.Select( x => x!=null).Any(o => o != bitmap_lengths[0]))
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                {
-
-                    _multiImageCanvas.UpdateMultiBitmap(
-                      current_occupied_channels[0],
-                      current_occupied_channels[1],
-                      current_occupied_channels[2],
-                      current_occupied_channels[3],
-                      current_occupied_channels[4],
-                      imageSizeX,
-                      imageSizeY,
-                      _contrastViewModel,
-                      format
-                      );
-                    _multiImageCanvas.SetBitmap();
-                    _multiImageCanvas.InvalidateBitmap();
-
-
-                });
-                _imageChannels.RemoveAt(0);
-                if(_imageChannels.Count==0)
-                {
-                    _imageChannels.Add(new byte[5][]);
-                }
-            }
+                _multiImageCanvas.UpdateMultiBitmap(
+                    frames[0],
+                    frames[1],
+                    frames[2],
+                    frames[3],
+                    frames[4],
+                    imageSizeX,
+                    imageSizeY,
+                    _contrastViewModel,
+                    format
+                    );
+                _multiImageCanvas.SetBitmap();
+                _multiImageCanvas.InvalidateBitmap();
+            });
         }
     }
 }

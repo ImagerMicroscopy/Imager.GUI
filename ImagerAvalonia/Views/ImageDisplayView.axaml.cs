@@ -4,8 +4,6 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
-using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Storage;
@@ -13,44 +11,29 @@ using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
 using ImagerAvalonia.Views.ImageViews;
 using ImagerAvalonia.Views.MultiChannelView;
-using ScottPlot;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-
-
-
-
 namespace ImagerAvalonia.Views;
-
-
-
-
 
 public partial class ImageDisplayView : UserControl
 {
-
-    private ScaleTransform? _scaleTransform;
-    private TranslateTransform? _translateTransform;
-
     private bool _isMultiChannelEnabled = false;
     private bool _isDotSelectionEnabled = true;
     private ImageDisplayViewModel? imageDisplayViewM;
 
-    private Canvas imageCanvas;
     private MultiChannelContrastView multiChannelContrast;
-    private ContrastPanelView contrastPanel;
     private ImageRegionCollectionPropertiesView regionCollectionProperties;
     private MultiChannelConfigView multiChannelConfigView;
     private ImageGrid imageGrid;
     private MultiImageGrid multiImageGrid;
-
+    private Grid imagePanel;
+    private Expander multiChannelContrastExpander;
+    private ContentControl multiChannelContrastHost;
 
     private ILifetimeScope scope = App.Container.BeginLifetimeScope();
 
@@ -70,17 +53,12 @@ public partial class ImageDisplayView : UserControl
     {
         InitializeComponent();
 
+        imagePanel = this.FindControl<Grid>("ImagePanel")!;
+        multiChannelContrastExpander = this.FindControl<Expander>("MultiChannelContrastExpander")!;
+        multiChannelContrastHost = this.FindControl<ContentControl>("MultiChannelContrastHost")!;
 
-        imageCanvas = this.FindControl<Canvas>("ImageCanvas")!;
-        imageSlider = this.FindControl<Slider>("imageSlider")!;
-
-        contrastPanel = (ContrastPanelView)this.FindControl<UserControl>("ContrastPanel")!;
-        multiChannelContrast = new MultiChannelContrastView();
         var regionPanel = this.FindControl<ContentControl>("RegionContent")!;
         var multichannelPanel = this.FindControl<ContentControl>("MultiChannelConfig")!;
-
-
-
 
         regionCollectionProperties = new ImageRegionCollectionPropertiesView(scope);
         regionPanel.Content = regionCollectionProperties;
@@ -88,36 +66,20 @@ public partial class ImageDisplayView : UserControl
         multiChannelConfigView = new MultiChannelConfigView(scope);
         multichannelPanel.Content = multiChannelConfigView;
 
-        var imageContainer = this.FindControl<Avalonia.Controls.Grid>("ImageContainer")!;
-        imageContainer.Width = ScreenHelper.ScreenSize.Width / ScreenHelper.Scaling;
-        imageContainer.Height = ScreenHelper.ScreenSize.Height / ScreenHelper.Scaling;
-
-
-        var contentControl = this.FindControl<Panel>("ImagePanel")!;
-
-
-
-        imageGrid = new ImageGrid();    // this.FindControl<ImagerAvalonia.Views.ImageGrid>("imageGrid")!;
+        // One region view model per tab (InstancePerLifetimeScope): the tiles'
+        // overlays and the element-properties panel share it.
+        imageGrid = new ImageGrid();
         imageGrid.SharedRegionViewModel = scope.Resolve<ImageRegionDisplayViewModel>();
-        imageGrid.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
-        imageGrid.KeyDown += ImageDisplayView_EnterSelection_KeyDown;
-        contentControl.Children.Add(imageGrid);
-
-        multiImageGrid = new MultiImageGrid(multiChannelConfigView.DataContext as MultiChannelViewModel, multiChannelContrast.DataContext as MultiChannelContrastViewModel);
-
-
-        var transformGroup = imageGrid.RenderTransform! as TransformGroup;
-        _scaleTransform = (ScaleTransform)transformGroup!.Children[0];
-        _translateTransform = (TranslateTransform)transformGroup!.Children[1];
-
         imageGrid.OnSelectedItemChanged += ImageGrid_OnSelectedItemChanged;
+        imageGrid.KeyDown += ImageDisplayView_KeyDown;
+        imagePanel.Children.Add(imageGrid);
+
+        multiChannelContrast = new MultiChannelContrastView();
+        multiImageGrid = new MultiImageGrid(multiChannelConfigView.DataContext as MultiChannelViewModel, multiChannelContrast.DataContext as MultiChannelContrastViewModel);
 
         DataContextChanged += OnDataContextChanged;
 
-
         _ = Task.Run(() => UpdateViewer());
-
-
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -216,20 +178,22 @@ public partial class ImageDisplayView : UserControl
         regionCollectionProperties.UpdateRegions(copy_image, acq, det, im_size_x, im_size_y, pos, timepoint);
     }
 
-    private void ImageGrid_OnSelectedItemChanged(object? sender, EventArgs e)
+    /// <summary>
+    /// A tile was clicked: the slot view model becomes the display's selection (the
+    /// single source of truth; its IsSelected flag drives the tile highlight).
+    /// Contrast panels live on the tiles themselves, so nothing else follows the
+    /// selection here anymore.
+    /// </summary>
+    private void ImageGrid_OnSelectedItemChanged(object? sender, ImageCanvasViewModel slot)
     {
-        if (contrastPanel.DataContext is ContrastAdjViewModel vm)
+        if (imageDisplayViewM != null)
         {
-            vm.OnHistogramUpdateRequested -= contrastPanel._viewModel_OnHistogramUpdateRequested;
+            imageDisplayViewM.SelectedSlot = slot;
         }
-        contrastPanel.DataContext = imageGrid.SelectedCanvasViewModel.ContrastSettings;
-        contrastPanel.ContrastPanelView_DataContextChanged(sender, e);
     }
 
-
-    private void OnDotToggled(object? sender, RoutedEventArgs e)
+    private void OnDotToggled(object? sender, RoutedEventArgs r)
     {
-
         if (_isDotSelectionEnabled && imageGrid.SelectedImage != null)
         {
             _isDotSelectionEnabled = false;
@@ -249,22 +213,24 @@ public partial class ImageDisplayView : UserControl
         }
     }
 
-    private void ImageDisplayView_EnterSelection_KeyDown(object? sender, KeyEventArgs e)
+    private void ImageDisplayView_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && !_isDotSelectionEnabled)
+        if (e.Key == Key.Escape)
+        {
+            // Restore the grid when a tile is maximized; a no-op otherwise.
+            imageGrid.RestoreMaximizedTile();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && !_isDotSelectionEnabled)
         {
             _isDotSelectionEnabled = true;
-            imageGrid.SelectedImage.DisableRegionSelection();
-
+            imageGrid.SelectedImage?.DisableRegionSelection();
         }
     }
 
 
-
     public void UpdateCurrentImageFromStream(TiffPlaneMetadata mt, byte[] image_data, bool canupdate)
     {
-        if ((imageGrid.isDragging)) return;
-
         ImageChannel.Writer.TryWrite(new ImageUpdateArguments(
             (int)mt.Width,
             (int)mt.Height,
@@ -277,25 +243,22 @@ public partial class ImageDisplayView : UserControl
             canupdate,
             mt.TimePoint
             ));
-
-
     }
 
     private async Task UpdateImageGrid(int im_size_x, int im_size_y, string acq, string det, byte[] image_data, ImagePixelFormat format, XYStagePosition pos, bool canupdate, double timepoint)
     {
         if (canupdate)
         {
+            // The histogram is expensive and only displayed on a tile whose
+            // contrast overlay is open, so it is fed only to those.
+            var slot = imageDisplayViewM?.Slots.FirstOrDefault(s => s.AcqName == acq && s.DetName == det);
+            if (slot is { IsContrastPanelVisible: true })
+            {
+                slot.ContrastSettings.UpdateHistogram(image_data, format);
+            }
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                if (imageGrid.SelectedCanvasViewModel.ContrastSettings is ContrastAdjViewModel vm &&
-                    imageGrid.SelectedCanvasViewModel.AcqName == acq && imageGrid.SelectedCanvasViewModel.DetName == det)
-                {
-
-                    vm.UpdateHistogram(image_data, format);
-                }
-
-
                 imageGrid[acq, det].UpdateBitmap(im_size_x, im_size_y, image_data, format);
                 imageGrid[acq, det].SetBitmap();
                 imageGrid[acq, det].InvalidateBitmap();
@@ -304,94 +267,58 @@ public partial class ImageDisplayView : UserControl
         }
     }
 
-
-
     private void InitializeGrid(object? sender, EventArgs e)
     {
+        if (imageDisplayViewM == null) return;
 
         _isDotSelectionEnabled = true;
         _isMultiChannelEnabled = false;
         imageDisplayViewM.MultiViewEnabled = false;
 
-        imageGrid.Margin = new Avalonia.Thickness(-410 * imageDisplayViewM.Acquisitions.Count + 410, 0, 0, 0);
-        imageGrid.Initialize(imageDisplayViewM.Acquisitions.ToList(), imageDisplayViewM.Detectors.ToList());
+        // Tiles are built from the slot view models; the grid shares the available
+        // space equally between them (no fixed sizes, no offsets).
+        imageGrid.Initialize(imageDisplayViewM.Slots, imageGrid.SharedRegionViewModel);
         multiImageGrid.Initialize(imageDisplayViewM.Acquisitions.ToList(), imageDisplayViewM.Detectors.ToList());
 
-        var contentControl = this.FindControl<Panel>("ImagePanel")!;
-        contentControl.Children.Clear();
-        contentControl.Children.Add(imageGrid);
-        //imageGrid.SharedRegionViewModel = (ImageRegionDisplayViewModel)regionCollectionProperties.DataContext;
-        contrastPanel.DataContext = imageGrid.SelectedCanvasViewModel.ContrastSettings;
+        imagePanel.Children.Clear();
+        imagePanel.Children.Add(imageGrid);
+        multiChannelContrastExpander.IsVisible = false;
+        multiChannelContrastHost.Content = null;
         regionCollectionProperties.DataContext = imageGrid.SharedRegionViewModel;
     }
 
-
-
     private void OnResetView(object? sender, RoutedEventArgs e)
     {
-        if (_translateTransform != null && _scaleTransform != null)
-        {
-            _translateTransform.X = 0;
-            _translateTransform.Y = 0;
-            _scaleTransform.ScaleX = 0.5;
-            _scaleTransform.ScaleY = 0.5;
-        }
+        // Tiles, not the grid, own their viewport: resetting re-fits every tile.
+        imageGrid.ResetView();
     }
-
-
-
-
 
     private void InitializeComponent()
     {
         AvaloniaXamlLoader.Load(this);
-
     }
 
     private void OnChangeToMultiChannel(object? sender, RoutedEventArgs e)
     {
         if(sender is ToggleButton button)
         {
-            var contentControl = this.FindControl<Panel>("ImagePanel")!;
-            var contrastControl = this.FindControl<StackPanel>("ElementsPanel")!;
-
             if (button.IsChecked is not null && (bool)button.IsChecked)
             {
                 _isMultiChannelEnabled = true;
-                contrastControl.Children.Clear();
-                contrastControl.Children.Add(multiChannelContrast);
-                contentControl.Children.Remove(imageGrid);
-                contentControl.Children.Add(multiImageGrid);
+                multiChannelContrastExpander.IsVisible = true;
+                multiChannelContrastHost.Content = multiChannelContrast;
+                imagePanel.Children.Remove(imageGrid);
+                imagePanel.Children.Add(multiImageGrid);
             }
             else
             {
                 _isMultiChannelEnabled = false;
-                contrastControl.Children.Clear();
-                contrastControl.Children.Add(contrastPanel);
-                contentControl.Children.Remove(multiImageGrid);
-                contentControl.Children.Add(imageGrid);
+                multiChannelContrastExpander.IsVisible = false;
+                multiChannelContrastHost.Content = null;
+                imagePanel.Children.Remove(multiImageGrid);
+                imagePanel.Children.Add(imageGrid);
             }
         }
-    }
-}
-
-
-
-
-public class GridContrastEventArgs : EventArgs
-{
-    public int row { get; }
-    public int col { get; }
-    public string? acquistion { get; }
-    public string? detector { get; }
-
-    public GridContrastEventArgs(int value1, int value2, string? acq, string? det)
-    {
-        row = value1;
-        col = value2;
-
-        acquistion = acq;
-        detector = det;
     }
 }
 

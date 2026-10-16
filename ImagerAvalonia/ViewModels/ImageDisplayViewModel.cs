@@ -98,6 +98,20 @@ public partial class ImageDisplayViewModel : ViewModelBase
     public ObservableCollection<string> Acquisitions = new();
     [ObservableProperty] ObservableCollection<XYStagePosition> _availableStagePositions  = new();
 
+    /// <summary>
+    /// One view model per grid tile (acquisition x detector, the same cross product
+    /// the grid view lays out). Rebuilt by SetGridData; the grid view creates its
+    /// tiles from this collection, so structure and state live here, not in the view.
+    /// </summary>
+    public ObservableCollection<ImageCanvasViewModel> Slots { get; } = new();
+
+    /// <summary>
+    /// The grid's selected tile. The single source of truth for selection: assigning
+    /// it moves the IsSelected flag, which the tiles bind their highlight to. Kept
+    /// non-null whenever slots exist; the first slot is selected by default.
+    /// </summary>
+    [ObservableProperty] private ImageCanvasViewModel? _selectedSlot;
+
     // The ImageHandler this view model is currently wired up to. Tracked here (rather
     // than asking the workspace) so DetachHandler always unsubscribes the exact instance
     // that was subscribed, even if the workspace has already moved on to another session.
@@ -311,7 +325,14 @@ public partial class ImageDisplayViewModel : ViewModelBase
         SelectedFrame = 0;
         Acquisitions.Clear();
         Detectors.Clear();
-        if (acq_det_pairs == null) return;
+        Slots.Clear();
+        if (acq_det_pairs == null)
+        {
+            // No slots remain, so the stale selection is dropped rather than kept
+            // pointing at a removed slot.
+            SelectedSlot = null;
+            return;
+        }
         AcqDetPairs = new List<Tuple<string, string>>(acq_det_pairs);
 
 
@@ -326,7 +347,39 @@ public partial class ImageDisplayViewModel : ViewModelBase
                 Detectors.Add(pair.Item2);
             }
         }
+
+        // The grid shows every acquisition/detector combination (the cross product),
+        // like the grid view's layout; the incoming pairs only define the axes.
+        foreach (string acquisition in Acquisitions)
+        {
+            foreach (string detector in Detectors)
+            {
+                Slots.Add(new ImageCanvasViewModel(acquisition, detector));
+            }
+        }
+
+        // The first slot is selected from the start, matching the grid's default
+        // tile; assignment moves the IsSelected flag.
+        if (Slots.Count > 0)
+        {
+            SelectedSlot = Slots[0];
+        }
+
         OnGridValueInitialized(new EventArgs());
+    }
+
+    partial void OnSelectedSlotChanged(ImageCanvasViewModel? oldValue, ImageCanvasViewModel? newValue)
+    {
+        // IsSelected is derived state: only the assigned slot carries it, in every
+        // code path (assignment, collection rebuild), so it can never go stale.
+        if (oldValue != null)
+        {
+            oldValue.IsSelected = false;
+        }
+        if (newValue != null)
+        {
+            newValue.IsSelected = true;
+        }
     }
 
 

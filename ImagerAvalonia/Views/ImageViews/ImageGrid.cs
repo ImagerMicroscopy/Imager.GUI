@@ -1,188 +1,170 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Media;
-using Avalonia.VisualTree;
 using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Net.NetworkInformation;
-
 
 namespace ImagerAvalonia.Views
 {
-
-    public interface IImageGridInitializable
-    {  
-        void Initialize(List<string> acquisitions, List<string> detectors);
-    }
-
-    internal class ImageGrid : Grid, IImageGridInitializable
+    /// <summary>
+    /// The image display surface: one tile per slot view model (acquisition x
+    /// detector), laid out in equal, star-sized grid cells that share the available
+    /// space. Structure and selection state live in the view models
+    /// (ImageDisplayViewModel.Slots / SelectedSlot); this control only lays out the
+    /// tiles, routes selection clicks, and manages the maximized-tile mode.
+    /// Zooming and panning are per tile (see ImageCanvas); this grid has no
+    /// transform of its own.
+    /// </summary>
+    internal class ImageGrid : Grid
     {
+        private readonly Dictionary<(string, string), ImageCanvas> _imageData = new();
 
-        private Dictionary<(string, string), ImageCanvas> _imageData = new Dictionary<(string, string), ImageCanvas>();
-        private Point _lastMousePosition;
-        private ImageGridViewModel _viewModel;
-        
+        /// <summary>The tile currently filling the whole grid area, if any.
+        /// Double-click a tile to maximize, double-click again (or Esc, routed by
+        /// the hosting view) to restore.</summary>
+        private ImageCanvas? _maximizedTile;
 
-        public ImageCanvasViewModel SelectedCanvasViewModel => _viewModel.SelectedImage;
         public ImageCanvas? SelectedImage { get; private set; }
 
-        public bool isDragging = false;
-        public event EventHandler? OnSelectedItemChanged;
+        /// <summary>Raised when a tile is selected by a click; carries the slot's
+        /// view model, which owns the IsSelected flag the tiles highlight with.</summary>
+        public event EventHandler<ImageCanvasViewModel>? OnSelectedItemChanged;
 
         public ImageRegionDisplayViewModel? SharedRegionViewModel;
-        protected readonly TranslateTransform _translateTransform = new TranslateTransform { X = 0, Y = 0 };
-        protected readonly ScaleTransform _scaleTransform = new ScaleTransform { ScaleX = 0.5, ScaleY = 0.5 };
-
 
         public ImageGrid()
         {
-            SetupRenderTransform(); // optional default transform
-
-            PointerWheelChanged += OnPointerWheelChanged;
-            PointerPressed += OnPointerPressed;
-            PointerMoved += OnPointerMoved;
-            PointerReleased += OnPointerReleased;
-
-            _viewModel = new ImageGridViewModel();
-            DataContext = _viewModel;
-            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch;
         }
 
-
-
-
-        private void SetupRenderTransform()
-        {
-            
-
-            RenderTransform = new TransformGroup
-            {
-                Children = new Transforms
-                {
-                    _scaleTransform,                   
-                    _translateTransform,
-
-                }
-            };
-        }
-
-
-
-        public void Initialize(List<string> acquisitions, List<string> detectors)
+        /// <summary>
+        /// Builds the tiles from the slot view models. The grid is laid out with a
+        /// horizontal priority to match typical wide screens: for N slots it uses
+        /// floor(sqrt(N)) rows and ceil(N/rows) columns, filling row-major in slot
+        /// order — two slots end up side by side, not stacked. Every cell is
+        /// star-sized, so the available space is shared equally, whatever the
+        /// window size.
+        /// </summary>
+        public void Initialize(IReadOnlyList<ImageCanvasViewModel> slots, ImageRegionDisplayViewModel? sharedRegionViewModel)
         {
             RowDefinitions.Clear();
             ColumnDefinitions.Clear();
             Children.Clear();
-            _imageData.Clear(); 
+            _imageData.Clear();
+            _maximizedTile = null;
+            SelectedImage = null;
 
-            detectors.ForEach(_ => RowDefinitions.Add(new RowDefinition { Height = new GridLength(820) }));
-            acquisitions.ForEach(_ => ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(820) }));
-
-
-            if (SharedRegionViewModel == null)
+            SharedRegionViewModel = sharedRegionViewModel;
+            if (SharedRegionViewModel == null || slots.Count == 0)
                 return;
+
+            var detectors = new List<string>();
+            var acquisitions = new List<string>();
+            foreach (var slot in slots)
+            {
+                if (!acquisitions.Contains(slot.AcqName)) acquisitions.Add(slot.AcqName);
+                if (!detectors.Contains(slot.DetName)) detectors.Add(slot.DetName);
+            }
+
+            int rowCount = (int)Math.Floor(Math.Sqrt(slots.Count));
+            if (rowCount < 1) rowCount = 1;
+            int columnCount = (int)Math.Ceiling((double)slots.Count / rowCount);
+
+            for (int r = 0; r < rowCount; r++)
+            {
+                RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            }
+            for (int c = 0; c < columnCount; c++)
+            {
+                ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            }
+
             SharedRegionViewModel.Acquisitions = new ObservableCollection<string>(acquisitions);
             SharedRegionViewModel.Detectors = new ObservableCollection<string>(detectors);
-            for (int col = 0; col < acquisitions.Count; col++)
+
+            int index = 0;
+            foreach (var slot in slots)
             {
-                for (int row = 0; row < detectors.Count; row++)
+                var tile = new ImageCanvas(slot, SharedRegionViewModel)
                 {
-                    string acquisition = acquisitions[col];
-                    string detector = detectors[row];
+                    DataContext = slot
+                };
+                tile.PointerPressed += Tile_OnPointerPressed;
+                tile.DoubleTapped += Tile_OnDoubleTapped;
+                Grid.SetColumn(tile, index % columnCount);
+                Grid.SetRow(tile, index / columnCount);
+                Children.Add(tile);
+                _imageData[(slot.AcqName, slot.DetName)] = tile;
+                index++;
+            }
 
-                    var imagePanel = new ImageCanvas(acquisition, detector, SharedRegionViewModel);
-                    imagePanel.DoubleTapped += OnImageSelected;
+            if (Children.Count > 0 && Children[0] is ImageCanvas firstTile)
+            {
+                SelectedImage = firstTile;
+            }
+        }
 
-                    Grid.SetColumn(imagePanel, col);
-                    Grid.SetRow(imagePanel, row);
-                    Children.Add(imagePanel);
+        private void Tile_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is ImageCanvas tile && tile.DataContext is ImageCanvasViewModel slot &&
+                e.GetCurrentPoint(tile).Properties.IsLeftButtonPressed)
+            {
+                SelectedImage = tile;
+                OnSelectedItemChanged?.Invoke(this, slot);
+            }
+        }
 
-                    _imageData[(acquisition, detector)] = imagePanel;
+        private void Tile_OnDoubleTapped(object? sender, TappedEventArgs e)
+        {
+            if (sender is ImageCanvas tile)
+            {
+                if (_maximizedTile == tile)
+                {
+                    RestoreMaximizedTile();
+                }
+                else
+                {
+                    if (_maximizedTile != null)
+                    {
+                        RestoreMaximizedTile();
+                    }
+                    foreach (var child in Children)
+                    {
+                        child.IsVisible = ReferenceEquals(child, tile);
+                    }
+                    Grid.SetRowSpan(tile, Math.Max(1, RowDefinitions.Count));
+                    Grid.SetColumnSpan(tile, Math.Max(1, ColumnDefinitions.Count));
+                    _maximizedTile = tile;
+                    tile.FitWorld();
                 }
             }
+        }
 
-            SelectedImage = null;
-            if (_imageData.TryGetValue((acquisitions[0], detectors[0]), out var imCanvas))
+        /// <summary>Restores the maximized tile, if any; a no-op otherwise.</summary>
+        public void RestoreMaximizedTile()
+        {
+            if (_maximizedTile == null) return;
+            Grid.SetRowSpan(_maximizedTile, 1);
+            Grid.SetColumnSpan(_maximizedTile, 1);
+            foreach (var child in Children)
             {
-                if(imCanvas.DataContext is ImageCanvasViewModel imcanvasvm)
-                {
-                    _viewModel.SelectedImage = imcanvasvm;
-                }
+                child.IsVisible = true;
+            }
+            _maximizedTile.FitWorld();
+            _maximizedTile = null;
+        }
+
+        /// <summary>Restores every tile to its fitted (unzoomed) state.</summary>
+        public void ResetView()
+        {
+            foreach (var tile in _imageData.Values)
+            {
+                tile?.FitWorld();
             }
         }
-
-
-
-
-
-        private void OnImageSelected(object? sender, TappedEventArgs e)
-        {
-            if (sender is ImageCanvas imcanvas) 
-            {
-                SelectedImage = imcanvas;
-                foreach (var item in Children)
-                {
-                    item.Effect = null;
-
-                }
-                imcanvas.Effect = imcanvas.SelectedEffect();
-                if(imcanvas.DataContext is ImageCanvasViewModel imvm)
-                    _viewModel.SelectedImage = imvm;
-                    
-
-                OnSelectedItemChanged?.Invoke(this, new EventArgs());
-            }
-        }
-
-        private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
-        {
-            double zoomFactor = e.Delta.Y > 0 ? 1.1 : 0.9;
-            _scaleTransform.ScaleX *= zoomFactor;
-            _scaleTransform.ScaleY *= zoomFactor;
-
-
-        }
-
-        private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
-        {
-
-            isDragging = true;
-            var visual = this.FindAncestorOfType<Canvas>();
-            if (visual == null)
-                return;
-            _lastMousePosition = e.GetPosition(visual);
-            
-        }
-
-        private void OnPointerMoved(object? sender, PointerEventArgs e)
-        {
-
-            if (isDragging)
-            {
-                var visual = this.FindAncestorOfType<Canvas>();
-                if (visual == null)
-                    return;
-
-                var currentPosition = e.GetPosition(visual);
-                var delta = currentPosition - _lastMousePosition;
-
-                _translateTransform.X += delta.X;
-                _translateTransform.Y += delta.Y;
-
-                _lastMousePosition = currentPosition;
-            }
-            
-        }
-
-        private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
-        {
-            isDragging = false;
-        }
-
-
 
         public ImageCanvas this[string key1, string key2]
         {
@@ -200,4 +182,3 @@ namespace ImagerAvalonia.Views
         }
     }
 }
-
