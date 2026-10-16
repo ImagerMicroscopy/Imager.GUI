@@ -23,7 +23,7 @@
 			<StackPanel>
 			<StackPanel Margin="0 0 100 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="180" Height="40" >
 				<TextBlock FontSize="10" Width="" HorizontalAlignment="Left" Opacity="1" Foreground="Black" VerticalAlignment="Center">Min value </TextBlock>
-				<Slider   IsEnabled="{Binding !IsAutoContrastEnabled}" x:Name="MinSlider" Minimum="1" Maximum="{Binding Max_disp_val, Mode=TwoWay}" Value="{Binding Min_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
+				<Slider   IsEnabled="{Binding !IsAutoContrastEnabled}" x:Name="MinSlider" Minimum="0" Maximum="{Binding SliderMaximum}" Value="{Binding Min_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
 					<Slider.Resources>
 						<x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
 						<x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
@@ -59,7 +59,7 @@
 				<Grid Margin="0 0 0 0" ColumnDefinitions="136.5,40">
 
 					<TextBlock Grid.Column="0" HorizontalAlignment="Left" FontSize="10" Opacity="1" Foreground="Black"  Margin="0 0 0 0"> 0</TextBlock>
-					<TextBlock Grid.Column="1"  HorizontalAlignment="Right"  FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding Max_disp_val}">  </TextBlock>
+					<TextBlock Grid.Column="1"  HorizontalAlignment="Right"  FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding SliderMaximum}">  </TextBlock>
 				</Grid>
 
 			</StackPanel>
@@ -72,7 +72,7 @@
 
 				<StackPanel Grid.Column="2" Margin="30 0 0 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="300" Height="40" >
 					<TextBlock Width="" FontSize="10" Opacity="1" Foreground="Black"  VerticalAlignment="Center">Max value </TextBlock>
-					<Slider IsEnabled="{Binding !IsAutoContrastEnabled}"  x:Name="MaxSlider" Minimum="{Binding Min_disp_val, Mode=TwoWay}" Maximum="65535" Value="{Binding Max_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
+					<Slider IsEnabled="{Binding !IsAutoContrastEnabled}"  x:Name="MaxSlider" Minimum="0" Maximum="{Binding SliderMaximum}" Value="{Binding Max_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
 						<Slider.Resources>
 							<x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
 							<x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
@@ -105,8 +105,8 @@
 				
 				<StackPanel Width="170" Margin="55 -45 20 0" Orientation="Horizontal">
 					<Grid Margin="0 30 0 0" ColumnDefinitions="145,40">
-					<TextBlock  HorizontalAlignment="Left"  Grid.Column="0" FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding Min_disp_val}" >  </TextBlock>
-					<TextBlock  HorizontalAlignment="Left" Grid.Column="1" FontSize="10" Opacity="1" Foreground="Black"  >  65535</TextBlock>
+					<TextBlock  HorizontalAlignment="Left"  Grid.Column="0" FontSize="10" Opacity="1" Foreground="Black"  >  0</TextBlock>
+					<TextBlock  HorizontalAlignment="Left" Grid.Column="1" FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding SliderMaximum}">  </TextBlock>
 					</Grid>
 				</StackPanel>
 			</StackPanel>
@@ -115,10 +115,10 @@
 		<StackPanel Grid.Column="2" Margin="30 -10 0 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="300" Height="40" >
 				<Grid ColumnDefinitions="30,110,30,70">
 					<TextBlock FontSize="10" Opacity="1" Foreground="Black"  Grid.Column="0"  HorizontalAlignment="Left" VerticalAlignment="Center"> Min: </TextBlock>
-					<NumericUpDown HorizontalAlignment="Left" Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}"  Height="20" TextElement.FontSize="12"   Grid.Column="1" Minimum="0" Maximum="{Binding Max_disp_val, Mode=TwoWay}" Increment="1" Value="{Binding Min_disp_val, Mode=TwoWay}" >  </NumericUpDown>
+					<NumericUpDown HorizontalAlignment="Left" Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}"  Height="20" TextElement.FontSize="12"   Grid.Column="1" Minimum="0" Maximum="{Binding SliderMaximum}" Increment="1" Value="{Binding Min_disp_val, Mode=TwoWay}" >  </NumericUpDown>
 
 					<TextBlock FontSize="10" Opacity="1" Foreground="Black"  Grid.Column="2"  HorizontalAlignment="Left" VerticalAlignment="Center"> Max: </TextBlock>
-					<NumericUpDown Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}" Grid.Column="3"    Height="18" TextElement.FontSize="12"   Maximum="65535" Minimum="{Binding Min_disp_val, Mode=TwoWay}" Increment="1" Value="{Binding Max_disp_val, Mode=TwoWay}" >  </NumericUpDown>
+					<NumericUpDown Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}" Grid.Column="3"    Height="18" TextElement.FontSize="12"   Maximum="{Binding SliderMaximum}" Minimum="0" Increment="1" Value="{Binding Max_disp_val, Mode=TwoWay}" >  </NumericUpDown>
 				</Grid>
 
 		</StackPanel>

@@ -333,8 +333,15 @@ namespace ImagerAvalonia.Views
                         int row = _contrastAcqDetPairIntDict[key].Item1;
                         int col = _contrastAcqDetPairIntDict[key].Item2;
 
-                        int minval = contrastView.contrastSettings[row][col].Min_disp_val;
-                        int maxval = contrastView.contrastSettings[row][col].Max_disp_val;
+                        var cellContrast = contrastView.contrastSettings[row][col];
+
+                        // The cell adapts its control bounds and stored limits to
+                        // the pixel format; the bounds feed Avalonia bindings, so
+                        // this runs on the UI thread.
+                        await Dispatcher.UIThread.InvokeAsync(() => cellContrast.SetPixelFormat(metadata.Type));
+
+                        int minval = cellContrast.Min_disp_val;
+                        int maxval = cellContrast.Max_disp_val;
 
                         var new_bitmap = TiffHandler.SubsampleContrastToGray8(
                             imageData.Images[i],

@@ -3,7 +3,6 @@ using Avalonia.Media.Imaging;
 using ImagerAvalonia.Utils;
 using System;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -38,78 +37,6 @@ namespace ImagerAvalonia.Views.ViewUtils
 
     internal class TiffHandler
     {
-
-        public static byte[] Convert16BitTo8BitFast(byte[] byteArray16Bit)
-        {
-            if (byteArray16Bit.Length % 2 != 0)
-                throw new ArgumentException("The byte array length must be even.");
-
-            int length = byteArray16Bit.Length / 2;
-            byte[] byteArray8Bit = new byte[length];
-
-            unsafe
-            {
-                fixed (byte* source = byteArray16Bit, dest = byteArray8Bit)
-                {
-                    for (int i = 0; i < length; i++)
-                    {
-                        dest[i] = source[i * 2 + 1]; // Copy the most significant byte
-                    }
-                }
-            }
-
-            return byteArray8Bit;
-        }
-
-
-        public static byte[] UpdateAutoContrast16Bit(byte[] image_array)
-        {
-            ushort[] converted_array = new ushort[image_array.Length / 2];
-            Buffer.BlockCopy(image_array, 0, converted_array, 0, image_array.Length);
-
-            double min_image_val = converted_array.Min();
-            double max_image_val = converted_array.Max();
-
-            ushort min_val = Convert.ToUInt16(min_image_val);
-            ushort max_val = Convert.ToUInt16(max_image_val);
-
-            if (min_val == max_val)
-            {
-                ushort flatValue = max_val == ushort.MaxValue ? ushort.MaxValue : (ushort)0;
-
-                for (int i = 0; i < converted_array.Length; i++)
-                {
-                    converted_array[i] = flatValue;
-                }
-
-                Buffer.BlockCopy(converted_array, 0, image_array, 0, converted_array.Length * 2);
-                return image_array;
-            }
-
-            unsafe
-            {
-                fixed (ushort* ptr = converted_array)
-                {
-                    for (int i = 0; i < converted_array.Length; i++)
-                    {
-                        if (ptr[i] < max_val && ptr[i] > min_val)
-                        {
-                            ptr[i] = (ushort)((float)((ptr[i] - min_val)) / (max_val - min_val) * ushort.MaxValue);
-                        }
-                        else if (ptr[i] < min_val)
-                        {
-                            ptr[i] = 0;
-                        }
-                        else if (ptr[i] > max_val)
-                        {
-                            ptr[i] = ushort.MaxValue;
-                        }
-                    }
-                }
-            }
-            Buffer.BlockCopy(converted_array, 0, image_array, 0, converted_array.Length * 2);
-            return image_array; 
-        }
 
         public static byte[] MaxIntensityProject8Bit(byte[] first_img, byte[] second_img)
         {
@@ -260,72 +187,20 @@ namespace ImagerAvalonia.Views.ViewUtils
             _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unknown pixel format."),
         };
 
-        public static byte[] UpdateContrastAndHistogramValues(byte[] image_array, ushort min_val, ushort max_val, bool autocontrast)
+        /// <summary>
+        /// Maps the contrast limits from the sliders' scale onto the 16-bit
+        /// display scale: Mono8 limits (0..255) are bit-replicated, all other
+        /// formats use the limits as-is.
+        /// </summary>
+        internal static (int Min, int Max) ToDisplayScaleLimits(int min_val, int max_val, ImagePixelFormat format)
         {
-            int pixelCount = image_array.Length / 2;
-            ushort[] converted_array = new ushort[pixelCount];
-
-            Buffer.BlockCopy(image_array, 0, converted_array, 0, image_array.Length);
-
-            if (autocontrast)
+            if (format == ImagePixelFormat.Mono8)
             {
-                ushort localMin = ushort.MaxValue;
-                ushort localMax = ushort.MinValue;
-
-                for (int i = 0; i < pixelCount; i++)
-                {
-                    ushort val = converted_array[i];
-                    if (val < localMin) localMin = val;
-                    if (val > localMax) localMax = val;
-                }
-
-                min_val = localMin;
-                max_val = localMax;
+                return (Math.Clamp(min_val, 0, 255) * 257, Math.Clamp(max_val, 0, 255) * 257);
             }
 
-            if (min_val == max_val)
-            {
-                for (int i = 0; i < pixelCount; i++)
-                {
-                    converted_array[i] = converted_array[i] == 0 ? (ushort)0 : ushort.MaxValue;
-                }
-
-                Buffer.BlockCopy(converted_array, 0, image_array, 0, image_array.Length);
-                return image_array;
-            }
-
-            double range = max_val - min_val;
-            double scale = (double)ushort.MaxValue / range;
-
-            unsafe
-            {
-                fixed (ushort* ptr = converted_array)
-                {
-                    ushort* p = ptr;
-                    for (int i = 0; i < pixelCount; i++, p++)
-                    {
-                        ushort val = *p;
-
-                        if (val <= min_val)
-                        {
-                            *p = 0;
-                        }
-                        else if (val >= max_val)
-                        {
-                            *p = ushort.MaxValue;
-                        }
-                        else
-                        {
-                            *p = (ushort)((val - min_val) * scale);
-                        }
-                    }
-                }
-            }
-
-            Buffer.BlockCopy(converted_array, 0, image_array, 0, image_array.Length);
-            return image_array;
+            return (min_val, max_val);
         }
-
 
         /// <summary>
         /// Normalizes raw image bytes of any supported pixel format to a 16-bit pixel
@@ -387,13 +262,9 @@ namespace ImagerAvalonia.Views.ViewUtils
             bool autocontrast,
             WriteableBitmap? existingBitmap = null)
         {
-            // Contrast limits are expressed on the 16-bit display scale; Mono8
-            // slider values (0..255) are bit-replicated onto it.
-            if (format == ImagePixelFormat.Mono8)
-            {
-                min_val = Math.Clamp(min_val, 0, 255) * 257;
-                max_val = Math.Clamp(max_val, 0, 255) * 257;
-            }
+            // Contrast limits are expressed on the sliders' scale; Mono8 values
+            // (0..255) are bit-replicated onto the 16-bit display scale.
+            (min_val, max_val) = ToDisplayScaleLimits(min_val, max_val, format);
 
             var bytes = image_array.AsSpan();
             int pixelCount = bytes.Length / format.BytesPerPixel();
@@ -512,22 +383,35 @@ namespace ImagerAvalonia.Views.ViewUtils
         /// <summary>
         /// Contrast stretch of a 16-bit display-scale pixel: values at or below
         /// min go to 0, values at or above max saturate to 65535, everything in
-        /// between is stretched linearly.
+        /// between is stretched linearly. An inverted range (min > max) inverts
+        /// the LUT: values at or below max saturate and values at or above min
+        /// go to 0.
         /// </summary>
-        private static ushort StretchedValue(ushort val, int min_val, int max_val, double scale)
+        internal static ushort StretchedValue(ushort val, int min_val, int max_val, double scale)
         {
-            if (val <= min_val)
-                return 0;
-            if (val >= max_val)
-                return ushort.MaxValue;
+            if (scale < 0)
+            {
+                if (val <= max_val)
+                    return ushort.MaxValue;
+                if (val >= min_val)
+                    return 0;
+            }
+            else
+            {
+                if (val <= min_val)
+                    return 0;
+                if (val >= max_val)
+                    return ushort.MaxValue;
+            }
             return (ushort)((val - min_val) * scale);
         }
 
         /// <summary>
         /// Builds the field-viewer overview tile for an image: samples every 8th
-        /// pixel of the raw data, stretches the sampled pixels against the 16-bit
-        /// display-scale contrast limits, and returns the result as a Gray8
-        /// bitmap. Sampling commutes with the per-pixel stretch, so only 1/64th
+        /// pixel of the raw data, stretches the sampled pixels against the
+        /// contrast limits on the sliders' scale, and returns the result as a
+        /// Gray8 bitmap. Sampling commutes with the per-pixel stretch, so only
+        /// 1/64th
         /// of the image is decoded and stretched and no full-resolution
         /// intermediate copy is made.
         /// </summary>
@@ -539,6 +423,10 @@ namespace ImagerAvalonia.Views.ViewUtils
             int min_val,
             int max_val)
         {
+            // Contrast limits are expressed on the sliders' scale, the same
+            // mapping as the main display path.
+            (min_val, max_val) = ToDisplayScaleLimits(min_val, max_val, format);
+
             int newWidth = width / 8;
             int newHeight = height / 8;
 
@@ -597,15 +485,27 @@ namespace ImagerAvalonia.Views.ViewUtils
 
         /// <summary>
         /// Applies the contrast stretch to a floating-point pixel against limits
-        /// expressed on the 16-bit display scale.
+        /// expressed on the 16-bit display scale. An inverted range (min > max)
+        /// inverts the LUT, mirroring StretchedValue.
         /// </summary>
-        private static uint StretchedGray(double val, int min_val, int max_val, double scale)
+        internal static uint StretchedGray(double val, int min_val, int max_val, double scale)
         {
-            if (val <= min_val)
-                return 0xFF000000u; // opaque black
+            if (scale < 0)
+            {
+                if (val <= max_val)
+                    return uint.MaxValue;
 
-            if (val >= max_val)
-                return uint.MaxValue;
+                if (val >= min_val)
+                    return 0xFF000000u; // opaque black
+            }
+            else
+            {
+                if (val <= min_val)
+                    return 0xFF000000u; // opaque black
+
+                if (val >= max_val)
+                    return uint.MaxValue;
+            }
 
             int stretched = (int)((val - min_val) * scale);
             byte gray = (byte)(stretched >> 8);

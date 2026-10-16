@@ -20,24 +20,6 @@ public class TiffHandlerTests
         return pixels;
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Contrast_and_histogram_values_maps_the_live_image(bool autocontrast)
-    {
-        var result = From16Bit(TiffHandler.UpdateContrastAndHistogramValues(To16Bit(100, 150, 200), 100, 200, autocontrast));
-
-        Assert.Equal(new ushort[] { 0, 32767, ushort.MaxValue }, result);
-    }
-
-    [Fact]
-    public void Contrast_and_histogram_values_on_a_flat_image_keeps_non_zero_values_white()
-    {
-        var result = From16Bit(TiffHandler.UpdateContrastAndHistogramValues(To16Bit(42, 42), 0, 0, autocontrast: true));
-
-        Assert.Equal(new ushort[] { ushort.MaxValue, ushort.MaxValue }, result);
-    }
-
     [Fact]
     public void Histogram_bins_every_pixel_including_the_maximum()
     {
@@ -126,13 +108,6 @@ public class TiffHandlerTests
     }
 
     [Fact]
-    public void Convert_16bit_to_8bit_keeps_the_high_byte_and_rejects_odd_lengths()
-    {
-        Assert.Equal(new byte[] { 0x12, 0xFF }, TiffHandler.Convert16BitTo8BitFast(To16Bit(0x12AB, 0xFF00)));
-        Assert.Throws<ArgumentException>(() => TiffHandler.Convert16BitTo8BitFast(new byte[3]));
-    }
-
-    [Fact]
     public void Bytes_per_pixel_matches_the_wire_format()
     {
         Assert.Equal(1, ImagePixelFormat.Mono8.BytesPerPixel());
@@ -193,5 +168,54 @@ public class TiffHandlerTests
         Assert.Equal(2, y[0]);
         Assert.Equal(1, y[128]);
         Assert.Equal(3, y[256]);
+    }
+
+    [Fact]
+    public void Stretched_value_saturates_at_the_limits_of_a_normal_range()
+    {
+        // min=12850, max=64250 on the 16-bit display scale
+        double scale = (double)ushort.MaxValue / (64250 - 12850);
+
+        Assert.Equal((ushort)0, TiffHandler.StretchedValue(12850, 12850, 64250, scale));
+        Assert.Equal(ushort.MaxValue, TiffHandler.StretchedValue(64250, 12850, 64250, scale));
+        Assert.Equal((ushort)32767, TiffHandler.StretchedValue(38550, 12850, 64250, scale));
+    }
+
+    [Fact]
+    public void Stretched_value_inverts_the_lut_when_min_is_above_max()
+    {
+        // Inverted range: min=64250, max=12850, negative scale
+        double scale = (double)ushort.MaxValue / (12850 - 64250);
+
+        Assert.Equal(ushort.MaxValue, TiffHandler.StretchedValue(12850, 64250, 12850, scale));
+        Assert.Equal((ushort)0, TiffHandler.StretchedValue(64250, 64250, 12850, scale));
+        Assert.Equal((ushort)32767, TiffHandler.StretchedValue(38550, 64250, 12850, scale));
+    }
+
+    [Fact]
+    public void Stretched_gray_inverts_the_lut_when_min_is_above_max()
+    {
+        // Inverted range: min=64250, max=12850, negative scale. Float64 pixels
+        // are stretched as raw values against the display-scale limits.
+        double scale = (double)ushort.MaxValue / (12850 - 64250);
+
+        Assert.Equal(uint.MaxValue, TiffHandler.StretchedGray(12850.0, 64250, 12850, scale));
+        Assert.Equal(0xFF000000u, TiffHandler.StretchedGray(64250.0, 64250, 12850, scale));
+        Assert.Equal(0xFF7F7F7Fu, TiffHandler.StretchedGray(38550.0, 64250, 12850, scale));
+    }
+
+    [Fact]
+    public void Display_scale_limits_bit_replicate_mono8_limits_and_clamp_to_the_byte_range()
+    {
+        Assert.Equal((0, 65535), TiffHandler.ToDisplayScaleLimits(0, 255, ImagePixelFormat.Mono8));
+        Assert.Equal((25700, 51400), TiffHandler.ToDisplayScaleLimits(100, 200, ImagePixelFormat.Mono8));
+        Assert.Equal((65535, 65535), TiffHandler.ToDisplayScaleLimits(300, 1000, ImagePixelFormat.Mono8));
+    }
+
+    [Fact]
+    public void Display_scale_limits_pass_non_mono8_limits_through_unchanged()
+    {
+        Assert.Equal((12850, 64250), TiffHandler.ToDisplayScaleLimits(12850, 64250, ImagePixelFormat.Mono16));
+        Assert.Equal((-5, 70000), TiffHandler.ToDisplayScaleLimits(-5, 70000, ImagePixelFormat.Float64));
     }
 }

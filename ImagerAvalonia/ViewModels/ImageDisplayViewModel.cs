@@ -39,8 +39,6 @@ public partial class ImageDisplayViewModel : ViewModelBase
     public event EventHandler? Terminated;
 
     [ObservableProperty] private bool _multiViewEnabled = false;
-    [ObservableProperty] private int _Min_disp_val = 10000;
-    [ObservableProperty] private int _Max_disp_val = 50000;
 
     /// <summary>Total number of frames the measurement plans to acquire. A count,
     /// not an index. A completed run ends with AcquiredFrameCount == MaxFrameCount.</summary>

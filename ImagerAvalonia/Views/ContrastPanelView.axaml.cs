@@ -4,11 +4,9 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 
 using System;
-using System.ComponentModel;
 using System.Collections.Generic;
 using ScottPlot.Avalonia;
 using System.Linq;
-using System.Timers;
 
 using ImagerAvalonia.ViewModels;
 
@@ -23,9 +21,8 @@ public partial class ContrastPanelView : UserControl
     private AvaPlot histogram_plot;
     private DispatcherTimer _refreshTimer;
     private ContrastAdjViewModel _viewModel;
+    private ContrastAdjViewModel? _selectedContrastCell;
 
-    private Timer _throttleTimer;
-    private bool _canFire = true;
     private readonly object _lockHistogram = new();
 
 
@@ -64,20 +61,8 @@ public partial class ContrastPanelView : UserControl
         }
 
 
-        _throttleTimer = new System.Timers.Timer(20) { AutoReset = false };
-        _throttleTimer.Elapsed += (_, _) => { System.Diagnostics.Debug.WriteLine("Elapsed timer"); _canFire = true; };
-
-        UpdateContrastOnCurrentImage += (s, e) =>
-        {
-            if (_canFire)
-            {
-                _canFire = false;
-                _throttleTimer.Start();
-            }
-        };
         DataContextChanged += ContrastPanelView_DataContextChanged;
     }
-
     public void ContrastPanelView_DataContextChanged(object? sender, EventArgs e)
     {
         if(DataContext is ContrastAdjViewModel vm)
@@ -130,18 +115,23 @@ public partial class ContrastPanelView : UserControl
 
     public void SetCurrentContrastVals(object sender, GridContrastEventArgs row_col_ind)
     {
-        DataContext = contrastSettings[row_col_ind.row][row_col_ind.col];
+        var cell = contrastSettings[row_col_ind.row][row_col_ind.col];
 
-        contrastSettings[row_col_ind.row][row_col_ind.col].PropertyChanged += OnContrastValuesChanged;
+        // Re-selecting a cell must not stack duplicate handlers: swap the
+        // subscription to the newly selected cell.
+        if (_selectedContrastCell != null)
+        {
+            _selectedContrastCell.OnContrastValsChanged -= SelectedCell_ContrastValsChanged;
+        }
+
+        _selectedContrastCell = cell;
+        DataContext = cell;
+        cell.OnContrastValsChanged += SelectedCell_ContrastValsChanged;
     }
 
-    public void OnContrastValuesChanged(object? sender, PropertyChangedEventArgs e)
+    private void SelectedCell_ContrastValsChanged(object? sender, EventArgs e)
     {
-        if (!_canFire)
-        {
-            return; // Discard this event
-        }
-        UpdateContrastOnCurrentImage?.Invoke(this, new EventArgs());
+        UpdateContrastOnCurrentImage?.Invoke(this, e);
     }
 
 
