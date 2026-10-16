@@ -1,4 +1,3 @@
-using Autofac;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -8,13 +7,10 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using ImagerAvalonia.Services;
 using ImagerAvalonia.Services.Storage;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.ViewModels;
-using ImagerAvalonia.Views.MultiChannelView;
 using ImagerAvalonia.Views.ViewUtils;
-using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -23,441 +19,431 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-
-
-
-
-public class CanvasContext
-{
-    public Canvas Canvas { get; set; }
-    public double CenterX { get; set; } = double.MaxValue;
-    public double CenterY { get; set; } = double.MaxValue;
-    public double CenterZ { get; set; } = double.MaxValue;
-    public double ScreenPosX { get; set; }
-    public double ScreenPosY { get; set; }
-
-
-    public int ContrastMin { get; set; } = 0;
-    public int ContrastMax { get; set; } = 0;
-    public byte[] _lastImage;
-}
-
 namespace ImagerAvalonia.Views
 {
+    /// <summary>
+    /// The field viewer: a live, coarse map of the sample built from acquired
+    /// frames, one canvas overlay per acquisition x detector pair. The spec is
+    /// in FieldViewerSpecTests; the placement logic is FieldViewerMosaic. This
+    /// class is UI wiring only: every piece of shared state lives on the UI
+    /// thread. The acquisition thread only writes into the image channel, and
+    /// the pump task forwards batches to the UI thread - there are no
+    /// cross-thread dictionary accesses.
+    /// </summary>
     public partial class FieldViewerView : UserControl
     {
-        private bool IsCenterPositionSet = false;
-        private bool _isDragging = false;
-        private Point _lastMousePosition;
+        private const int ChannelCapacity = 64;
 
-        private double LastImageTransformX = 0;
-        private double LastImageTransformY = 0;
-        private Dictionary<Tuple<string, string>, CanvasContext> _canvasContextDict = new();
+        private readonly FieldViewerMosaic _mosaic = new();
+        private Channel<ImageData>? _imageChannel;
+        private CancellationTokenSource? _pumpShutdown;
 
-        //This is a bit stupid. ContrastPanelView was designed to work with a 2D list of Acquisition x Detectors. 
-        //The field view was designed to work with a dictionary. This inconsistency requires a mapping between two.
-        //Ideally, ContrastPanelView, together with ImageDisplayView may need a re-work so that everything accepts an
-        //Acq Det key pair. For now, this stays as is.
-
-        private Dictionary<Tuple<int, int>,Tuple<string, string>> _contrastIntAcqDetPairDict = new();
-        private Dictionary<Tuple<string, string>, Tuple<int, int>> _contrastAcqDetPairIntDict = new();
-        private Dictionary<Tuple<string, string>, Tuple<int, int>> _contrastSettings = new();
+        private readonly Dictionary<(string Acquisition, string Detector), Canvas> _pairCanvases = new();
+        private readonly Dictionary<(string Acquisition, string Detector), (int Row, int Col)> _contrastCellForPair = new();
+        private readonly Dictionary<(string Acquisition, string Detector), (int Min, int Max)> _contrastSettings = new();
+        private readonly Dictionary<FieldViewerTile, Image> _tileControls = new();
+        private readonly List<Canvas> _createdCanvases = new();
 
         private Canvas? _selectedCanvas;
-        private Canvas? _relstageViewVisualizer = new();
+        private (string Acquisition, string Detector)? _selectedPair;
+        private FieldViewerViewModel? _viewModel;
 
-
-        private const double ZDisplacementTHS = 0.01; // In microns
-        private double _DisplacementThsMicron = 20;
-        private double _PixelSizeNM = 130; // In nanometers
-        private double _init_pos_x;
-        private double _init_pos_y;
         private ScaleTransform? _scaleTransform;
         private TranslateTransform? _translateTransform;
-        private ContrastPanelView contrastView;
-        private Channel<ImageData> ImageChannel = Channel.CreateUnbounded<ImageData>();
+        private ContrastPanelView? _contrastView;
 
-        public bool IsFieldViewerEngaged = false;
-        private readonly object _updateLock = new object();
+        private double _initPosX;
+        private double _initPosY;
+        private double _lastTileX;
+        private double _lastTileY;
+
+        private bool _isDragging;
+        private Point _lastMousePosition;
 
         public FieldViewerView()
         {
             InitializeComponent();
 
-
-
             var screenBounds = ScreenHelper.ScreenSize;
             var screenScale = ScreenHelper.Scaling;
-
-            _init_pos_x = (screenBounds.Width / 2 - 260 * screenScale) / screenScale;
-            _init_pos_y = (screenBounds.Height / 2) / screenScale;
-
-            LastImageTransformX = _init_pos_x;
-            LastImageTransformY = _init_pos_y;
+            _initPosX = (screenBounds.Width / 2 - 260 * screenScale) / screenScale;
+            _initPosY = screenBounds.Height / 2 / screenScale;
+            _mosaic.OriginX = _initPosX;
+            _mosaic.OriginY = _initPosY;
 
             var transformGroup = (TransformGroup)((Canvas)this.FindControl<Canvas>("CNVS")).RenderTransform;
             _scaleTransform = (ScaleTransform)transformGroup.Children[0];
             _translateTransform = (TranslateTransform)transformGroup.Children[1];
-            contrastView = this.FindControl<ContrastPanelView>("ContrastPanelFieldView");
-            contrastView.SetSliderVisibility(false);
-            contrastView.SetHistogramVisibility(false);
-            contrastView.SetToggleAutoContrastVisibility(false);
-            contrastView.UpdateContrastOnCurrentImage += FieldView_UpdateContrastSettings;
-            InitializeUpdateContrastFieldView += contrastView.PopulateContrastSettings;
 
-            
-            var _ = Task.Run(() => UpdateViewer());
+            _contrastView = this.FindControl<ContrastPanelView>("ContrastPanelFieldView");
+            _contrastView.SetSliderVisibility(false);
+            _contrastView.SetHistogramVisibility(false);
+            _contrastView.SetToggleAutoContrastVisibility(false);
 
+            // The tab control caches this view (see ImageTabContentTemplate) and
+            // attaches/detaches it on every tab switch, so activation is a
+            // suspend/resume cycle, not a create/destroy one.
             DataContextChanged += OnDataContextChanged;
-        }
-        private async Task UpdateViewer()
-        {
-            while (await ImageChannel.Reader.WaitToReadAsync())
-            {
-                while (ImageChannel.Reader.TryRead(out ImageData im_args))
-                {
-                    try
-                    {
-                        await UpdateFieldViewImage(im_args);
-                    }
-                    catch(Exception e)
-                    {
-                        Console.WriteLine($"{e.Message}\n{e.StackTrace}");
-                    }
-                }
-            }
-        }
-
-
-
-        private void FieldView_UpdateContrastSettings(object? sender, EventArgs e)
-        {
-            var vm = DataContext as FieldViewerViewModel;
-            if (vm.SelectedAcquisition != null && vm.SelectedDetector != null)
-            {
-                var key = new Tuple<string, string>(vm.SelectedAcquisition, vm.SelectedDetector);
-
-                int row = _contrastAcqDetPairIntDict[key].Item1;
-                int col = _contrastAcqDetPairIntDict[key].Item2;
-
-                _contrastSettings[key] = new Tuple<int, int>(contrastView.contrastSettings[row][col].Min_disp_val, contrastView.contrastSettings[row][col].Max_disp_val);
-            }
+            AttachedToVisualTree += OnAttachedToVisualTree;
+            DetachedFromVisualTree += OnDetachedFromVisualTree;
         }
 
         private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
 
-        private void OnDataContextChanged(object? sender, EventArgs e)
-        {
-            if (DataContext is FieldViewerViewModel field_viewer)
-            {
-                field_viewer.PropertyChanged += Field_viewer_IsFieldViewerEngaged;
-                field_viewer.PropertyChanged += Field_viewer_CenterXYitionChanged;
-                field_viewer.PropertyChanged += Field_viewer_SelectedPropertyChanged;
 
-                field_viewer.FocusViewInitialized += PopulateCanvas;
-                field_viewer.UpdateImageData += AddImageToFieldViewerChannel; ;
+        // --- Image pipeline ---------------------------------------------------
+
+        /// <summary>
+        /// Drains the image channel (written by the acquisition thread) and
+        /// forwards each batch to the UI thread. Bounded with DropOldest: the
+        /// map only needs recent frames, so under load the oldest pending
+        /// batches are discarded instead of queueing unboundedly.
+        /// </summary>
+        private async Task PumpImagesAsync()
+        {
+            var channel = _imageChannel!;
+            var token = _pumpShutdown!.Token;
+            try
+            {
+                while (await channel.Reader.WaitToReadAsync(token).ConfigureAwait(false))
+                {
+                    while (channel.Reader.TryRead(out var batch))
+                        Dispatcher.UIThread.Post(() => ProcessBatch(batch));
+                }
+            }
+            catch (OperationCanceledException)
+            {
             }
         }
 
-        private void AddImageToFieldViewerChannel(object? sender, ImageData e)
+        private void OnImageData(object? sender, ImageData batch) => _imageChannel?.Writer.TryWrite(batch);
+
+        private void ProcessBatch(ImageData batch)
         {
-            ImageChannel.Writer.TryWrite(e);
-        }
-
-        public event EventHandler<GridContrastEventArgs> InitializeUpdateContrastFieldView;
-
-
-        private void Field_viewer_SelectedPropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == "SelectedAcquisition" || e.PropertyName=="SelectedDetector") 
-            {
-                if(DataContext is FieldViewerViewModel vm)
-                if (vm.SelectedDetector != null && vm.SelectedAcquisition != null)
-                {
-                    var key = Tuple.Create(vm.SelectedAcquisition, vm.SelectedDetector);
-                    if (_canvasContextDict.ContainsKey(key))
-                    {
-                        Dispatcher.UIThread.Post(() =>
-                        {
-                            _selectedCanvas?.SetValue(IsVisibleProperty, false);
-                            _canvasContextDict[key].Canvas.IsVisible = true;
-                            _selectedCanvas = _canvasContextDict[key].Canvas;
-                            contrastView.SetCurrentContrastVals(this, new GridContrastEventArgs(_contrastAcqDetPairIntDict[key].Item1, _contrastAcqDetPairIntDict[key].Item2, null, null));
-                        }, DispatcherPriority.Background);
-
-                    }
-                }
-            }
-        }
-
-        private void Field_viewer_CenterXYitionChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == "CurrentStagePosition" && DataContext is FieldViewerViewModel vm)
-            {
-                try
-                {
-                    foreach (var key in _canvasContextDict.Keys.ToList())
-                    {
-                        _canvasContextDict[key].CenterX = vm.CurrentStagePosition.Coordinates.x;
-                        _canvasContextDict[key].CenterY = vm.CurrentStagePosition.Coordinates.y;
-                        _canvasContextDict[key].CenterZ = vm.CurrentStagePosition.Coordinates.z;
-
-                    }
-
-                    IsCenterPositionSet = true;
-                }
-                catch
-                {
-                    IsCenterPositionSet = false;
-                }
-            }
-        }
-
-        private void Field_viewer_IsFieldViewerEngaged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == "IsStageViewerEngaged" && IsCenterPositionSet)
-            {
-                IsFieldViewerEngaged = !IsFieldViewerEngaged;
-            }
-        }
-
-        private void PopulateCanvas(object? sender, EventArgs e)
-        {
-            contrastView.contrastSettings.Clear();
-            _contrastAcqDetPairIntDict.Clear();
-            _contrastIntAcqDetPairDict.Clear();
-
-            if (sender is FieldViewerViewModel vm && vm.Acquisitions.Count > 0 && vm.Detectors.Count > 0)
-            {
-                foreach (var (acquisition, row) in vm.Acquisitions.Select((v, i) => (v, i)))
-                {
-                    foreach (var (detector, col) in vm.Detectors.Select((v, i) => (v, i)))
-                    {
-                        var key = Tuple.Create(acquisition, detector);
-
-                        contrastView.PopulateContrastSettings(this, new GridContrastEventArgs(row, col, null, null));
-                        contrastView.contrastSettings[row][col].IsAutoContrastEnabled = false;
-                        _contrastAcqDetPairIntDict[key] = new Tuple<int, int>(row, col);
-                        _contrastIntAcqDetPairDict[new Tuple<int, int>(row, col)] = key;
-
-
-                        if (!_canvasContextDict.ContainsKey(key))
-                        {
-                            _canvasContextDict.Clear();
-                        }
-                        if (_contrastSettings.ContainsKey(key))
-                        {
-                            contrastView.contrastSettings[row][col].Min_disp_val = _contrastSettings[key].Item1;
-                            contrastView.contrastSettings[row][col].Max_disp_val = _contrastSettings[key].Item2;
-                        }
-                    }
-                }
-            
-                var parentGrid = this.FindControl<Grid>("ParentCanvasGrid");
-
-                foreach (var (acquisition, row) in vm.Acquisitions.Select((v, i) => (v, i)))
-                {
-                    foreach (var (detector, col) in vm.Detectors.Select((v, i) => (v, i)))
-                    {
-                        var canvas = new Canvas { IsVisible = false };
-
-                        canvas.PointerWheelChanged += OnPointerWheelChanged;
-                        canvas.PointerPressed += OnPointerPressed;
-                        canvas.PointerMoved += OnPointerMoved;
-                        canvas.PointerReleased += OnPointerReleased;
-
-                        var tf = new TransformGroup();
-                        tf.Children.Add(_translateTransform);
-                        tf.Children.Add(_scaleTransform);
-                        canvas.RenderTransform = tf;
-                        canvas.Background = Brushes.Transparent;
-                        var key = Tuple.Create(acquisition, detector);
-                        if (!_canvasContextDict.ContainsKey(key))
-                        {
-                            var context = new CanvasContext
-                            {
-                                Canvas = canvas,
-                                ScreenPosX = _init_pos_x,
-                                ScreenPosY = _init_pos_y
-                            };
-
-                            _canvasContextDict[key] = context;
-                        }
-                        parentGrid.Children.Add(canvas);
-                        contrastView.SetCurrentContrastVals(this, new GridContrastEventArgs(row, col, null, null));
-                    }
-                }
-            }
-        }
-
-
-
-        public double CalculateXScreenSpaceCoordinate(TiffPlaneMetadata metadata, double center_x, double current_x)
-        {
-            double pos_x = center_x == double.MaxValue ? 0 : metadata.PositionX - center_x;
-            return current_x + pos_x / ((_PixelSizeNM * 10) / 1000);
-        }
-
-        public double CalculateYScreenSpaceCoordinate(TiffPlaneMetadata metadata, double center_y, double current_y)
-        {
-            double pos_y = center_y == double.MaxValue ? 0 : metadata.PositionY - center_y;
-            return current_y - pos_y / ((_PixelSizeNM * 10) / 1000);
-        }
-
-        public async Task UpdateFieldViewImage(ImageData imageData)
-        {
-            Dispatcher.UIThread.Invoke(() => { 
-            if (DataContext is FieldViewerViewModel vm)
-            {
-                _PixelSizeNM = vm.PixelSize;
-            }});
-
-            for (int i = 0; i < imageData.Images.Count; i++)
-            {
-                var metadata = imageData.Metadata[i];
-
-                var key = Tuple.Create(metadata.AcquisitionName, metadata.DetectorName);
-                if (!_canvasContextDict.TryGetValue(key, out var context))
-                    continue;
-
-                bool xyDisplacement = Math.Abs(metadata.PositionX - context.CenterX) > _DisplacementThsMicron ||
-                                        Math.Abs(metadata.PositionY - context.CenterY) > _DisplacementThsMicron;
-
-                if (xyDisplacement)
-                {
-                    context.ScreenPosX = CalculateXScreenSpaceCoordinate(metadata, context.CenterX, context.ScreenPosX);
-                    context.ScreenPosY = CalculateYScreenSpaceCoordinate(metadata, context.CenterY, context.ScreenPosY);
-
-                    if (IsFieldViewerEngaged)
-                    {
-                        int row = _contrastAcqDetPairIntDict[key].Item1;
-                        int col = _contrastAcqDetPairIntDict[key].Item2;
-
-                        var cellContrast = contrastView.contrastSettings[row][col];
-
-                        // The cell adapts its control bounds and stored limits to
-                        // the pixel format; the bounds feed Avalonia bindings, so
-                        // this runs on the UI thread.
-                        await Dispatcher.UIThread.InvokeAsync(() => cellContrast.SetPixelFormat(metadata.Type));
-
-                        int minval = cellContrast.Min_disp_val;
-                        int maxval = cellContrast.Max_disp_val;
-
-                        var new_bitmap = TiffHandler.SubsampleContrastToGray8(
-                            imageData.Images[i],
-                            (int)metadata.Width,
-                            (int)metadata.Height,
-                            metadata.Type,
-                            minval,
-                            maxval);
-
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            UpdateCanvasImage(key, metadata, new_bitmap);
-                        });
-
-                        context.CenterX = metadata.PositionX;
-                        context.CenterY = metadata.PositionY;
-                        context.CenterZ = metadata.PositionZ;
-                    }
-                }
-                //else if (Math.Abs(metadata.PositionZ - context.CenterZ) > ZDisplacementTHS)
-                //{
-                //    if (IsFieldViewerEngaged)
-                //    {
-                //        byte[] bytes = new byte[imageData.Images[i].Length];
-                //        var img = TiffHandler.CopyBytes(imageData.Images[i], bytes);
-
-                //        byte[] newImg = TiffHandler.GetSubsampledImage(img, (int)metadata.Width, (int)metadata.Height);
-                //        if (context._lastImage == null)
-                //        {
-                //            context._lastImage = newImg;
-                //        }
-                //        context._lastImage = TiffHandler.MaxIntensityProject8Bit(context._lastImage, newImg);
-
-                //        Dispatcher.UIThread.Post(() =>
-                //        {
-                //            var control_indx = context.Canvas.Children.ToList().FindLastIndex(x => x is Image);
-                //            if (control_indx != -1)
-                //            {
-                //                context.Canvas.Children.RemoveAt(control_indx);
-                //            }
-
-                           
-                //            context.ScreenPosX = CalculateXScreenSpaceCoordinate(metadata, context.CenterX, context.ScreenPosX);
-                //            context.ScreenPosY = CalculateYScreenSpaceCoordinate(metadata, context.CenterY, context.ScreenPosY);
-
-
-
-                //            UpdateCanvasImage(key, metadata, TiffHandler.UpdateAutoContrast8Bit(context._lastImage));
-                //        }, DispatcherPriority.Background);
-                //    }
-                //    context.CenterZ = metadata.PositionZ;
-
-                //}
-            }
-            
-        }
-
-
-        private void UpdateCanvasImage(Tuple<string, string> key, TiffPlaneMetadata metadata, WriteableBitmap image)
-        {
-            if (!_canvasContextDict.TryGetValue(key, out var context))
+            var vm = _viewModel;
+            if (vm is null || !vm.IsStageViewerEngaged)
                 return;
 
-            var canvas = context.Canvas;
+            _mosaic.PixelSizeNm = vm.PixelSize;
 
-
-
-            var imgControl = new Image
+            for (int i = 0; i < batch.Images.Count; i++)
             {
-                Source = image,
+                var metadata = batch.Metadata[i];
+                var key = (metadata.AcquisitionName, metadata.DetectorName);
+                if (!_mosaic.TryGetChannel(key, out var channel) || !_pairCanvases.TryGetValue(key, out var canvas))
+                    continue;
+
+                if (!_mosaic.ShouldPlace(metadata, channel, out var screenX, out var screenY))
+                    continue;
+
+                var cell = _contrastCellForPair.TryGetValue(key, out var cellIndex)
+                    ? _contrastView!.contrastSettings[cellIndex.Row][cellIndex.Col]
+                    : null;
+                if (cell == null)
+                    continue;
+
+                // The cell adapts its bounds and stored limits to the pixel format.
+                cell.SetPixelFormat(metadata.Type);
+                _contrastSettings[key] = (cell.Min_disp_val, cell.Max_disp_val);
+
+                var sample = TiffHandler.SubsampleToUshort(
+                    batch.Images[i], (int)metadata.Width, (int)metadata.Height, metadata.Type);
+                var tile = _mosaic.Place(
+                    metadata, channel, sample,
+                    (int)metadata.Width / 8, (int)metadata.Height / 8,
+                    screenX, screenY, cell.Min_disp_val, cell.Max_disp_val);
+
+                DrawTile(canvas, tile, metadata);
+
+                _lastTileX = screenX;
+                _lastTileY = screenY;
+            }
+        }
+
+        private void DrawTile(Canvas canvas, FieldViewerTile tile, TiffPlaneMetadata metadata)
+        {
+            var bitmap = TiffHandler.SampledToGray8(
+                tile.Sample, tile.Width, tile.Height, tile.Format, tile.ContrastMin, tile.ContrastMax);
+
+            var image = new Image
+            {
+                Source = bitmap,
                 Stretch = Stretch.Uniform,
+                // One screen unit spans 10 image pixels (see FieldViewerMosaic).
                 Width = metadata.Width / 10,
                 Height = metadata.Height / 10,
-                ZIndex = 0
+                ZIndex = 0,
             };
-
-
-            Canvas.SetLeft(imgControl, context.ScreenPosX);
-            Canvas.SetTop(imgControl, context.ScreenPosY);
-
-            LastImageTransformX = context.ScreenPosX;
-            LastImageTransformY = context.ScreenPosY;
-
-
-            canvas.Children.Add(imgControl);
+            Canvas.SetLeft(image, tile.ScreenX);
+            Canvas.SetTop(image, tile.ScreenY);
+            canvas.Children.Add(image);
+            _tileControls[tile] = image;
         }
+
+        // --- Contrast -----------------------------------------------------------
+
+        private void OnContrastChanged(object? sender, EventArgs e)
+        {
+            if (_selectedPair is not { } key)
+                return;
+            if (!_mosaic.TryGetChannel(key, out var channel) || !_contrastCellForPair.TryGetValue(key, out var cellIndex))
+                return;
+
+            var cell = _contrastView!.contrastSettings[cellIndex.Row][cellIndex.Col];
+            var (min, max) = (cell.Min_disp_val, cell.Max_disp_val);
+            _contrastSettings[key] = (min, max);
+
+            // Contrast applies to the whole map, not just future tiles: each
+            // tile is re-rendered from its cached sample.
+            foreach (var tile in channel.Tiles)
+            {
+                if (tile.ContrastMin == min && tile.ContrastMax == max)
+                    continue;
+                tile.ContrastMin = min;
+                tile.ContrastMax = max;
+
+                if (_tileControls.TryGetValue(tile, out var image) && image.Source is WriteableBitmap oldBitmap)
+                {
+                    image.Source = TiffHandler.SampledToGray8(tile.Sample, tile.Width, tile.Height, tile.Format, min, max);
+                    oldBitmap.Dispose();
+                }
+            }
+        }
+
+        // --- View-model wiring ----------------------------------------------------
+
+        private void OnDataContextChanged(object? sender, EventArgs e)
+        {
+            Suspend();
+            Resume();
+        }
+
+        private void Subscribe(FieldViewerViewModel vm)
+        {
+            vm.PropertyChanged += OnViewModelPropertyChanged;
+            vm.FocusViewInitialized += OnSchemaInitialized;
+            vm.UpdateImageData += OnImageData;
+        }
+
+        private void Unsubscribe(FieldViewerViewModel vm)
+        {
+            vm.PropertyChanged -= OnViewModelPropertyChanged;
+            vm.FocusViewInitialized -= OnSchemaInitialized;
+            vm.UpdateImageData -= OnImageData;
+        }
+
+        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (_viewModel == null)
+                return;
+
+            switch (e.PropertyName)
+            {
+                case nameof(FieldViewerViewModel.CurrentStagePosition):
+                    // Read when the viewer engages; anchors every channel that
+                    // has not received frames yet. An unreadable position leaves
+                    // the anchoring to the first frame.
+                    if (_viewModel.CurrentStagePosition is { } position)
+                        _mosaic.SetAnchor(position.Coordinates.x, position.Coordinates.y);
+                    break;
+
+                case nameof(FieldViewerViewModel.SelectedAcquisition):
+                case nameof(FieldViewerViewModel.SelectedDetector):
+                    ShowSelectedPair();
+                    break;
+            }
+        }
+
+        // --- Schema and selection ------------------------------------------------
+
+        private void OnSchemaInitialized(object? sender, EventArgs e)
+        {
+            if (DataContext is FieldViewerViewModel vm)
+                RebuildSchema(vm);
+        }
+
+        private void RebuildSchema(FieldViewerViewModel vm)
+        {
+            var parentGrid = this.FindControl<Grid>("ParentCanvasGrid")!;
+
+            // A new session's schema replaces the previous one entirely: the
+            // old canvases leave the tree (no orphans), the per-pair contrast
+            // settings survive.
+            foreach (var canvas in _createdCanvases)
+                parentGrid.Children.Remove(canvas);
+            _createdCanvases.Clear();
+            _pairCanvases.Clear();
+            _tileControls.Clear();
+            _selectedCanvas = null;
+            _contrastView!.contrastSettings.Clear();
+            _contrastCellForPair.Clear();
+
+            var keys = new List<(string, string)>();
+            foreach (var (acquisition, row) in vm.Acquisitions.Select((v, i) => (v, i)))
+            {
+                foreach (var (detector, col) in vm.Detectors.Select((v, i) => (v, i)))
+                {
+                    var key = (acquisition, detector);
+                    keys.Add(key);
+
+                    _contrastView.PopulateContrastSettings(this, new GridContrastEventArgs(row, col, null, null));
+                    var cell = _contrastView.contrastSettings[row][col];
+                    cell.IsAutoContrastEnabled = false;
+                    if (_contrastSettings.TryGetValue(key, out var saved))
+                    {
+                        cell.Min_disp_val = saved.Min;
+                        cell.Max_disp_val = saved.Max;
+                    }
+                    _contrastCellForPair[key] = (row, col);
+
+                    var canvas = new Canvas { IsVisible = false, Background = Brushes.Transparent };
+                    canvas.PointerWheelChanged += OnPointerWheelChanged;
+                    canvas.PointerPressed += OnPointerPressed;
+                    canvas.PointerMoved += OnPointerMoved;
+                    canvas.PointerReleased += OnPointerReleased;
+
+                    var transform = new TransformGroup();
+                    transform.Children.Add(_translateTransform!);
+                    transform.Children.Add(_scaleTransform!);
+                    canvas.RenderTransform = transform;
+
+                    _pairCanvases[key] = canvas;
+                    _createdCanvases.Add(canvas);
+                    parentGrid.Children.Add(canvas);
+
+                    // Selecting the last cell mirrors the previous behavior;
+                    // the panel then has a selection before the user picks one.
+                    _contrastView.SetCurrentContrastVals(this, new GridContrastEventArgs(row, col, null, null));
+                    _selectedPair = key;
+                }
+            }
+
+            _mosaic.Rebuild(keys);
+
+            // The anchor may already be known from an earlier engage; the
+            // selection may already be set on the view model.
+            if (vm.CurrentStagePosition is { } position)
+                _mosaic.SetAnchor(position.Coordinates.x, position.Coordinates.y);
+            ShowSelectedPair();
+        }
+
+        private void ShowSelectedPair()
+        {
+            var vm = _viewModel;
+            if (vm == null || vm.SelectedAcquisition == null || vm.SelectedDetector == null)
+                return;
+
+            var key = (vm.SelectedAcquisition, vm.SelectedDetector);
+            if (!_pairCanvases.TryGetValue(key, out var canvas))
+                return;
+
+            _selectedCanvas?.SetValue(IsVisibleProperty, false);
+            canvas.IsVisible = true;
+            _selectedCanvas = canvas;
+            _selectedPair = key;
+
+            if (_contrastCellForPair.TryGetValue(key, out var cellIndex))
+                _contrastView!.SetCurrentContrastVals(this, new GridContrastEventArgs(cellIndex.Row, cellIndex.Col, null, null));
+        }
+
+        // --- Lifecycle -------------------------------------------------------------
+
+        /// <summary>
+        /// Activates the view for the view model in its DataContext: subscribes
+        /// to its events, starts the image pump, and catches up on the schema
+        /// and anchor if they changed while the view was detached. Idempotent
+        /// for the same view model.
+        /// </summary>
+        private void Resume()
+        {
+            if (DataContext is not FieldViewerViewModel vm || _viewModel == vm)
+                return;
+
+            _viewModel = vm;
+            Subscribe(vm);
+            _contrastView!.UpdateContrastOnCurrentImage += OnContrastChanged;
+
+            _imageChannel = Channel.CreateBounded<ImageData>(
+                new BoundedChannelOptions(ChannelCapacity) { FullMode = BoundedChannelFullMode.DropOldest });
+            _pumpShutdown = new CancellationTokenSource();
+            _ = PumpImagesAsync();
+
+            if (vm.CurrentStagePosition is { } position)
+                _mosaic.SetAnchor(position.Coordinates.x, position.Coordinates.y);
+
+            // A session may have started while the view was detached; rebuild
+            // the schema if it no longer matches the view model.
+            if (!SchemaMatches(vm))
+                RebuildSchema(vm);
+        }
+
+        /// <summary>
+        /// Deactivates the view: unsubscribes and stops the pump. The view model
+        /// and the canvases (tiles, zoom, contrast) are kept, so a re-attach
+        /// continues where the view left off.
+        /// </summary>
+        private void Suspend()
+        {
+            if (_viewModel == null)
+                return;
+
+            Unsubscribe(_viewModel);
+            _viewModel = null;
+            _contrastView!.UpdateContrastOnCurrentImage -= OnContrastChanged;
+            _pumpShutdown?.Cancel();
+            _imageChannel?.Writer.TryComplete();
+        }
+
+        private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs e) => Resume();
+
+        private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs e) => Suspend();
+
+        /// <summary>Whether the canvases still match the view model's schema.</summary>
+        private bool SchemaMatches(FieldViewerViewModel vm)
+        {
+            if (_pairCanvases.Count != vm.Acquisitions.Count * vm.Detectors.Count)
+                return false;
+
+            foreach (var acquisition in vm.Acquisitions)
+                foreach (var detector in vm.Detectors)
+                    if (!_pairCanvases.ContainsKey((acquisition, detector)))
+                        return false;
+            return true;
+        }
+
+        // --- View controls --------------------------------------------------------
 
         private void GoToCurrent(object? sender, RoutedEventArgs e)
         {
-            _scaleTransform.ScaleX = 1;
+            _scaleTransform!.ScaleX = 1;
             _scaleTransform.ScaleY = 1;
-            _translateTransform.X =  -(LastImageTransformX - _init_pos_x);
-            _translateTransform.Y =  -(LastImageTransformY - _init_pos_y);
-
+            _translateTransform!.X = -(_lastTileX - _initPosX);
+            _translateTransform.Y = -(_lastTileY - _initPosY);
         }
 
         private void ClearSelected(object? sender, RoutedEventArgs e)
         {
-            foreach( var item in _canvasContextDict.Values )
-            {
-                item.Canvas.Children.Clear();
-            }
+            foreach (var canvas in _createdCanvases)
+                canvas.Children.Clear();
+
+            foreach (var image in _tileControls.Values)
+                (image.Source as WriteableBitmap)?.Dispose();
+            _tileControls.Clear();
+            _mosaic.ClearTiles();
         }
 
         private void OnResetView(object? sender, RoutedEventArgs e)
         {
-            _translateTransform.X = 0;
+            _translateTransform!.X = 0;
             _translateTransform.Y = 0;
-            _scaleTransform.ScaleX = 0.5;
+            _scaleTransform!.ScaleX = 0.5;
             _scaleTransform.ScaleY = 0.5;
         }
 
         private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs e)
         {
             double zoomFactor = e.Delta.Y > 0 ? 1.1 : 0.9;
-            _scaleTransform.ScaleX *= zoomFactor;
+            _scaleTransform!.ScaleX *= zoomFactor;
             _scaleTransform.ScaleY *= zoomFactor;
         }
 
@@ -474,7 +460,7 @@ namespace ImagerAvalonia.Views
                 var currentPosition = e.GetPosition(this.FindControl<Grid>("ParentGrid"));
                 var delta = currentPosition - _lastMousePosition;
 
-                _translateTransform.X += delta.X;
+                _translateTransform!.X += delta.X;
                 _translateTransform.Y += delta.Y;
                 _lastMousePosition = currentPosition;
             }
@@ -486,4 +472,3 @@ namespace ImagerAvalonia.Views
         }
     }
 }
-

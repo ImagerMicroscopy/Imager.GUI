@@ -37,37 +37,44 @@ public partial class FieldViewerViewModel : ViewModelBase
     }
 
     public void EngageFieldViewer()
-    { 
-        this.FindCurrentStagePosition();
-        IsStageViewerEngaged = !IsStageViewerEngaged;
+    {
+        // The anchor is read when engaging only: disengaging must not move it.
+        // An unreadable position leaves the anchoring to the first frame.
+        if (!IsStageViewerEngaged)
+            FindCurrentStagePosition();
 
+        IsStageViewerEngaged = !IsStageViewerEngaged;
     }
 
     public void SetGridData(List<Tuple<string,string>> acq_det_pairs)
     {
+        // Clearing the item sources resets the combo selections; keep them if
+        // the new schema still contains the same names (a live session restart
+        // typically uses the same schema).
+        string? selectedAcquisition = SelectedAcquisition;
+        string? selectedDetector = SelectedDetector;
+
         Acquisitions.Clear();
         Detectors.Clear();
         if (acq_det_pairs == null) return;
-        if (acq_det_pairs == null) return;
-        foreach (Tuple<string, string> acquisition in acq_det_pairs)
+
+        foreach (Tuple<string, string> pair in acq_det_pairs)
         {
-            foreach (Tuple<string, string> detector in acq_det_pairs)
-            {
-                if (!Acquisitions.Contains(acquisition.Item1))
-                {
-                    Acquisitions.Add(acquisition.Item1);
+            if (!Acquisitions.Contains(pair.Item1))
+                Acquisitions.Add(pair.Item1);
 
-                }
-                if (!Detectors.Contains(detector.Item2))
-                {
-
-                    Detectors.Add(detector.Item2);
-                }
-            }
+            if (!Detectors.Contains(pair.Item2))
+                Detectors.Add(pair.Item2);
         }
 
-        FocusViewInitialized?.Invoke(this, new EventArgs());
+        SelectedAcquisition = selectedAcquisition != null && Acquisitions.Contains(selectedAcquisition)
+            ? selectedAcquisition
+            : null;
+        SelectedDetector = selectedDetector != null && Detectors.Contains(selectedDetector)
+            ? selectedDetector
+            : null;
 
+        FocusViewInitialized?.Invoke(this, new EventArgs());
     }
 
     public void ProcessImages(object? sender, ImageData images)
