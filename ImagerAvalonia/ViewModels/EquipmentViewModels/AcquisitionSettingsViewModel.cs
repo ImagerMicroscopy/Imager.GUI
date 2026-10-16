@@ -5,7 +5,6 @@ using ImagerAvalonia.Services.ImagerModels.EquipmentModels;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Services.Workspace;
 using ImagerAvalonia.ViewModels.MeasurementViewModels;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -92,13 +91,8 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
             {
                 _detector = new ObservableCollection<DetectorEquipmentViewModel>(
                     DetectionSettings.Settings.Detectors.Select(x => new DetectorEquipmentViewModel(x, _imagerWorkspace,_experimentManager)));
-                //WireDetectorCollection(_detector);
             }
             return _detector;
-        }
-        set
-        {
-            if (value == _detector) return;
         }
     }
 
@@ -134,13 +128,7 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
         WeakReferenceMessenger.Default.Send(new AcquisitionNameChangedMessage(this, newValue));
     }
 
-    public List<Tuple<string, string>> AcqDetPairs = new();
     public List<Stage> Stages;
-
-    public AcquisitionSettingsViewModel(string name, List<string> detector_names)
-    {
-        Name = name;
-    }
 
     public AcquisitionSettingsViewModel(string name, List<Source> sources,
         List<MovableComponentModel> filterWheels, List<DetectorEquipmentModel> detectors, ImagerWorkspace imagerWorkspace, ExperimentManager experimentManager)
@@ -159,23 +147,6 @@ public partial class AcquisitionSettingsViewModel : ObservableValidator, IDispos
         : this(acquisition.Name, acquisition.Settings.Irradiation, acquisition.Settings.MovableComponents, acquisition.Settings.Detectors, imagerWorkspace,
               experimentManager)
     {
-    }
-
-    public JObject SerializeAcquisition() => null;
-
-    public DefinedDetection GetAcquisitionSettingsFromViewModel() => DetectionSettings;
-
-    public List<Tuple<string,string>> GetAcquisitionDetectorPairs()
-    {
-        var pairs = new List<Tuple<string, string>>();
-        foreach (var det in Detector)
-        {
-            if (det.IsEnabled)
-            {
-                pairs.Add(new Tuple<string, string>(Name, det.Name));
-            }
-        }
-        return pairs;
     }
 
     public void Dispose()
