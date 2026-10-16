@@ -153,35 +153,55 @@ namespace ImagerAvalonia.Utils
 
                         _storageProvider.OpenWriteStream();
 
-                        await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
-                            switch (measurementEvent) {
-                                case MeasurementDataEvent dataEvent:
-                                    var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
-                                    if (images.Images.Count > 0) {
-                                        _storageProvider.SavePlanes(images.Images, images.Metadata);
-                                        var _ = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
-                                    }
+                        // Batches are dispatched to the display fire-and-forget; this
+                        // tracks the newest dispatch so the run can flush it before
+                        // winding down. Counters are monotonic, so the newest batch
+                        // subsumes every older one.
+                        var lastDispatch = Task.CompletedTask;
 
-                                    // Smart program decisions arrive in the same batches as images
-                                    // (possibly on their own) and are stored alongside them.
-                                    var decisions = images.Decisions.Where(d => !string.IsNullOrEmpty(d)).ToList();
-                                    if (decisions.Count > 0) {
-                                        _storageProvider.SaveDecisions(decisions);
-                                    }
-                                    break;
+                        try {
+                            await foreach (var measurementEvent in channel.Reader.ReadAllAsync(src.Token)) {
+                                switch (measurementEvent) {
+                                    case MeasurementDataEvent dataEvent:
+                                        var images = _acquisitionHandler.ProcessMessages(dataEvent.Messages);
+                                        if (images.Images.Count > 0) {
+                                            _storageProvider.SavePlanes(images.Images, images.Metadata);
+                                            lastDispatch = Task.Run(() => NewImageDataAvailable(images, ShowLiveView));
+                                        }
 
-                                case MeasurementStatusTextEvent statusEvent:
-                                    foreach (var msg in statusEvent.Messages) {
-                                        _logger.LogInformation(msg);
-                                    }
-                                    break;
+                                        // Smart program decisions arrive in the same batches as images
+                                        // (possibly on their own) and are stored alongside them.
+                                        var decisions = images.Decisions.Where(d => !string.IsNullOrEmpty(d)).ToList();
+                                        if (decisions.Count > 0) {
+                                            _storageProvider.SaveDecisions(decisions);
+                                        }
+                                        break;
 
-                                case MeasurementErrorEvent errorEvent:
-                                    _logger.LogError($"Measurement Error: {errorEvent.Error}");
-                                    break;
+                                    case MeasurementStatusTextEvent statusEvent:
+                                        foreach (var msg in statusEvent.Messages) {
+                                            _logger.LogInformation(msg);
+                                        }
+                                        break;
 
-                                case MeasurementCompletedEvent _:
-                                    return; // End of stream
+                                    case MeasurementErrorEvent errorEvent:
+                                        _logger.LogError($"Measurement Error: {errorEvent.Error}");
+                                        break;
+
+                                    case MeasurementCompletedEvent _:
+                                        return; // End of stream
+                                }
+                            }
+                        } finally {
+                            // The UI finalizes the measurement (and clamps the slider to
+                            // the acquired frame count) as soon as this run unwinds, so
+                            // the last dispatched batch must have been delivered first -
+                            // whether the stream completed normally or was cancelled.
+                            try {
+                                await lastDispatch;
+                            } catch (Exception ex) {
+                                // A display dispatch failure must not fail the run; these
+                                // were unobserved task exceptions before the flush.
+                                _logger?.LogError(ex, "Display dispatch failed");
                             }
                         }
                     }
