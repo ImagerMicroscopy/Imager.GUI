@@ -68,6 +68,14 @@ public partial class ImageTabViewModel : ViewModelBase
             if (Session.Kind == AcquisitionSessionKind.Experiment)
             {
                 viewModel.ShowLiveView = false;
+
+                // The slider now covers exactly the frames that were saved, and the
+                // position snaps to the end of the measurement.
+                if (viewModel.AcquiredFrameCount > 0)
+                {
+                    viewModel.MaxFrameCount = viewModel.AcquiredFrameCount;
+                    viewModel.SelectedFrame = viewModel.AcquiredFrameCount - 1;
+                }
             }
         }
     }

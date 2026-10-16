@@ -9,8 +9,6 @@ using ImagerAvalonia.Views;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
-using System.Threading;
 
 
 
@@ -26,36 +24,72 @@ public partial class ImageDisplayViewModel : ViewModelBase
     public event Action<TiffPlaneMetadata, byte[], bool>? UpdateImage;
     public event Action<int, int, string, string, byte[], XYStagePosition, bool, double>? UpdateRegionProperties;
     public event EventHandler? GridValuesInitialized;
-    public event EventHandler<int>? SliderPropertyChanged;
     public event EventHandler<OnDetectionRequestedEventArgs>? OnDetectionRequested;
-    public event EventHandler? LiveViewDisabled;
-    public event EventHandler<XYStagePosition>? PinnedPositionChanged;
+    public event EventHandler<XYStagePosition>? SelectedStagePositionChanged;
     public event EventHandler<ObservableCollection<XYStagePosition>> OnXYitionsChanged;
+
+    /// <summary>
+    /// Notifies the attached ImageHandler (and anyone else) whenever ShowLiveView
+    /// changes, so the handler's display-forwarding flag always mirrors the
+    /// checkbox instead of being toggled independently.
+    /// </summary>
+    public event EventHandler<bool>? LiveViewChanged;
+
+    /// <summary>Raised on Dispose; the display view ends its update loop when this fires.</summary>
+    public event EventHandler? Terminated;
 
     [ObservableProperty] private bool _multiViewEnabled = false;
     [ObservableProperty] private int _Min_disp_val = 10000;
     [ObservableProperty] private int _Max_disp_val = 50000;
+
+    /// <summary>Total number of frames the measurement plans to acquire. A count,
+    /// not an index. A completed run ends with AcquiredFrameCount == MaxFrameCount.</summary>
     [ObservableProperty] private int _MaxFrameCount = 0;
-    [ObservableProperty] private int _MaxSliderValue = 1;
+
+    /// <summary>Zero-based index of the last frame the slider can select (the planned
+    /// total minus one, since MaxFrameCount is a count). The slider's maximum.</summary>
+    [ObservableProperty] private int _LastFrameIndex = 0;
+
+    /// <summary>Number of frames acquired so far. Frames up to this number exist in
+    /// storage; beyond it they have not been measured yet (see IsFramePending).</summary>
+    [ObservableProperty] private int _AcquiredFrameCount = 0;
+
+    /// <summary>True when the selected frame lies beyond what has been acquired; the
+    /// view shows a "not measured yet" indicator instead of silently displaying the
+    /// newest frame.</summary>
+    [ObservableProperty] private bool _IsFramePending = false;
+
+    /// <summary>True for the live view: it only ever shows live acquisitions, which are
+    /// not stored, so there is no history to browse at any time — running or not.
+    /// "Show last" is locked on and the checkbox and slider are always disabled. A
+    /// permanent trait of that tab's view model; measurement and file tabs keep it
+    /// false and retain independent slider and checkbox settings.</summary>
+    [ObservableProperty] private bool _IsLiveView = false;
+
     [ObservableProperty] private bool _IsAutoContrastEnabled = true;
     [ObservableProperty] private bool _ShowLiveView = true;
-    [ObservableProperty] private int _Slider_value;
     [ObservableProperty] private double _AlphaWidth = 800;
     [ObservableProperty] private double _AlphaHeight = 800;
     [ObservableProperty] private double _AlphaTop = 0;
     [ObservableProperty] private double _AlphaLeft = 0;
     [ObservableProperty] private bool _IsExperimentRunning = false;
+
+    /// <summary>User-facing progress text, derived from SelectedFrame and
+    /// MaxFrameCount (see UpdateProgressText): one-based, e.g. "3/10".</summary>
     [ObservableProperty] private string _AcquisitionProgress = "";
-    [ObservableProperty] private int _RequestedFrame = 0;
-    [ObservableProperty] private XYStagePosition _PinnedPosition; 
+
+    /// <summary>Zero-based index of the frame selected on the slider. Frame indices are
+    /// zero-based everywhere internally (this property, storage, handler requests);
+    /// one-based numbers exist only in user-facing text, e.g. AcquisitionProgress.</summary>
+    [ObservableProperty] private int _SelectedFrame = 0;
+    /// <summary>Stage position this view is filtered to: only images acquired at this
+    /// position are displayed. The special "&lt;None&gt;" position shows all.</summary>
+    [ObservableProperty] private XYStagePosition _SelectedStagePosition;
 
     public bool IsDataStreaming = false;
-    public bool process_field_view;
     public int StorageID { get; set; } = -1;
 
     private List<Tuple<string, string>> AcqDetPairs = new();
-    private bool _canFire = true;
-    private System.Timers.Timer _throttleTimer = new System.Timers.Timer(10) { AutoReset = true } ;
 
 
     //private IExperimentSerialization _experimentTraversal;
@@ -63,8 +97,6 @@ public partial class ImageDisplayViewModel : ViewModelBase
     public ObservableCollection<string> Detectors = new();
     public ObservableCollection<string> Acquisitions = new();
     [ObservableProperty] ObservableCollection<XYStagePosition> _availableStagePositions  = new();
-
-    public CancellationTokenSource source { get; set; } = new();
 
     // The ImageHandler this view model is currently wired up to. Tracked here (rather
     // than asking the workspace) so DetachHandler always unsubscribes the exact instance
@@ -75,21 +107,6 @@ public partial class ImageDisplayViewModel : ViewModelBase
 
     public ImageDisplayViewModel()
     {
-        
-        _throttleTimer.Elapsed += (_, _) => _canFire = true;
-
-        SliderPropertyChanged += (s, e) =>
-        {
-            if (_canFire)
-            {
-                _canFire = false;
-                _throttleTimer.Start();
-
-
-            }
-        };
-        this.PropertyChanged += OnSliderPropertyChanged;
-        
     }
 
 
@@ -101,7 +118,7 @@ public partial class ImageDisplayViewModel : ViewModelBase
             positions);
 
         AvailableStagePositions.Add(IStageControl.DefaultStagePosition);
-        PinnedPosition = AvailableStagePositions[AvailableStagePositions.Count - 1];
+        SelectedStagePosition = AvailableStagePositions[AvailableStagePositions.Count - 1];
         
         OnXYitionsChanged?.Invoke(this, AvailableStagePositions);       
     }
@@ -109,14 +126,8 @@ public partial class ImageDisplayViewModel : ViewModelBase
 
     public void LoadFirstImage()
     {
-        AcquisitionProgress = $"1/{MaxFrameCount}";
-        RequestedFrame = 1;
-    }
-
-    public void DisableLiveView()
-    {
-        LiveViewDisabled?.Invoke(this, new EventArgs());
-
+        SelectedFrame = 0;
+        RequestFrameImage();
     }
 
     /// <summary>
@@ -134,12 +145,16 @@ public partial class ImageDisplayViewModel : ViewModelBase
         handler.UpdateImageDisplay += ProcessImages;
         handler.UpdateImageElements += ProcessImageElements;
         handler.UpdateCurrentPositions += ProcessPositions;
-        LiveViewDisabled += handler.EnableDisableLiveView;
+        handler.UpdateAsyncProgress += ProcessProgress;
+        LiveViewChanged += handler.OnLiveViewChanged;
+
+        // The handler's forwarding flag mirrors the checkbox state from the start, so
+        // the two can never disagree (programmatic changes raise LiveViewChanged too).
+        handler.OnLiveViewChanged(this, ShowLiveView);
 
         if (enableFrameRequests)
         {
             OnDetectionRequested += handler.LoadImage;
-            handler.UpdateAsyncProgress += ProcessProgress;
         }
     }
 
@@ -156,47 +171,132 @@ public partial class ImageDisplayViewModel : ViewModelBase
         handler.UpdateImageDisplay -= ProcessImages;
         handler.UpdateImageElements -= ProcessImageElements;
         handler.UpdateCurrentPositions -= ProcessPositions;
-        LiveViewDisabled -= handler.EnableDisableLiveView;
-
-        // No-ops if they were never added (display-only attachments).
-        OnDetectionRequested -= handler.LoadImage;
         handler.UpdateAsyncProgress -= ProcessProgress;
+        LiveViewChanged -= handler.OnLiveViewChanged;
+
+        // No-op if it was never added (display-only attachments).
+        OnDetectionRequested -= handler.LoadImage;
     }
 
     partial void OnShowLiveViewChanged(bool value)
     {
-        if(value)
+        if (IsLiveView && !value)
         {
-            RequestedFrame = 1;
+            // The live view has no stored history to browse, running or not: "show
+            // last" cannot be turned off. The revert raises LiveViewChanged for the
+            // restored value only, so the attached handler never sees a transient
+            // "off".
+            ShowLiveView = true;
+            return;
+        }
+
+        LiveViewChanged?.Invoke(this, value);
+
+        if (!value)
+        {
+            return;
+        }
+
+        // Re-enabling "show last" snaps to the newest acquired frame and loads it, so
+        // the display and slider agree immediately instead of on the next frame.
+        IsFramePending = false;
+        SelectedFrame = Math.Max(0, Math.Min(AcquiredFrameCount, MaxFrameCount) - 1);
+        if (AcquiredFrameCount > 0)
+        {
+            RequestFrameImage();
         }
     }
 
-    public void UpdateDisplayedImageNumber(string acqname, string detname, int frame)
+    partial void OnMaxFrameCountChanged(int value)
     {
+        LastFrameIndex = Math.Max(0, value - 1);
+        UpdateProgressText();
+    }
+
+    partial void OnSelectedFrameChanged(int value)
+    {
+        UpdateProgressText();
+
+        // Serving the selected frame happens only while browsing: while "show last"
+        // is on, the stream itself updates the display (see UpdateDisplayedImageNumber).
         if (ShowLiveView)
         {
-            if (frame + 1 > MaxFrameCount)
-            {
-                MaxFrameCount = frame + 1;
-            }
+            return;
+        }
 
-            AcquisitionProgress = $"{frame + 1}/{MaxFrameCount}";
-                
-            MaxSliderValue = MaxFrameCount;
-            RequestedFrame = frame;
+        if (SelectedFrame >= AcquiredFrameCount)
+        {
+            // Beyond what has been measured: keep the current image and show the
+            // pending indicator. Requesting would silently clamp to the newest frame.
+            IsFramePending = true;
+            return;
+        }
+
+        IsFramePending = false;
+        RequestFrameImage();
+    }
+
+    /// <summary>
+    /// The progress text is derived state: whenever the selected frame or the planned
+    /// total changes, it is recomputed here, so no code path can leave it stale. This
+    /// is the only place where one-based numbering is produced.
+    /// </summary>
+    private void UpdateProgressText()
+    {
+        AcquisitionProgress = $"{SelectedFrame + 1}/{MaxFrameCount}";
+    }
+
+    partial void OnIsLiveViewChanged(bool value)
+    {
+        if (value)
+        {
+            // The live view always follows the stream; there is no stored history
+            // to browse, running or not.
+            ShowLiveView = true;
         }
     }
 
-    protected virtual void OnSliderPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    /// <summary>
+    /// Called for every acquired frame (frame is the zero-based detection index),
+    /// whether or not live view is on: it tracks how many frames exist. While "show
+    /// last" is on, the slider follows the newest frame; while browsing, a frame the
+    /// user has browsed ahead to is loaded as soon as it arrives.
+    /// </summary>
+    public void UpdateDisplayedImageNumber(string acqname, string detname, int frame)
     {
-        if (e.PropertyName == nameof(RequestedFrame) && !ShowLiveView)
+        if (frame + 1 > AcquiredFrameCount)
         {
-            AcquisitionProgress = $"{RequestedFrame}/{MaxFrameCount}";
-            SliderPropertyChanged?.Invoke(this, RequestedFrame);
-            OnDetectionRequested?.Invoke(this,
-                new OnDetectionRequestedEventArgs(AcqDetPairs,RequestedFrame
-                ));
+            AcquiredFrameCount = frame + 1;
         }
+
+        // Safety net for a planned total that was too low: the slider must never be
+        // able to select beyond the last frame that exists.
+        if (AcquiredFrameCount > MaxFrameCount)
+        {
+            MaxFrameCount = AcquiredFrameCount;
+        }
+
+        if (ShowLiveView)
+        {
+            if (AcquiredFrameCount > 0)
+            {
+                SelectedFrame = AcquiredFrameCount - 1;
+            }
+        }
+        else if (IsFramePending && SelectedFrame < AcquiredFrameCount)
+        {
+            // The frame the user browsed ahead to has arrived: show it now.
+            IsFramePending = false;
+            RequestFrameImage();
+        }
+    }
+
+    /// <summary>Requests the currently selected frame from the attached handler.
+    /// Zero-based throughout: the selected index is passed to storage unchanged.</summary>
+    private void RequestFrameImage()
+    {
+        OnDetectionRequested?.Invoke(this,
+            new OnDetectionRequestedEventArgs(AcqDetPairs, SelectedFrame));
     }
 
 
@@ -208,25 +308,22 @@ public partial class ImageDisplayViewModel : ViewModelBase
 
     public void SetGridData(List<Tuple<string,string>> acq_det_pairs)
     {
-        RequestedFrame = 1;
+        SelectedFrame = 0;
         Acquisitions.Clear();
         Detectors.Clear();
         if (acq_det_pairs == null) return;
         AcqDetPairs = new List<Tuple<string, string>>(acq_det_pairs);
 
 
-        foreach (Tuple<string, string> acquisition in acq_det_pairs)
+        foreach (Tuple<string, string> pair in acq_det_pairs)
         {
-            foreach (Tuple<string, string> detector in acq_det_pairs)
+            if (!Acquisitions.Contains(pair.Item1))
             {
-                if (!Acquisitions.Contains(acquisition.Item1))
-                {
-                    Acquisitions.Add(acquisition.Item1);
-                }
-                if (!Detectors.Contains(detector.Item2))
-                {
-                    Detectors.Add(detector.Item2);
-                }
+                Acquisitions.Add(pair.Item1);
+            }
+            if (!Detectors.Contains(pair.Item2))
+            {
+                Detectors.Add(pair.Item2);
             }
         }
         OnGridValueInitialized(new EventArgs());
@@ -274,9 +371,9 @@ public partial class ImageDisplayViewModel : ViewModelBase
         {
             if (i >= Math.Max(0, images.Images.Count - Acquisitions.Count * Detectors.Count))
             {
-                if (PinnedPosition != IStageControl.DefaultStagePosition)
+                if (SelectedStagePosition != IStageControl.DefaultStagePosition)
                 {
-                    if (images.Metadata[i].PositionName == PinnedPosition.Name)
+                    if (images.Metadata[i].PositionName == SelectedStagePosition.Name)
                     {
                         UpdateImage?.Invoke(images.Metadata[i], images.Images[i], true);
                     }
@@ -289,11 +386,11 @@ public partial class ImageDisplayViewModel : ViewModelBase
         }
     }
 
-    partial void OnPinnedPositionChanged(XYStagePosition? oldValue, XYStagePosition? newValue)
+    partial void OnSelectedStagePositionChanged(XYStagePosition? oldValue, XYStagePosition? newValue)
     {
         if (newValue != null)
         {
-            PinnedPositionChanged?.Invoke(this, newValue);
+            SelectedStagePositionChanged?.Invoke(this, newValue);
         }
     }
 
@@ -322,16 +419,10 @@ public partial class ImageDisplayViewModel : ViewModelBase
         StorageID = openID;
     }
 
-    public class RegionPropertiesEventArgs : EventArgs
+    public override void Dispose()
     {
-        public ImageData ImageData { get; }
-        public XYStagePosition StagePosition { get; }
-
-        public RegionPropertiesEventArgs(ImageData imageData, XYStagePosition stagePosition)
-        {
-            ImageData = imageData;
-            StagePosition = stagePosition;
-        }
+        DetachHandler();
+        Terminated?.Invoke(this, EventArgs.Empty);
     }
 }
 

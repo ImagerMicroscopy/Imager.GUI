@@ -38,13 +38,10 @@ public partial class ImageDisplayView : UserControl
 
     private ScaleTransform? _scaleTransform;
     private TranslateTransform? _translateTransform;
-    public static volatile bool _isImageProcessing = false; // Flag to prevent redundant calls
 
     private bool _isMultiChannelEnabled = false;
     private bool _isDotSelectionEnabled = true;
-    //private RectangelBorder _cropBorder;
     private ImageDisplayViewModel? imageDisplayViewM;
-    private readonly object _lockObj = new object();
 
     private Canvas imageCanvas;
     private MultiChannelContrastView multiChannelContrast;
@@ -56,12 +53,6 @@ public partial class ImageDisplayView : UserControl
 
 
     private ILifetimeScope scope = App.Container.BeginLifetimeScope();
-
-    public Dictionary<int, WriteableBitmap> GridImages = new();
-    public Dictionary<ValueTuple<int, int>, int> FlattenedGrid = new();
-    public Dictionary<ValueTuple<int, int>, string> AcqNames = new();
-    public Dictionary<ValueTuple<int, int>, string> DetNames = new();
-    public Dictionary<ValueTuple<int, int>, ValueTuple<int, int>> ImSizes = new();
 
     // Bounded with DropOldest so a stalled UI thread cannot accumulate an unbounded
     // backlog of stale frames; UpdateViewer additionally renders only the newest
@@ -82,7 +73,6 @@ public partial class ImageDisplayView : UserControl
 
         imageCanvas = this.FindControl<Canvas>("ImageCanvas")!;
         imageSlider = this.FindControl<Slider>("imageSlider")!;
-        imageSlider.IsEnabled = false;
 
         contrastPanel = (ContrastPanelView)this.FindControl<UserControl>("ContrastPanel")!;
         multiChannelContrast = new MultiChannelContrastView();
@@ -120,6 +110,8 @@ public partial class ImageDisplayView : UserControl
         _scaleTransform = (ScaleTransform)transformGroup!.Children[0];
         _translateTransform = (TranslateTransform)transformGroup!.Children[1];
 
+        imageGrid.OnSelectedItemChanged += ImageGrid_OnSelectedItemChanged;
+
         DataContextChanged += OnDataContextChanged;
 
 
@@ -128,9 +120,37 @@ public partial class ImageDisplayView : UserControl
 
     }
 
-    public void UpdateXYitions(object? sender, ILifetimeScope scope)
+    private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        // A view model can be attached only once here, but unsubscribe the previous
+        // one anyway so re-attachment never accumulates subscriptions.
+        if (imageDisplayViewM != null)
+        {
+            imageDisplayViewM.OnXYitionsChanged -= ImageDisplayViewM_OnXYitionsChanged;
+            imageDisplayViewM.UpdateImage -= UpdateCurrentImageFromStream;
+            imageDisplayViewM.UpdateRegionProperties -= UpdateRegionPropertiesFromStream;
+            imageDisplayViewM.GridValuesInitialized -= InitializeGrid;
+            imageDisplayViewM.Terminated -= OnViewModelTerminated;
+        }
 
+        if (DataContext is ImageDisplayViewModel vm)
+        {
+            imageDisplayViewM = vm;
+            vm.OnXYitionsChanged += ImageDisplayViewM_OnXYitionsChanged;
+            vm.UpdateImage += UpdateCurrentImageFromStream;
+            vm.UpdateRegionProperties += UpdateRegionPropertiesFromStream;
+            vm.GridValuesInitialized += InitializeGrid;
+            vm.Terminated += OnViewModelTerminated;
+        }
+    }
+
+    /// <summary>
+    /// The view model this view presents has been disposed (its tab was closed). End
+    /// the display loop so the pending await no longer keeps this view alive.
+    /// </summary>
+    private void OnViewModelTerminated(object? sender, EventArgs e)
+    {
+        ImageChannel.Writer.TryComplete();
     }
 
     private async Task UpdateViewer()
@@ -178,20 +198,10 @@ public partial class ImageDisplayView : UserControl
                 }
             }
         }
-    }
 
-    private void OnDataContextChanged(object? sender, EventArgs e)
-    {
-        if (DataContext is ImageDisplayViewModel vm)
-        {
-            imageDisplayViewM = vm;
-            imageDisplayViewM.OnXYitionsChanged += ImageDisplayViewM_OnXYitionsChanged;
-            imageDisplayViewM.UpdateImage += UpdateCurrentImageFromStream;
-            imageDisplayViewM.UpdateRegionProperties += UpdateRegionPropertiesFromStream;
-            imageDisplayViewM.GridValuesInitialized += InitializeGrid;
-            imageDisplayViewM.SliderPropertyChanged += OnSliderValChanged;
-        }
-        imageGrid.OnSelectedItemChanged += ImageGrid_OnSelectedItemChanged;
+        // The channel is completed when the view model is disposed (its tab closed);
+        // nothing can use this view anymore, so its lifetime scope can be released.
+        scope.Dispose();
     }
 
     private void ImageDisplayViewM_OnXYitionsChanged(object? sender, ObservableCollection<XYStagePosition> e)
@@ -248,20 +258,6 @@ public partial class ImageDisplayView : UserControl
 
         }
     }
-
-
-
-    private void OnSliderValChanged(object? sender, int frame)
-    {
-
-        Dispatcher.UIThread.Invoke(() =>
-        {
-            imageSlider.Value = frame;
-        });
-
-    }
-
-
 
 
 

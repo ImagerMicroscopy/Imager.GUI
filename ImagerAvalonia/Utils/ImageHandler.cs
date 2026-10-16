@@ -27,9 +27,7 @@ namespace ImagerAvalonia.Utils
         private readonly IImagerConnectionHandler _connectionHandler;
         private readonly IImagerCommunicationManager _communicationManager = ImagerCommunicationManager.Instance;
 
-        private Channel<ImageData> _imageReader = Channel.CreateUnbounded<ImageData>();
-
-        public bool ShowLiveView = true;
+        public bool ShowLiveView { get; private set; } = true;
 
 
         public ImageHandler(IStorageProvider storageProvider)
@@ -86,21 +84,14 @@ namespace ImagerAvalonia.Utils
         }
 
 
-        public void EnableDisableLiveView(object? sender, EventArgs e)
+        /// <summary>
+        /// Sets whether streamed images are forwarded to the display. The attached view
+        /// model's ShowLiveView checkbox is the single source of truth; this is its
+        /// handler-side mirror (set, never toggled, so it cannot drift out of sync).
+        /// </summary>
+        public void OnLiveViewChanged(object? sender, bool showLiveView)
         {
-            ShowLiveView = !ShowLiveView;
-        }
-
-
-        public ImageData RequestImageMetadata(List<Tuple<string, string>> AcqDetPairs, int RequestedTime)
-        {
-            ImageData imageData = new ImageData();
-            imageData.Metadata = new List<TiffPlaneMetadata>() { };
-            foreach (var acq_det_pair in AcqDetPairs)
-            {
-                //WIP
-            }
-            return imageData;
+            ShowLiveView = showLiveView;
         }
 
 
@@ -116,7 +107,7 @@ namespace ImagerAvalonia.Utils
             {
                 int image_idx = _storageProvider.GetImageIndex(acq_det_pair.Item1, acq_det_pair.Item2, RequestedTime);
                 byte[] image_data = _storageProvider.ReadPlane(acq_det_pair.Item1, acq_det_pair.Item2, image_idx);
-                if (image_data.Length > 0)
+                if (image_data is { Length: > 0 })
                 {
                     num_datasets += 1;
                     imageData.Images.Add(image_data);
@@ -136,21 +127,6 @@ namespace ImagerAvalonia.Utils
                 ImageData imageData = RequestImage(e.AcqDetPairs, e.RequestedTime);
             
                 NewLoadedImageDataAvailable(imageData);
-        }
-
-        public async Task ImageReader(CancellationToken token)
-        {
-            while (await _imageReader.Reader.WaitToReadAsync(token))
-            {
-                if(token.IsCancellationRequested)
-                {
-                    return ;
-                }
-                while (_imageReader.Reader.TryRead(out ImageData? acquiredData))
-                {                  
-                    NewImageDataAvailable(acquiredData, ShowLiveView);
-                }         
-            }
         }
 
 

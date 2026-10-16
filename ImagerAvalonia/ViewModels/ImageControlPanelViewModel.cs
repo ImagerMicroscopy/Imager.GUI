@@ -79,6 +79,10 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         Tabs.Add(new ImageTabViewModel("Smart Program", smartPrograms, isFixed: true));
         SelectedTab = Tabs[0];
 
+        // The live view shows only unstored live acquisitions: browsing is never
+        // possible there, so "show last" is locked on for the tab's lifetime.
+        liveView.IsLiveView = true;
+
         // Wire up to workspace events
         _workspace.SessionStarted += Workspace_SessionStarted;
         _workspace.SessionStopped += Workspace_SessionStopped;
@@ -198,6 +202,11 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             tab.ViewModel!.SetGridData(acqdetpairs);
             tab.ViewModel!.SetAvailableXYPositions(stagePositions);
             tab.ViewModel!.MaxFrameCount = storageProvider.LoadMaxFrameNumber();
+
+            // A stored file is browsed, not followed: every planned frame already
+            // exists, and the first one is shown right away.
+            tab.ViewModel!.AcquiredFrameCount = tab.ViewModel!.MaxFrameCount;
+            tab.ViewModel!.ShowLiveView = false;
             tab.ViewModel!.LoadFirstImage();
         }
         catch (Exception ex)
@@ -250,6 +259,11 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             LiveView.IsExperimentRunning = false;
             LiveView.IsDataStreaming = true;
             LiveView.MaxFrameCount = session.StorageProvider.GetMaxNumberOfFrames();
+
+            // The live view tab persists across sessions; start each one from a
+            // clean frame state.
+            LiveView.AcquiredFrameCount = 0;
+            LiveView.IsFramePending = false;
         }
         else
         {
