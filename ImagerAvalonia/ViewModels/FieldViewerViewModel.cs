@@ -1,5 +1,6 @@
 ﻿
 using CommunityToolkit.Mvvm.ComponentModel;
+using ImagerAvalonia.Exceptions;
 using ImagerAvalonia.Services.MeasurementControl;
 using ImagerAvalonia.Utils;
 using ImagerAvalonia.Views;
@@ -7,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 
 
 namespace ImagerAvalonia.ViewModels;
@@ -19,6 +21,21 @@ public partial class FieldViewerViewModel : ViewModelBase
     [ObservableProperty] XYStagePosition _currentStagePosition;
     [ObservableProperty] bool _isStageViewerEngaged = false;
     [ObservableProperty] double _pixelSize = 100;
+    [ObservableProperty] bool _isMeasurementRunning = false;
+    [ObservableProperty] bool _isStageMoveInFlight = false;
+
+    /// <summary>
+    /// Moves beyond this distance (in micrometers) ask the user to confirm
+    /// before the stage is commanded.
+    /// </summary>
+    public const double FarMoveThresholdUm = 500;
+
+    /// <summary>
+    /// Confirmation callback for far moves (distance in micrometers);
+    /// injectable so tests can answer without a window. Defaults to the
+    /// MoveStageConfirmation dialog.
+    /// </summary>
+    public Func<double, Task<bool>>? MoveConfirmation { get; set; }
 
     [ObservableProperty] ObservableCollection<string> _Acquisitions = new();
     [ObservableProperty] ObservableCollection<string> _Detectors = new();
@@ -85,9 +102,63 @@ public partial class FieldViewerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Commands the stage to an absolute position picked on the map. XY only:
+    /// Z and the hardware-autofocus state are taken from a fresh stage read.
+    /// Blocked while a measurement runs or another move is in flight; moves
+    /// beyond FarMoveThresholdUm ask for confirmation first.
+    /// </summary>
+    public async Task MoveStageTo(double stageX, double stageY)
+    {
+        if (_stageControl == null || IsMeasurementRunning || IsStageMoveInFlight)
+            return;
+
+        IsStageMoveInFlight = true;
+        try
+        {
+            // ReadStagePosition and SetStagePosition are blocking
+            // hardware calls (sync-over-async); keep them off the UI thread.
+            var current = await Task.Run(() => _stageControl.ReadStagePosition());
+            if (current == null)
+                return;
+
+            double dx = stageX - current.Coordinates.x;
+            double dy = stageY - current.Coordinates.y;
+            double distanceUm = Math.Sqrt(dx * dx + dy * dy);
+
+            if (distanceUm > FarMoveThresholdUm)
+            {
+                var confirm = MoveConfirmation ?? ConfirmFarMoveAsync;
+                if (!await confirm(distanceUm))
+                    return;
+            }
+
+            var target = new XYStagePosition(
+                current.Coordinates.hardwareautofocusoffset,
+                stageX,
+                stageY,
+                current.Coordinates.z,
+                current.Coordinates.usinghardwareautofocus,
+                current.Name);
+
+            await Task.Run(() => _stageControl.SetStagePosition(target));
+        }
+        catch (Exception ex)
+        {
+            await ExceptionWindowHandler.ShowExceptionAsync(ex);
+        }
+        finally
+        {
+            IsStageMoveInFlight = false;
+        }
+    }
+
+    private static Task<bool> ConfirmFarMoveAsync(double distanceUm) =>
+        MoveStageConfirmation.ShowAsync(distanceUm);
+
     public FieldViewerViewModel()
-    { 
-        
+    {
+
     }
 
 

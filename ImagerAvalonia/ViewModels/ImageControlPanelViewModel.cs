@@ -268,6 +268,9 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         else
         {
             IsExperimentEnabled = true;
+            // Stage moves picked on the map are blocked while a measurement
+            // runs: the program itself drives the stage.
+            FieldView.IsMeasurementRunning = true;
             var tab = _activeMeasurementTab;
             _activeMeasurementTab = null;
             if (tab == null) return;
@@ -297,6 +300,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         else if (session.Kind == AcquisitionSessionKind.Experiment)
         {
             IsExperimentEnabled = false;
+            FieldView.IsMeasurementRunning = false;
             // The tab stays attached to the session so the partially saved measurement
             // remains browsable once SessionFinished reopens the file for reading.
             var tab = FindTab(session);
@@ -313,6 +317,7 @@ public partial class ImageControlPanelViewModel : ViewModelBase
         if (session.Kind != AcquisitionSessionKind.Experiment) return;
 
         IsExperimentEnabled = false;
+        FieldView.IsMeasurementRunning = false;
         session.Handler.UpdateFieldViewDisplay -= FieldView.ProcessImages;
 
         FindTab(session)?.SessionFinished();

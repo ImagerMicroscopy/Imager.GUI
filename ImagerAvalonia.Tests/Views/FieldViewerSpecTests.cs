@@ -18,6 +18,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -48,6 +49,11 @@ namespace ImagerAvalonia.Tests.Views;
 ///    contrast settings, exclusively.
 /// 7. Lifecycle: rebuilding the schema replaces the canvases (no orphaned canvases
 ///    accumulate); detaching the view stops image processing.
+/// 8. Stage moves: right-clicking the map offers "Move stage here" when the map's
+///    anchor is a trusted stage read and no measurement is running. The target
+///    accounts for pan and zoom. A move farther than 0.5 mm from the current
+///    position requires confirmation. Z and autofocus state are preserved;
+///    blocking hardware calls stay off the UI thread.
 /// </summary>
 public sealed class FieldViewerSpecTests
 {
@@ -435,5 +441,166 @@ public sealed class FieldViewerSpecTests
 
         Assert.Equal("Acq2", vm.SelectedAcquisition);
         Assert.Equal("Det2", vm.SelectedDetector);
+    }
+
+    // --- Spec 8: stage moves from the map -------------------------------------
+
+    [Fact]
+    public void The_map_reports_stage_positions_for_canvas_points()
+    {
+        var mosaic = new FieldViewerMosaic { OriginX = 700, OriginY = 540, PixelSizeNm = 100 };
+        mosaic.SetAnchor(1000, 2000);
+
+        // Canvas point 30 units right of and 20 units above the origin.
+        Assert.True(mosaic.TryGetStagePositionAt(730, 520, out var stageX, out var stageY));
+        Assert.Equal(1030, stageX, 3);
+        Assert.Equal(2020, stageY, 3);
+    }
+
+    [Fact]
+    public void The_map_refuses_stage_positions_without_a_stage_anchor()
+    {
+        var mosaic = new FieldViewerMosaic { OriginX = 700, OriginY = 540 };
+
+        // No stage read at engage: the anchor may be in frame-metadata units,
+        // so no stage target may be derived from the map.
+        Assert.False(mosaic.TryGetStagePositionAt(730, 520, out _, out _));
+    }
+
+    private static Mock<IStageControl> StageWithPositions()
+    {
+        var stage = new Mock<IStageControl>();
+        stage.Setup(s => s.ReadStagePosition())
+            .Returns(new XYStagePosition(0, 1000, 2000, 55, true, "Stage"));
+        return stage;
+    }
+
+    [Fact]
+    public async Task Moving_the_stage_targets_the_requested_position_preserving_z_and_autofocus()
+    {
+        var stage = StageWithPositions();
+        var captured = new List<XYStagePosition>();
+        stage.Setup(s => s.SetStagePosition(Capture.In(captured)));
+        var vm = new FieldViewerViewModel(stage.Object);
+
+        // A small move: no confirmation needed.
+        await vm.MoveStageTo(1030, 1985);
+
+        var sent = Assert.Single(captured);
+        Assert.Equal(1030, sent.Coordinates.x, 3);
+        Assert.Equal(1985, sent.Coordinates.y, 3);
+        Assert.Equal(55, sent.Coordinates.z, 3);
+        Assert.True(sent.Coordinates.usinghardwareautofocus);
+        Assert.False(vm.IsStageMoveInFlight);
+    }
+
+    [Fact]
+    public async Task A_far_move_requires_confirmation()
+    {
+        var stage = StageWithPositions();
+        var captured = new List<XYStagePosition>();
+        stage.Setup(s => s.SetStagePosition(Capture.In(captured)));
+        var vm = new FieldViewerViewModel(stage.Object);
+
+        double? askedDistance = null;
+        vm.MoveConfirmation = distance =>
+        {
+            askedDistance = distance;
+            return Task.FromResult(false);
+        };
+
+        // 2 mm away: past the 0.5 mm threshold.
+        await vm.MoveStageTo(3000, 2000);
+
+        Assert.Equal(2000, askedDistance.GetValueOrDefault(), 1);
+        Assert.Empty(captured);
+
+        vm.MoveConfirmation = _ => Task.FromResult(true);
+        await vm.MoveStageTo(3000, 2000);
+
+        Assert.Equal(3000, Assert.Single(captured).Coordinates.x, 3);
+    }
+
+    [Fact]
+    public async Task A_short_move_does_not_ask_for_confirmation()
+    {
+        var stage = StageWithPositions();
+        var captured = new List<XYStagePosition>();
+        stage.Setup(s => s.SetStagePosition(Capture.In(captured)));
+        var vm = new FieldViewerViewModel(stage.Object) { MoveConfirmation = _ => Task.FromCanceled<bool>(new CancellationToken(true)) };
+
+        // 30 µm: well below the threshold; a cancelled confirmation would
+        // never complete the move.
+        await vm.MoveStageTo(1030, 2000);
+
+        Assert.Single(captured);
+    }
+
+    [Fact]
+    public async Task Stage_moves_are_blocked_while_a_measurement_runs()
+    {
+        var stage = StageWithPositions();
+        var vm = new FieldViewerViewModel(stage.Object) { IsMeasurementRunning = true };
+
+        await vm.MoveStageTo(1030, 2000);
+
+        stage.Verify(s => s.SetStagePosition(It.IsAny<XYStagePosition>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_stage_that_cannot_be_read_cannot_be_moved()
+    {
+        var stage = UnreadableStage();
+        var vm = new FieldViewerViewModel(stage.Object);
+
+        await vm.MoveStageTo(1030, 2000);
+
+        stage.Verify(s => s.SetStagePosition(It.IsAny<XYStagePosition>()), Times.Never);
+    }
+
+    [AvaloniaFact]
+    public void A_right_click_target_accounts_for_pan_and_zoom()
+    {
+        var vm = new FieldViewerViewModel(StageAt(1000, 2000).Object);
+        var view = CreateView(vm);
+        vm.SetGridData(Pairs(("Acq1", "Det1")));
+        vm.EngageFieldViewer();
+
+        // Pan and zoom the map; the click position arrives in screen (grid)
+        // coordinates and must be un-transformed before resolving the target.
+        view.SetMapTransformForTests(2, 100, 50);
+        var canvas = Assert.Single(PairCanvases(view));
+
+        var canvasPoint = new Point(730, 520); // 30 units right of, 20 above the origin
+        var gridPoint = canvasPoint.Transform(canvas.RenderTransform!.Value);
+
+        Assert.True(view.TryGetMoveTarget(gridPoint, out var stageX, out var stageY));
+        Assert.Equal(1030, stageX, 3);
+        Assert.Equal(2020, stageY, 3);
+    }
+
+    [AvaloniaFact]
+    public void A_right_click_target_is_gated_by_the_session_and_anchor()
+    {
+        var vm = new FieldViewerViewModel(StageAt(1000, 2000).Object);
+        var view = CreateView(vm);
+        vm.SetGridData(Pairs(("Acq1", "Det1")));
+        vm.EngageFieldViewer();
+
+        Assert.True(view.TryGetMoveTarget(new Point(700, 540), out _, out _));
+
+        vm.IsMeasurementRunning = true;
+        Assert.False(view.TryGetMoveTarget(new Point(700, 540), out _, out _));
+        vm.IsMeasurementRunning = false;
+        Assert.True(view.TryGetMoveTarget(new Point(700, 540), out _, out _));
+
+        // An unreadable stage at engage leaves the map without a trusted
+        // anchor: no stage move may be offered.
+        var untrustedVm = new FieldViewerViewModel(UnreadableStage().Object);
+        var untrustedView = CreateView(untrustedVm);
+        untrustedVm.SetGridData(Pairs(("Acq1", "Det1")));
+        untrustedVm.EngageFieldViewer();
+
+        Assert.False(untrustedView.TryGetMoveTarget(new Point(700, 540), out _, out _));
     }
 }

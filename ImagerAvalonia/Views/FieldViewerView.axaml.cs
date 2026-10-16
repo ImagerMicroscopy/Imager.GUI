@@ -59,6 +59,7 @@ namespace ImagerAvalonia.Views
 
         private bool _isDragging;
         private Point _lastMousePosition;
+        private Point _contextClickPoint;
 
         public FieldViewerView()
         {
@@ -86,6 +87,7 @@ namespace ImagerAvalonia.Views
             DataContextChanged += OnDataContextChanged;
             AttachedToVisualTree += OnAttachedToVisualTree;
             DetachedFromVisualTree += OnDetachedFromVisualTree;
+            ContextRequested += OnContextRequested;
         }
 
         private void InitializeComponent() => AvaloniaXamlLoader.Load(this);
@@ -411,6 +413,61 @@ namespace ImagerAvalonia.Views
             return true;
         }
 
+        // --- Stage moves from the map ----------------------------------------------
+
+        private void OnContextRequested(object? sender, ContextRequestedEventArgs e)
+        {
+            if (!TryGetMoveTarget(_contextClickPoint, out var stageX, out var stageY))
+                return;
+
+            e.Handled = true;
+
+            var item = new MenuItem { Header = "Move stage here" };
+            item.Click += (_, _) =>
+            {
+                if (_viewModel is { } vm)
+                    _ = vm.MoveStageTo(stageX, stageY);
+            };
+
+            var menu = new ContextMenu();
+            menu.Items.Add(item);
+            menu.Open(this);
+        }
+
+        /// <summary>
+        /// The stage target a right-click on the map corresponds to. Available
+        /// only when a map exists, its anchor is a trusted stage read (engage),
+        /// and no measurement is running and no stage move is in flight.
+        /// </summary>
+        internal bool TryGetMoveTarget(Point gridPoint, out double stageX, out double stageY)
+        {
+            stageX = stageY = 0;
+
+            if (_viewModel is not { } vm || vm.IsMeasurementRunning || vm.IsStageMoveInFlight)
+                return false;
+            if (_createdCanvases.Count == 0)
+                return false;
+
+            // The click is in screen (grid) coordinates; tiles are placed in
+            // canvas coordinates behind the shared pan/zoom transform. All pair
+            // canvases share the same transform, so the first one's matrix is
+            // the map's transform.
+            var canvas = _createdCanvases[0];
+            var canvasPoint = gridPoint.Transform(canvas.RenderTransform!.Value.Invert());
+
+            _mosaic.PixelSizeNm = vm.PixelSize;
+            return _mosaic.TryGetStagePositionAt(canvasPoint.X, canvasPoint.Y, out stageX, out stageY);
+        }
+
+        /// <summary>Test seam: sets the shared pan/zoom transform.</summary>
+        internal void SetMapTransformForTests(double scale, double translateX, double translateY)
+        {
+            _scaleTransform!.ScaleX = scale;
+            _scaleTransform.ScaleY = scale;
+            _translateTransform!.X = translateX;
+            _translateTransform.Y = translateY;
+        }
+
         // --- View controls --------------------------------------------------------
 
         private void GoToCurrent(object? sender, RoutedEventArgs e)
@@ -449,7 +506,17 @@ namespace ImagerAvalonia.Views
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            _lastMousePosition = e.GetPosition(this.FindControl<Grid>("ParentGrid"));
+            var point = e.GetCurrentPoint(this.FindControl<Grid>("ParentGrid"));
+
+            if (point.Properties.IsRightButtonPressed)
+            {
+                // Right click targets a stage move; the pan drag starts on
+                // left press only.
+                _contextClickPoint = point.Position;
+                return;
+            }
+
+            _lastMousePosition = point.Position;
             _isDragging = true;
         }
 

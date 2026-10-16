@@ -64,6 +64,15 @@ public sealed class FieldViewerMosaic
     public double OriginX { get; set; }
     public double OriginY { get; set; }
 
+    /// <summary>
+    /// The map's anchor from a stage read (at engage). Stage moves picked on
+    /// the map are only meaningful when this exists: channel anchors that
+    /// fell back to frame metadata are not guaranteed to be in stage units.
+    /// </summary>
+    public bool HasStageAnchor { get; private set; }
+    public double StageAnchorX { get; private set; }
+    public double StageAnchorY { get; private set; }
+
     /// <summary>Micrometers of stage travel per screen unit.</summary>
     private double MicronsPerScreenUnit => PixelSizeNm / 100.0;
 
@@ -80,6 +89,7 @@ public sealed class FieldViewerMosaic
     /// <summary>
     /// Sets the engage anchor on channels that have not received frames yet.
     /// Channels that already anchored (from their first frame) keep theirs.
+    /// The stage anchor marks the whole map as being in trusted stage units.
     /// </summary>
     public void SetAnchor(double stageX, double stageY)
     {
@@ -91,6 +101,29 @@ public sealed class FieldViewerMosaic
             channel.AnchorX = stageX;
             channel.AnchorY = stageY;
         }
+
+        StageAnchorX = stageX;
+        StageAnchorY = stageY;
+        HasStageAnchor = true;
+    }
+
+    /// <summary>
+    /// The stage position a canvas point (tile coordinates, before the
+    /// pan/zoom transform) corresponds to; the inverse of the tile placement
+    /// rule. Returns false when the map has no trusted stage anchor.
+    /// </summary>
+    public bool TryGetStagePositionAt(double canvasX, double canvasY, out double stageX, out double stageY)
+    {
+        if (!HasStageAnchor)
+        {
+            stageX = stageY = 0;
+            return false;
+        }
+
+        stageX = StageAnchorX + (canvasX - OriginX) * MicronsPerScreenUnit;
+        // Canvas +Y is down, stage +Y is up.
+        stageY = StageAnchorY - (canvasY - OriginY) * MicronsPerScreenUnit;
+        return true;
     }
 
     /// <summary>
