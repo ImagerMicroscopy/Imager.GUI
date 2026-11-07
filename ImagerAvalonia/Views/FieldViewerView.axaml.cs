@@ -452,8 +452,10 @@ namespace ImagerAvalonia.Views
             // canvas coordinates behind the shared pan/zoom transform. All pair
             // canvases share the same transform, so the first one's matrix is
             // the map's transform.
-            var canvas = _createdCanvases[0];
-            var canvasPoint = gridPoint.Transform(canvas.RenderTransform!.Value.Invert());
+            var canvas = _selectedCanvas ?? _createdCanvases[0];
+            var grid = this.FindControl<Grid>("ParentGrid");
+            var canvasPoint = grid?.TranslatePoint(gridPoint, canvas)
+                ?? gridPoint.Transform(canvas.RenderTransform!.Value.Invert());
 
             _mosaic.PixelSizeNm = vm.PixelSize;
             return _mosaic.TryGetStagePositionAt(canvasPoint.X, canvasPoint.Y, out stageX, out stageY);

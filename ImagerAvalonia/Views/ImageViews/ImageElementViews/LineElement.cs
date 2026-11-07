@@ -222,11 +222,7 @@ namespace ImagerAvalonia.Views.ImageViews
         }
 
         private SolidColorBrush GenerateRandomBrush() =>
-            new(Avalonia.Media.Color.FromRgb(
-                (byte)_random.Next(256),
-                (byte)_random.Next(256),
-                (byte)_random.Next(256))
-            );
+            new(new Avalonia.Media.HsvColor(1.0, _random.NextDouble() * 360.0, 0.85, 1.0).ToRgb());
 
         public override void OnDotPointerMoved(object? sender, PointerEventArgs e)
         {

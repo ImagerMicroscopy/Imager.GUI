@@ -32,7 +32,7 @@ public partial class ImageDisplayView : UserControl
     private ImageGrid imageGrid;
     private MultiImageGrid multiImageGrid;
     private Grid imagePanel;
-    private Expander multiChannelContrastExpander;
+    private Control multiChannelContrastExpander;
     private ContentControl multiChannelContrastHost;
 
     private ILifetimeScope scope = App.Container.BeginLifetimeScope();
@@ -54,7 +54,7 @@ public partial class ImageDisplayView : UserControl
         InitializeComponent();
 
         imagePanel = this.FindControl<Grid>("ImagePanel")!;
-        multiChannelContrastExpander = this.FindControl<Expander>("MultiChannelContrastExpander")!;
+        multiChannelContrastExpander = this.FindControl<StackPanel>("MultiChannelContrastExpander")!;
         multiChannelContrastHost = this.FindControl<ContentControl>("MultiChannelContrastHost")!;
 
         var regionPanel = this.FindControl<ContentControl>("RegionContent")!;
@@ -289,8 +289,8 @@ public partial class ImageDisplayView : UserControl
 
     private void OnResetView(object? sender, RoutedEventArgs e)
     {
-        // Tiles, not the grid, own their viewport: resetting re-fits every tile.
         imageGrid.ResetView();
+        multiImageGrid.ResetZoomAndPan();
     }
 
     private void InitializeComponent()

@@ -182,9 +182,10 @@ public partial class ImageControlPanelViewModel : ViewModelBase
             var programTree = loader.GetProgramTree(program);
 
             var detections = programTree.Detections;
-            var acqdetpairs = detections.Select(x => x.Value.Detectors.Select(y => new Tuple<string,string>(x.Key, y.Detectorname)))
+            var acqdetpairs = detections.Select(x => x.Value.Detectors.Where(y => y.IsEnabled).Select(y => new Tuple<string,string>(x.Key, y.Detectorname)))
                 .SelectMany(x => x)
                 .ToList();
+            storageProvider.SetAcqDetPairs(acqdetpairs);
 
             var stagePositions = new List<XYStagePosition>();
             ExperimentManager.ReturnStagePositions(programTree.Program, ref stagePositions);

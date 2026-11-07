@@ -11,134 +11,101 @@
              x:Class="ImagerAvalonia.Views.ContrastPanelView"
              x:DataType="vm:ContrastAdjViewModel">
 
+	<UserControl.Styles>
+		<Style Selector="TextBlock.contrast-label">
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="TextBlock.contrast-range">
+			<Setter Property="FontSize" Value="9"/>
+			<Setter Property="Foreground" Value="#9a9a9a"/>
+		</Style>
+		<Style Selector="Slider.contrast">
+			<Setter Property="Margin" Value="4 0"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Style Selector="^ /template/ Track #PART_DecreaseButton Border">
+				<Setter Property="Background" Value="#ad76ea"/>
+				<Setter Property="Height" Value="3"/>
+			</Style>
+			<Style Selector="^ /template/ Track #PART_IncreaseButton Border">
+				<Setter Property="Background" Value="#5f5f5f"/>
+				<Setter Property="Height" Value="3"/>
+			</Style>
+			<Style Selector="^ /template/ Track Thumb">
+				<Setter Property="Background" Value="#ba96e3"/>
+			</Style>
+			<Style Selector="^:disabled /template/ Track #PART_DecreaseButton Border">
+				<Setter Property="Background" Value="#555555"/>
+			</Style>
+			<Style Selector="^:disabled /template/ Track Thumb">
+				<Setter Property="Background" Value="#555555"/>
+			</Style>
+		</Style>
+	</UserControl.Styles>
 
-
-
-	<StackPanel Width="240" >
-		<Border Background="#80DCDCDC" x:Name="HistogramPlotPanel">
-			<ScottPlot:AvaPlot   x:Name="HistogramPlot" VerticalAlignment="Top" Margin="0 -10 0 0"  Height="140" Width="260" Name="AvaPlot1"/>
-
+	<StackPanel Width="256" Spacing="4">
+		<Border x:Name="HistogramPlotPanel" CornerRadius="4" ClipToBounds="True">
+			<ScottPlot:AvaPlot x:Name="HistogramPlot" Height="130"/>
 		</Border>
-		<Border Margin="0 -20 0 0"  x:Name="SliderMinPanel">
-			<StackPanel>
-			<StackPanel Margin="0 0 100 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="180" Height="40" >
-				<TextBlock FontSize="10" Width="" HorizontalAlignment="Left" Opacity="1" Foreground="Black" VerticalAlignment="Center">Min value </TextBlock>
-				<Slider   IsEnabled="{Binding !IsAutoContrastEnabled}" x:Name="MinSlider" Minimum="0" Maximum="{Binding SliderMaximum}" Value="{Binding Min_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
+
+		<Border x:Name="SliderMinPanel">
+			<Grid ColumnDefinitions="30,*" RowDefinitions="Auto,Auto">
+				<TextBlock Grid.Column="0" Classes="contrast-label" Text="Min"/>
+				<Slider Grid.Column="1" Classes="contrast" x:Name="MinSlider"
+				        IsEnabled="{Binding !IsAutoContrastEnabled}"
+				        Minimum="0" Maximum="{Binding SliderMaximum}"
+				        Value="{Binding Min_disp_val, Mode=TwoWay}">
 					<Slider.Resources>
 						<x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
 						<x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
-
 					</Slider.Resources>
-
-					<Slider.Styles>					
-						<Style Selector="Slider:horizontal">
-							<Style Selector="^ Track">
-								<Style Selector="^ #PART_DecreaseButton Border">
-									<Setter Property="Background" Value="#ad76ea"/>
-									<Setter Property="Height" Value="2"/>
-								</Style>
-								<Style Selector="^ #PART_DecreaseButton Border:disabled">
-									<Setter Property="Background" Value="#2e2e2e"/>
-									<Setter Property="Height" Value="2"/>
-								</Style>
-								<Style Selector="^ Thumb">
-									<Setter Property="Background" Value="#ad76ea"/>
-								</Style>
-								<Style Selector="^ Thumb:disabled">
-									<Setter Property="Background" Value="#2e2e2e"/>
-								</Style>
-							</Style>
-						</Style>
-					</Slider.Styles>
 				</Slider>
-
-				
-				
-			</StackPanel>
-			<StackPanel Width="170" Margin="55 -15 20 0" Orientation="Horizontal">
-				<Grid Margin="0 0 0 0" ColumnDefinitions="136.5,40">
-
-					<TextBlock Grid.Column="0" HorizontalAlignment="Left" FontSize="10" Opacity="1" Foreground="Black"  Margin="0 0 0 0"> 0</TextBlock>
-					<TextBlock Grid.Column="1"  HorizontalAlignment="Right"  FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding SliderMaximum}">  </TextBlock>
+				<Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,*" Margin="4 -8 4 0">
+					<TextBlock Grid.Column="0" Classes="contrast-range" Text="0"/>
+					<TextBlock Grid.Column="1" Classes="contrast-range" HorizontalAlignment="Right" Text="{Binding SliderMaximum}"/>
 				</Grid>
-
-			</StackPanel>
-			</StackPanel>
-		</Border>
-		
-		
-		<Border Margin="0 -10 0 0" x:Name="SliderMaxPanel">
-			<StackPanel>
-
-				<StackPanel Grid.Column="2" Margin="30 0 0 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="300" Height="40" >
-					<TextBlock Width="" FontSize="10" Opacity="1" Foreground="Black"  VerticalAlignment="Center">Max value </TextBlock>
-					<Slider IsEnabled="{Binding !IsAutoContrastEnabled}"  x:Name="MaxSlider" Minimum="0" Maximum="{Binding SliderMaximum}" Value="{Binding Max_disp_val, Mode=TwoWay}" VerticalAlignment="Center" Margin="10 0 0 0"  Width="180">
-						<Slider.Resources>
-							<x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
-							<x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
-
-						</Slider.Resources>
-
-						<Slider.Styles>					
-							<Style Selector="Slider:horizontal">
-								<Style Selector="^ Track">
-									<Style Selector="^ #PART_DecreaseButton Border">
-										<Setter Property="Background" Value="#ad76ea"/>
-										<Setter Property="Height" Value="2"/>
-									</Style>
-									<Style Selector="^ #PART_DecreaseButton Border:disabled">
-										<Setter Property="Background" Value="#2e2e2e"/>
-										<Setter Property="Height" Value="2"/>
-									</Style>
-									<Style Selector="^ Thumb">
-										<Setter Property="Background" Value="#ad76ea"/>
-									</Style>
-									<Style Selector="^ Thumb:disabled">
-										<Setter Property="Background" Value="#2e2e2e"/>
-									</Style>
-								</Style>
-							</Style>
-						</Slider.Styles>
-					</Slider>
-				</StackPanel>
-				
-				
-				<StackPanel Width="170" Margin="55 -45 20 0" Orientation="Horizontal">
-					<Grid Margin="0 30 0 0" ColumnDefinitions="145,40">
-					<TextBlock  HorizontalAlignment="Left"  Grid.Column="0" FontSize="10" Opacity="1" Foreground="Black"  >  0</TextBlock>
-					<TextBlock  HorizontalAlignment="Left" Grid.Column="1" FontSize="10" Opacity="1" Foreground="Black"  Text="{Binding SliderMaximum}">  </TextBlock>
-					</Grid>
-				</StackPanel>
-			</StackPanel>
-		</Border>
-
-		<StackPanel Grid.Column="2" Margin="30 -10 0 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="300" Height="40" >
-				<Grid ColumnDefinitions="30,110,30,70">
-					<TextBlock FontSize="10" Opacity="1" Foreground="Black"  Grid.Column="0"  HorizontalAlignment="Left" VerticalAlignment="Center"> Min: </TextBlock>
-					<NumericUpDown HorizontalAlignment="Left" Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}"  Height="20" TextElement.FontSize="12"   Grid.Column="1" Minimum="0" Maximum="{Binding SliderMaximum}" Increment="1" Value="{Binding Min_disp_val, Mode=TwoWay}" >  </NumericUpDown>
-
-					<TextBlock FontSize="10" Opacity="1" Foreground="Black"  Grid.Column="2"  HorizontalAlignment="Left" VerticalAlignment="Center"> Max: </TextBlock>
-					<NumericUpDown Width="75" Classes="custom-numeric-style" IsEnabled="{Binding !IsAutoContrastEnabled}" Grid.Column="3"    Height="18" TextElement.FontSize="12"   Maximum="{Binding SliderMaximum}" Minimum="0" Increment="1" Value="{Binding Max_disp_val, Mode=TwoWay}" >  </NumericUpDown>
-				</Grid>
-
-		</StackPanel>
-		<Border  x:Name="AutoContrastPanel">
-
-			<StackPanel   Grid.Column="2" Margin="60 -10 0 0" VerticalAlignment="Top" Orientation="Horizontal"  Width="300" Height="40" >
-			<Grid ColumnDefinitions="100,130">
-				<TextBlock FontSize="10" Opacity="1" Foreground="Black"  Grid.Column="0"  HorizontalAlignment="Left" VerticalAlignment="Center"> Auto contrast: </TextBlock>
-				<ToggleSwitch    Grid.Column="1" IsChecked="{Binding IsAutoContrastEnabled}" > </ToggleSwitch>
-
 			</Grid>
-
-		</StackPanel>
 		</Border>
 
+		<Border x:Name="SliderMaxPanel">
+			<Grid ColumnDefinitions="30,*" RowDefinitions="Auto,Auto">
+				<TextBlock Grid.Column="0" Classes="contrast-label" Text="Max"/>
+				<Slider Grid.Column="1" Classes="contrast" x:Name="MaxSlider"
+				        IsEnabled="{Binding !IsAutoContrastEnabled}"
+				        Minimum="0" Maximum="{Binding SliderMaximum}"
+				        Value="{Binding Max_disp_val, Mode=TwoWay}">
+					<Slider.Resources>
+						<x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
+						<x:Double x:Key="SliderHorizontalThumbHeight">10</x:Double>
+					</Slider.Resources>
+				</Slider>
+				<Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,*" Margin="4 -8 4 0">
+					<TextBlock Grid.Column="0" Classes="contrast-range" Text="0"/>
+					<TextBlock Grid.Column="1" Classes="contrast-range" HorizontalAlignment="Right" Text="{Binding SliderMaximum}"/>
+				</Grid>
+			</Grid>
+		</Border>
 
+		<Grid ColumnDefinitions="30,*,30,*" ColumnSpacing="4" Margin="0 4 0 0">
+			<TextBlock Grid.Column="0" Classes="contrast-label" Text="Min"/>
+			<NumericUpDown Grid.Column="1" Classes="custom-numeric-style" Height="20"
+			               IsEnabled="{Binding !IsAutoContrastEnabled}"
+			               Minimum="0" Maximum="{Binding SliderMaximum}" Increment="1"
+			               Value="{Binding Min_disp_val, Mode=TwoWay}"/>
+			<TextBlock Grid.Column="2" Classes="contrast-label" Text="Max" Margin="6 0 0 0"/>
+			<NumericUpDown Grid.Column="3" Classes="custom-numeric-style" Height="20"
+			               IsEnabled="{Binding !IsAutoContrastEnabled}"
+			               Minimum="0" Maximum="{Binding SliderMaximum}" Increment="1"
+			               Value="{Binding Max_disp_val, Mode=TwoWay}"/>
+		</Grid>
 
+		<Border x:Name="AutoContrastPanel">
+			<Grid ColumnDefinitions="*,Auto">
+				<TextBlock Grid.Column="0" Classes="contrast-label" Text="Auto contrast"/>
+				<ToggleSwitch Grid.Column="1" OnContent="" OffContent="" MinWidth="0"
+				              IsChecked="{Binding IsAutoContrastEnabled}"/>
+			</Grid>
+		</Border>
 	</StackPanel>
-
-
-
-
 </UserControl>

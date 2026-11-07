@@ -5,6 +5,7 @@ using ImagerAvalonia.ViewModels;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 
 namespace ImagerAvalonia.Views
 {
@@ -25,6 +26,8 @@ namespace ImagerAvalonia.Views
         /// Double-click a tile to maximize, double-click again (or Esc, routed by
         /// the hosting view) to restore.</summary>
         private ImageCanvas? _maximizedTile;
+        private int _maximizedTileRow;
+        private int _maximizedTileColumn;
 
         public ImageCanvas? SelectedImage { get; private set; }
 
@@ -93,6 +96,7 @@ namespace ImagerAvalonia.Views
                     DataContext = slot
                 };
                 tile.PointerPressed += Tile_OnPointerPressed;
+                tile.PointerEntered += Tile_OnPointerEntered;
                 tile.DoubleTapped += Tile_OnDoubleTapped;
                 Grid.SetColumn(tile, index % columnCount);
                 Grid.SetRow(tile, index / columnCount);
@@ -117,6 +121,21 @@ namespace ImagerAvalonia.Views
             }
         }
 
+        private void Tile_OnPointerEntered(object? sender, PointerEventArgs e)
+        {
+            if (sender is not ImageCanvas tile || tile.HasRegionSelection) return;
+
+            var source = _imageData.Values.FirstOrDefault(t => t is not null && t.HasRegionSelection);
+            if (source is null) return;
+
+            source.MoveRegionSelectionTo(tile);
+            SelectedImage = tile;
+            if (tile.DataContext is ImageCanvasViewModel slot)
+            {
+                OnSelectedItemChanged?.Invoke(this, slot);
+            }
+        }
+
         private void Tile_OnDoubleTapped(object? sender, TappedEventArgs e)
         {
             if (sender is ImageCanvas tile)
@@ -135,6 +154,10 @@ namespace ImagerAvalonia.Views
                     {
                         child.IsVisible = ReferenceEquals(child, tile);
                     }
+                    _maximizedTileRow = Grid.GetRow(tile);
+                    _maximizedTileColumn = Grid.GetColumn(tile);
+                    Grid.SetRow(tile, 0);
+                    Grid.SetColumn(tile, 0);
                     Grid.SetRowSpan(tile, Math.Max(1, RowDefinitions.Count));
                     Grid.SetColumnSpan(tile, Math.Max(1, ColumnDefinitions.Count));
                     _maximizedTile = tile;
@@ -149,6 +172,8 @@ namespace ImagerAvalonia.Views
             if (_maximizedTile == null) return;
             Grid.SetRowSpan(_maximizedTile, 1);
             Grid.SetColumnSpan(_maximizedTile, 1);
+            Grid.SetRow(_maximizedTile, _maximizedTileRow);
+            Grid.SetColumn(_maximizedTile, _maximizedTileColumn);
             foreach (var child in Children)
             {
                 child.IsVisible = true;

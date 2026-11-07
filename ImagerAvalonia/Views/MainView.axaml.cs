@@ -176,6 +176,28 @@ public partial class MainView : UserControl
         
     }
 
+    private async void OnOpenImageRequested(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } topLevel) return;
+        if (this.FindControl<ImageControlPanelView>("ImageControlView")?.DataContext is not ImageControlPanelViewModel imageControlVM) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open image",
+            AllowMultiple = true,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("TIFF images") { Patterns = new[] { "*.tif", "*.tiff" } },
+                FilePickerFileTypes.All
+            }
+        });
+
+        foreach (var file in files)
+        {
+            imageControlVM.OpenFileInNewTab(file.Path.ToString());
+        }
+    }
+
     private void OnSplittingRequested(object? sender, RoutedEventArgs e)
     {
         if (this.FindControl<ImageControlPanelView>("ImageControlView") is ImageControlPanelView imageControl)

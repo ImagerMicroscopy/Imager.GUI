@@ -17,7 +17,7 @@
 
     <StackPanel Margin="0 -10 0 0"  Width="280" Orientation="Vertical" Spacing="5">
        <Grid Margin="30 0 0 0" ColumnDefinitions="20,180">
-       <TextBlock ClipToBounds="False" Foreground="Black" Grid.Column="0" Text="Red" FontSize="10"></TextBlock>
+       <TextBlock ClipToBounds="False" Foreground="#dddddd" Grid.Column="0" Text="Red" FontSize="10"></TextBlock>
        <rs:RangeSlider  Grid.Column="1" MoveWholeRange="True" TickFrequency="1" IsSnapToTickEnabled="True" Width="180" LowerSelectedValue="{Binding RedValueMin}" UpperSelectedValue="{Binding RedValueMax}" Orientation="Horizontal" Minimum="0" Maximum="65536" IsThumbOverlap="True">
             <rs:RangeSlider.Resources>
 				    <x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
@@ -58,13 +58,13 @@
         </Grid>
 
         <Grid Margin="10 -20 0 0" HorizontalAlignment="Center"  ColumnDefinitions="35,140,35">
-            <TextBlock Foreground="Black" Grid.Column="0" Text="{Binding RedValueMin}" FontSize="8"></TextBlock>
-            <TextBlock Foreground="Black" Grid.Column="2" Text="{Binding RedValueMax}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="0" Text="{Binding RedValueMin}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="2" Text="{Binding RedValueMax}" FontSize="8"></TextBlock>
         </Grid>
     </StackPanel>
      <StackPanel  Margin="0 -10 0 0"   Width="280" Orientation="Vertical" Spacing="5">
        <Grid Margin="30 0 0 0" ColumnDefinitions="20,180">
-       <TextBlock ClipToBounds="False" Foreground="Black" Grid.Column="0" Text="Green" FontSize="10"></TextBlock>
+       <TextBlock ClipToBounds="False" Foreground="#dddddd" Grid.Column="0" Text="Green" FontSize="10"></TextBlock>
        <rs:RangeSlider  Grid.Column="1" MoveWholeRange="True" TickFrequency="1" IsSnapToTickEnabled="True"  Width="180" LowerSelectedValue="{Binding GreenValueMin}" UpperSelectedValue="{Binding GreenValueMax}" Orientation="Horizontal" Minimum="0" Maximum="65536" IsThumbOverlap="True">
             <rs:RangeSlider.Resources>
 				    <x:Double x:Key="SliderHorizontalThumbWidth">10</x:Double>
@@ -105,13 +105,13 @@
         </Grid>
 
         <Grid Margin="10 -20 0 0" HorizontalAlignment="Center"  ColumnDefinitions="35,140,35">
-            <TextBlock Foreground="Black" Grid.Column="0" Text="{Binding GreenValueMin}" FontSize="8"></TextBlock>
-            <TextBlock Foreground="Black" Grid.Column="2" Text="{Binding GreenValueMax}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="0" Text="{Binding GreenValueMin}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="2" Text="{Binding GreenValueMax}" FontSize="8"></TextBlock>
         </Grid>
     </StackPanel>
     <StackPanel  Margin="0 -10 0 0"   Width="280" Orientation="Vertical" Spacing="5">
        <Grid Margin="30 0 0 0" ColumnDefinitions="20,180">
-       <TextBlock ClipToBounds="False" Foreground="Black" Grid.Column="0" Text="Blue" FontSize="10"></TextBlock>
+       <TextBlock ClipToBounds="False" Foreground="#dddddd" Grid.Column="0" Text="Blue" FontSize="10"></TextBlock>
 
            <rs:RangeSlider Grid.Column="1"  MoveWholeRange="True" TickFrequency="1" IsSnapToTickEnabled="True" Width="180" LowerSelectedValue="{Binding BlueValueMin}" UpperSelectedValue="{Binding BlueValueMax}" Orientation="Horizontal" Minimum="0" Maximum="65536" IsThumbOverlap="True">
                   <rs:RangeSlider.Resources>
@@ -151,15 +151,15 @@
             </rs:RangeSlider>
         </Grid>
         <Grid Margin="10 -20 0 0" HorizontalAlignment="Center" ColumnDefinitions="35,140,35">
-            <TextBlock Foreground="Black" Grid.Column="0" Text="{Binding BlueValueMin}" FontSize="8"></TextBlock>
-            <TextBlock Foreground="Black" Grid.Column="2" Text="{Binding BlueValueMax}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="0" Text="{Binding BlueValueMin}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="2" Text="{Binding BlueValueMax}" FontSize="8"></TextBlock>
         </Grid>
 
     </StackPanel>
 
     <StackPanel  Margin="0 -10 0 0"   Width="280" Orientation="Vertical" Spacing="5">
        <Grid Margin="30 0 0 0" ColumnDefinitions="20,180">
-       <TextBlock ClipToBounds="False" Foreground="Black" Grid.Column="0" Text="Yellow" FontSize="10"></TextBlock>
+       <TextBlock ClipToBounds="False" Foreground="#dddddd" Grid.Column="0" Text="Yellow" FontSize="10"></TextBlock>
 
            <rs:RangeSlider Grid.Column="1"  MoveWholeRange="True" TickFrequency="1" IsSnapToTickEnabled="True" Width="180" LowerSelectedValue="{Binding YellowValueMin}" UpperSelectedValue="{Binding YellowValueMax}" Orientation="Horizontal" Minimum="0" Maximum="65536" IsThumbOverlap="True">
                   <rs:RangeSlider.Resources>
@@ -199,15 +199,15 @@
             </rs:RangeSlider>
         </Grid>
         <Grid Margin="10 -20 0 0" HorizontalAlignment="Center" ColumnDefinitions="35,140,35">
-            <TextBlock Foreground="Black" Grid.Column="0" Text="{Binding YellowValueMin}" FontSize="8"></TextBlock>
-            <TextBlock Foreground="Black" Grid.Column="2" Text="{Binding YellowValueMax}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="0" Text="{Binding YellowValueMin}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="2" Text="{Binding YellowValueMax}" FontSize="8"></TextBlock>
         </Grid>
 
     </StackPanel>
 
     <StackPanel  Margin="0 -10 0 0"   Width="280" Orientation="Vertical" Spacing="5">
        <Grid Margin="30 0 0 0" ColumnDefinitions="20,180">
-       <TextBlock ClipToBounds="False" Foreground="Black" Grid.Column="0" Text="Transmission" FontSize="10"></TextBlock>
+       <TextBlock ClipToBounds="False" Foreground="#dddddd" Grid.Column="0" Text="Transmission" FontSize="10"></TextBlock>
 
            <rs:RangeSlider Grid.Column="1"  MoveWholeRange="True" TickFrequency="1" IsSnapToTickEnabled="True" Width="180" LowerSelectedValue="{Binding TransmissionValueMin}" UpperSelectedValue="{Binding TransmissionValueMax}" Orientation="Horizontal" Minimum="0" Maximum="65536" IsThumbOverlap="True">
                   <rs:RangeSlider.Resources>
@@ -247,8 +247,8 @@
             </rs:RangeSlider>
         </Grid>
         <Grid Margin="10 -20 0 0" HorizontalAlignment="Center" ColumnDefinitions="35,140,35">
-            <TextBlock Foreground="Black" Grid.Column="0" Text="{Binding TransmissionValueMin}" FontSize="8"></TextBlock>
-            <TextBlock Foreground="Black" Grid.Column="2" Text="{Binding TransmissionValueMax}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="0" Text="{Binding TransmissionValueMin}" FontSize="8"></TextBlock>
+            <TextBlock Foreground="#dddddd" Grid.Column="2" Text="{Binding TransmissionValueMax}" FontSize="8"></TextBlock>
         </Grid>
 
     </StackPanel>

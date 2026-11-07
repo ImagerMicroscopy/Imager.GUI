@@ -21,7 +21,6 @@ namespace ImagerAvalonia.Views
             _elementCanvas = this.FindControl<Canvas>("RegionsControl")!;
             DataContext = _viewModel;
 
-            _viewModel.RegionsChanged += OnRegionsChanged;
             _viewModel.HideAllCollectionsRequested += OnHideAllCollectionsRequested; ;
 
 
@@ -54,6 +53,8 @@ namespace ImagerAvalonia.Views
         }
 
 
+        internal bool IsSelecting => _selectedRegion is not null;
+
         internal void SubmitSelection()
         {
             if (_selectedRegion is null)
@@ -81,10 +82,45 @@ namespace ImagerAvalonia.Views
         {
             _selectedRegion = region;
             _elementCanvas.Children.Add(region.AddedVisualType);
+            foreach (var element in region.AddedRegions)
+            {
+                _elementCanvas.Children.Add(element);
+            }
 
             _elementCanvas.PointerMoved += region.OnDotPointerMoved;
             _elementCanvas.PointerPressed += region.OnPointerPressed;
             _elementCanvas.KeyDown += region.ElementKeyDown;
+        }
+
+        internal ImageElementControlBase? DetachSelection()
+        {
+            if (_selectedRegion is null)
+                return null;
+
+            var region = _selectedRegion;
+            _elementCanvas.PointerMoved -= region.OnDotPointerMoved;
+            _elementCanvas.PointerPressed -= region.OnPointerPressed;
+            _elementCanvas.KeyDown -= region.ElementKeyDown;
+
+            _elementCanvas.Children.Remove(region.AddedVisualType);
+            foreach (var element in region.AddedRegions)
+            {
+                _elementCanvas.Children.Remove(element);
+            }
+
+            _selectedRegion = null;
+            return region;
+        }
+
+        protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnAttachedToVisualTree(e);
+            _viewModel.RegionsChanged -= OnRegionsChanged;
+            _viewModel.RegionsChanged += OnRegionsChanged;
+            if (_selectedRegion is null)
+            {
+                OnRegionsChanged(this, _viewModel.RegionParameters);
+            }
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

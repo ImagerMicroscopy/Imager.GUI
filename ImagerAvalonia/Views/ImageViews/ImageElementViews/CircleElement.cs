@@ -133,7 +133,7 @@ namespace ImagerAvalonia.Views.ImageViews
                 Width = Radius,
                 Height = Radius,
                 Stroke = new SolidColorBrush(Color),
-                StrokeThickness = 2,
+                StrokeThickness = 3,
                 ZIndex = 2,
                 Tag = RegionParameterName
 
@@ -201,11 +201,7 @@ namespace ImagerAvalonia.Views.ImageViews
         }
 
         private SolidColorBrush GenerateRandomBrush() =>
-            new(Avalonia.Media.Color.FromRgb(
-                (byte)_random.Next(256),
-                (byte)_random.Next(256),
-                (byte)_random.Next(256))
-            );
+            new(new Avalonia.Media.HsvColor(1.0, _random.NextDouble() * 360.0, 0.85, 1.0).ToRgb());
 
         public override void OnDotPointerMoved(object? sender, PointerEventArgs e)
         {
@@ -253,7 +249,7 @@ namespace ImagerAvalonia.Views.ImageViews
                 Width = AddedVisualType.Width,
                 Height = AddedVisualType.Height,
                 Stroke = GenerateRandomBrush(),
-                StrokeThickness = 2
+                StrokeThickness = 3
             };
 
             Canvas.SetLeft(newDot, position.X - newDot.Width / 2);

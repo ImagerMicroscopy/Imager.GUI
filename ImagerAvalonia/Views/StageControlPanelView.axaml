@@ -3,69 +3,102 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:ImagerAvalonia.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="250" d:DesignHeight="150"
+             mc:Ignorable="d" d:DesignWidth="250" d:DesignHeight="200"
              x:Class="ImagerAvalonia.Views.StageControlPanelView"
              x:DataType="vm:StageControlPanelViewModel">
 
 	<UserControl.Styles>
 		<Style Selector="Button.stage-move">
-			<Setter Property="Width" Value="26"/>
-			<Setter Property="Height" Value="26"/>
+			<Setter Property="Width" Value="32"/>
+			<Setter Property="Height" Value="32"/>
 			<Setter Property="Padding" Value="0"/>
-			<Setter Property="Margin" Value="1"/>
 			<Setter Property="FontSize" Value="11"/>
-			<Setter Property="Background" Value="Gainsboro"/>
-			<Setter Property="CornerRadius" Value="4"/>
-			<Setter Property="BorderBrush" Value="#2e2e2e"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Background">
+				<Setter.Value>
+					<LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+						<GradientStop Color="#6a6a6a" Offset="0.0"/>
+						<GradientStop Color="#575757" Offset="1.0"/>
+					</LinearGradientBrush>
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
 			<Setter Property="HorizontalContentAlignment" Value="Center"/>
 			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Effect">
+				<DropShadowEffect OffsetX="0" OffsetY="1" BlurRadius="4" Opacity="0.5" Color="Black"/>
+			</Setter>
+		</Style>
+		<Style Selector="Button.stage-move /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+		</Style>
+		<Style Selector="Button.stage-move:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background">
+				<Setter.Value>
+					<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+						<GradientStop Color="#ba96e3" Offset="0.0"/>
+						<GradientStop Color="#ad76ea" Offset="1.0"/>
+					</LinearGradientBrush>
+				</Setter.Value>
+			</Setter>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+		<Style Selector="Button.stage-move:pressed /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#8d56ca"/>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+		<Style Selector="TextBlock.stage-header">
+			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0 0 0 4"/>
 		</Style>
 		<Style Selector="TextBlock.stage-label">
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="FontSize" Value="16"/>
 			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="Margin" Value="0 12 0 2"/>
 		</Style>
 	</UserControl.Styles>
 
 	<Grid>
-		<!-- The available hardware is fixed at startup; when no motorized
-		     stage was found the controls are hidden entirely. -->
 		<TextBlock Text="No motorized stage found."
 		           FontSize="12" Foreground="White"
 		           HorizontalAlignment="Center" VerticalAlignment="Center"
 		           IsVisible="{Binding !IsStageAvailable}"/>
 
-		<StackPanel Orientation="Horizontal" IsVisible="{Binding IsStageAvailable}"
-		            HorizontalAlignment="Center" Margin="0 4 0 2">
+		<Grid IsVisible="{Binding IsStageAvailable}"
+		      ColumnDefinitions="120,10,110" RowDefinitions="Auto,Auto,Auto,Auto"
+		      HorizontalAlignment="Center" Margin="0 6 0 6">
 
-			<!-- XY movement -->
-			<StackPanel Margin="0 0 12 0">
-				<Grid ColumnDefinitions="Auto,Auto,Auto" RowDefinitions="Auto,Auto,Auto">
-					<Button Classes="stage-move" Grid.Row="0" Grid.Column="1" Command="{Binding MoveNorth}"> ▲ </Button>
-					<Button Classes="stage-move" Grid.Row="1" Grid.Column="0" Command="{Binding MoveWest}"> ◀ </Button>
-					<Button Classes="stage-move" Grid.Row="1" Grid.Column="2" Command="{Binding MoveEast}"> ▶ </Button>
-					<Button Classes="stage-move" Grid.Row="2" Grid.Column="1" Command="{Binding MoveSouth}"> ▼ </Button>
-				</Grid>
-				<TextBlock Classes="stage-label" FontSize="10" Text="XY step (μm)" Margin="0 4 0 1"/>
-				<NumericUpDown Classes="custom-numeric-style" Minimum="0" Width="92"
-				               Value="{Binding XYStep, TargetNullValue=0.0, FallbackValue=0.0}"/>
-			</StackPanel>
+			<TextBlock Grid.Row="0" Grid.Column="0" Classes="stage-header" Text="XY"/>
+			<Grid Grid.Row="1" Grid.Column="0" HorizontalAlignment="Center"
+			      ColumnDefinitions="32,32,32" RowDefinitions="32,32,32"
+			      ColumnSpacing="3" RowSpacing="3">
+				<Button Classes="stage-move" Grid.Row="0" Grid.Column="1" Command="{Binding MoveNorth}">▲</Button>
+				<Button Classes="stage-move" Grid.Row="1" Grid.Column="0" Command="{Binding MoveWest}">◀</Button>
+				<Button Classes="stage-move" Grid.Row="1" Grid.Column="2" Command="{Binding MoveEast}">▶</Button>
+				<Button Classes="stage-move" Grid.Row="2" Grid.Column="1" Command="{Binding MoveSouth}">▼</Button>
+			</Grid>
+			<TextBlock Grid.Row="2" Grid.Column="0" Classes="stage-label" Text="XY step (μm)"/>
+			<NumericUpDown Grid.Row="3" Grid.Column="0" Classes="custom-numeric-style"
+			               Minimum="0" Width="120" HorizontalAlignment="Center"
+			               Value="{Binding XYStep, TargetNullValue=0.0, FallbackValue=0.0}"/>
 
-			<!-- Z movement: the up/down buttons are centered above the
-			     step spinner, at the same height as the XY pad. -->
-			<StackPanel>
-				<Panel Height="84">
-					<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-						<Button Classes="stage-move" Command="{Binding MoveUp}"> ▲ </Button>
-						<Button Classes="stage-move" Command="{Binding MoveDown}"> ▼ </Button>
-					</StackPanel>
-				</Panel>
-				<TextBlock Classes="stage-label" FontSize="10" Text="Z step (μm)" Margin="0 4 0 1"/>
-				<NumericUpDown Classes="custom-numeric-style" Minimum="0" Width="92"
-				               Value="{Binding ZStep, TargetNullValue=0.0, FallbackValue=0.0}"/>
-			</StackPanel>
-
-		</StackPanel>
+			<TextBlock Grid.Row="0" Grid.Column="2" Classes="stage-header" Text="Z"/>
+			<Grid Grid.Row="1" Grid.Column="2" HorizontalAlignment="Center"
+			      RowDefinitions="32,32,32" RowSpacing="3">
+				<Button Classes="stage-move" Grid.Row="0" Command="{Binding MoveUp}">▲</Button>
+				<Button Classes="stage-move" Grid.Row="2" Command="{Binding MoveDown}">▼</Button>
+			</Grid>
+			<TextBlock Grid.Row="2" Grid.Column="2" Classes="stage-label" Text="Z step (μm)"/>
+			<NumericUpDown Grid.Row="3" Grid.Column="2" Classes="custom-numeric-style"
+			               Minimum="0" Width="110" HorizontalAlignment="Center"
+			               Value="{Binding ZStep, TargetNullValue=0.0, FallbackValue=0.0}"/>
+		</Grid>
 	</Grid>
 
 </UserControl>

@@ -25,18 +25,14 @@
 	    <ItemsControl Background="Transparent" ItemsSource="{Binding AvailableChannels}">
             <ItemsControl.ItemTemplate>
 				<DataTemplate>
-                    <StackPanel Orientation="Vertical">
-                        <TextBlock Foreground="Black" Text="{Binding ChannelName}" FontSize="14"> </TextBlock>
-                        <StackPanel Margin="-50 0 0 0" Width="200" Orientation="Horizontal" Spacing="140">
-			                <Button Foreground="Black" Command="{Binding OnChannelAdded}" Width="40" Height="25"  HorizontalAlignment="Left"  FontSize="12"  >
-				                Add
-			                </Button>
-			                <Button  Foreground="Black" Command="{Binding OnChannelRemoved}" Width="65" Height="25"   HorizontalAlignment="Right"  FontSize="12"  >
-				                Remove
-			                </Button>
-		                </StackPanel>
-                         <ContentControl Margin="0 4 0 0" IsVisible="{Binding IsEnabled}" Content="{Binding ConfigChannelViewModel}" />
-
+                    <StackPanel Orientation="Vertical" Margin="0 0 0 8">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="4">
+                            <TextBlock Grid.Column="0" Foreground="White" FontSize="13"
+                                       VerticalAlignment="Center" Text="{Binding ChannelName}"/>
+                            <Button Grid.Column="1" Command="{Binding OnChannelAdded}" Width="50" FontSize="11">Add</Button>
+                            <Button Grid.Column="2" Command="{Binding OnChannelRemoved}" Width="60" FontSize="11">Remove</Button>
+                        </Grid>
+                        <ContentControl Margin="0 4 0 0" IsVisible="{Binding IsEnabled}" Content="{Binding ConfigChannelViewModel}" />
                     </StackPanel>
 				</DataTemplate>
 			</ItemsControl.ItemTemplate>

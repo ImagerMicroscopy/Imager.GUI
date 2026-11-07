@@ -31,7 +31,10 @@ namespace ImagerAvalonia.Views.MultiChannelView
 
         private readonly ScaleTransform _scaleTransform = new(1, 1);
         private readonly TranslateTransform _translateTransform = new(0, 0);
+        private const double DragThreshold = 4.0;
         private bool _isPanning;
+        private bool _leftDragPending;
+        private Point _pressPosition;
         private Point _lastPanPosition;
 
         private static readonly Dictionary<string, int> _channelMaps = new Dictionary<string, int>()
@@ -84,7 +87,11 @@ namespace ImagerAvalonia.Views.MultiChannelView
             Grid.SetRow(_multiImageCanvas, 0);
             Children.Add(_multiImageCanvas);
 
-            // Reset the pan/zoom surface for the new measurement.
+            ResetZoomAndPan();
+        }
+
+        public void ResetZoomAndPan()
+        {
             _scaleTransform.ScaleX = 1;
             _scaleTransform.ScaleY = 1;
             _translateTransform.X = 0;
@@ -109,19 +116,44 @@ namespace ImagerAvalonia.Views.MultiChannelView
 
         private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+            var point = e.GetCurrentPoint(this);
+            if (point.Properties.IsMiddleButtonPressed)
             {
                 _isPanning = true;
                 _lastPanPosition = e.GetPosition(this);
+                e.Pointer.Capture(this);
                 e.Handled = true;
+            }
+            else if (point.Properties.IsLeftButtonPressed)
+            {
+                _leftDragPending = true;
+                _pressPosition = e.GetPosition(this);
             }
         }
 
         private void OnPointerMoved(object? sender, PointerEventArgs e)
         {
+            var position = e.GetPosition(this);
+
+            if (_leftDragPending)
+            {
+                if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                {
+                    _leftDragPending = false;
+                    return;
+                }
+                var moved = position - _pressPosition;
+                if (Math.Abs(moved.X) < DragThreshold && Math.Abs(moved.Y) < DragThreshold) return;
+
+                _leftDragPending = false;
+                _isPanning = true;
+                _lastPanPosition = _pressPosition;
+                e.Pointer.Capture(this);
+                Cursor = new Cursor(StandardCursorType.SizeAll);
+            }
+
             if (!_isPanning) return;
 
-            var position = e.GetPosition(this);
             _translateTransform.X += position.X - _lastPanPosition.X;
             _translateTransform.Y += position.Y - _lastPanPosition.Y;
             _lastPanPosition = position;
@@ -130,9 +162,12 @@ namespace ImagerAvalonia.Views.MultiChannelView
 
         private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
         {
+            _leftDragPending = false;
             if (_isPanning)
             {
                 _isPanning = false;
+                e.Pointer.Capture(null);
+                Cursor = Cursor.Default;
                 e.Handled = true;
             }
         }

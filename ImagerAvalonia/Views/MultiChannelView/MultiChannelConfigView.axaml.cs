@@ -13,7 +13,7 @@ public partial class MultiChannelConfigView : UserControl
     public MultiChannelConfigView(ILifetimeScope scope)
     {
         InitializeComponent();
-        DataContext = new MultiChannelViewModel();
+        DataContext = scope.ResolveOptional<MultiChannelViewModel>() ?? new MultiChannelViewModel();
     }
     private void InitializeComponent()
     {

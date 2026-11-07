@@ -25,6 +25,24 @@ public partial class ExperimentalPanelViewControl : UserControl
 
     public event EventHandler<MeasurementElementViewModel>? DetectionDoubleTapped;
 
+    public static readonly StyledProperty<bool> IsEditableProperty =
+        AvaloniaProperty.Register<ExperimentalPanelViewControl, bool>(nameof(IsEditable), true);
+
+    public bool IsEditable
+    {
+        get => GetValue(IsEditableProperty);
+        set => SetValue(IsEditableProperty, value);
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsEditableProperty)
+        {
+            Classes.Set("readonly", !IsEditable);
+        }
+    }
+
     public ExperimentalPanelViewControl(ExperimentalPanelViewModel expViewModel)
     {
         DataContext = expViewModel;
@@ -212,7 +230,7 @@ public partial class ExperimentalPanelViewControl : UserControl
 
     public void OnNodeDragOver(object sender, DragEventArgs e)
     {
-        if (!TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
+        if (!IsEditable || !TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
             || !IsValidDrop(draggedNode, destNode, zone))
         {
             e.DragEffects = DragDropEffects.None;
@@ -233,7 +251,7 @@ public partial class ExperimentalPanelViewControl : UserControl
     {
         ShowDropFeedback(null, DropZone.Nest);
 
-        if (!TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
+        if (!IsEditable || !TryGetDrop(sender, e, out var card, out var draggedNode, out var destNode, out var zone)
             || !IsValidDrop(draggedNode, destNode, zone))
         {
             return;

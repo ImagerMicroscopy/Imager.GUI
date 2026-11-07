@@ -56,6 +56,7 @@
 	<DockPanel>
 	<Menu DockPanel.Dock="Top">
 		<MenuItem Header="_Imager">
+		<MenuItem Header="_Open image..." Click="OnOpenImageRequested"/>
 		<Separator/>
 		<MenuItem Header="_Exit" Click="OnExitRequested"/>
 		</MenuItem>
@@ -119,7 +120,8 @@
 								<RowDefinition Height="Auto" />
 							</Grid.RowDefinitions>
 						<ScrollViewer Grid.Row="0" x:Name="ExperimentsScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-							<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}" Width="270">
+							<StackPanel Width="270">
+								<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}">
 								<Border
 									CornerRadius="5"
 									BorderBrush="Transparent"
@@ -181,10 +183,12 @@
 											Remove
 										</Button>
 								</StackPanel>
+								</StackPanel>
 								<Border  Margin="0 5 2 0" BorderThickness="0 1 0 0" Width="250" BorderBrush="Gray">
 									
 								</Border>
 								<views:ExperimentalPanelViewControl Margin="0 5 0 0"  Padding="0" HorizontalAlignment="Left" Width="270"  x:Name="ExperimentalPanelViewControl"
+											 IsEditable="{ReflectionBinding #ExperimentsScroller.DataContext.IsEnableExperimentalPanel}"
 											 DataContext="{Binding SelectedExperiment}"/>
 							</StackPanel>
 							</ScrollViewer>

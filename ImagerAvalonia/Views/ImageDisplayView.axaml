@@ -11,134 +11,161 @@
              x:DataType="vm:ImageDisplayViewModel"
 			 DragDrop.AllowDrop="True">
 
-
+	<UserControl.Styles>
+		<Style Selector="StackPanel#imageControls Button, StackPanel#imageControls ToggleButton">
+			<Setter Property="Width" Value="32"/>
+			<Setter Property="Height" Value="32"/>
+			<Setter Property="Padding" Value="3"/>
+			<Setter Property="Background" Value="Gainsboro"/>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="StackPanel#imageControls Button /template/ ContentPresenter#PART_ContentPresenter, StackPanel#imageControls ToggleButton /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+		</Style>
+		<Style Selector="StackPanel#imageControls Button:pointerover /template/ ContentPresenter#PART_ContentPresenter, StackPanel#imageControls ToggleButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#ba96e3"/>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+		</Style>
+		<Style Selector="StackPanel#imageControls ToggleButton:checked /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#ad76ea"/>
+			<Setter Property="BorderBrush" Value="#2b2b2b"/>
+		</Style>
+		<Style Selector="ToggleButton.dock-toggle">
+			<Setter Property="Height" Value="21"/>
+			<Setter Property="Padding" Value="10 0"/>
+			<Setter Property="Margin" Value="4 0 0 0"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Background" Value="#5a5a5a"/>
+			<Setter Property="BorderBrush" Value="#2e2e2e"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+			<Setter Property="VerticalContentAlignment" Value="Center"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+		<Style Selector="ToggleButton.dock-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#6a6a6a"/>
+			<Setter Property="BorderBrush" Value="#2e2e2e"/>
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+		<Style Selector="ToggleButton.dock-toggle:disabled /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#4a4a4a"/>
+			<Setter Property="BorderBrush" Value="#3a3a3a"/>
+			<Setter Property="Foreground" Value="#808080"/>
+		</Style>
+		<Style Selector="ToggleButton.dock-toggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#ad76ea"/>
+			<Setter Property="BorderBrush" Value="#2e2e2e"/>
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+		<Style Selector="Border.dock-card">
+			<Setter Property="Width" Value="300"/>
+			<Setter Property="Margin" Value="0 0 6 6"/>
+			<Setter Property="Background" Value="#F02b2b2b"/>
+			<Setter Property="BoxShadow" Value="0 4 12 2 #80000000"/>
+			<Setter Property="BorderBrush" Value="#5f5f5f"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="5"/>
+			<Setter Property="ClipToBounds" Value="True"/>
+			<Setter Property="VerticalAlignment" Value="Bottom"/>
+		</Style>
+		<Style Selector="Border.dock-card Button">
+			<Setter Property="Height" Value="20"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Padding" Value="6 0"/>
+			<Setter Property="FontSize" Value="11"/>
+		</Style>
+		<Style Selector="Border.dock-card Button /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+		</Style>
+		<Style Selector="Border.dock-card-header">
+			<Setter Property="Background" Value="Gray"/>
+			<Setter Property="Padding" Value="8 4"/>
+		</Style>
+		<Style Selector="Border.dock-card-header TextBlock">
+			<Setter Property="FontSize" Value="12"/>
+			<Setter Property="Foreground" Value="White"/>
+		</Style>
+	</UserControl.Styles>
 
 	<Grid>
 		<Grid.RowDefinitions>
 			<RowDefinition Height="*" />
 			<RowDefinition Height="Auto"/>
 		</Grid.RowDefinitions>
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="*" />
+		</Grid.ColumnDefinitions>
 
-		<!-- Image area: hosts the tile grid (or the multi-channel composite view).
-		     A Grid (not a plain Panel: that would arrange the grid at its desired
-		     size in the top-left corner instead of stretching it), so the tiles
-		     always fill the window. -->
-		<Grid Grid.Row="0" x:Name="ImagePanel" Background="#454545" />
+		<Grid Grid.Row="0" Grid.Column="1" x:Name="ImagePanel" Background="#454545" />
 
-		<!-- Shown when the user browses to a frame beyond what has been measured.
-		     The display keeps the last shown image; the slider's maximum covers the
-		     whole planned measurement (see ImageDisplayViewModel.IsFramePending). -->
-		<Border Grid.Row="0" ZIndex="5" IsVisible="{Binding IsFramePending}" IsHitTestVisible="False"
+		<Border Grid.Row="0" Grid.Column="1" ZIndex="5" IsVisible="{Binding IsFramePending}" IsHitTestVisible="False"
 				HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0 0 0 60"
 				Background="#B0000000" CornerRadius="5" Padding="12 6">
 			<TextBlock Text="This frame has not been measured yet" Foreground="White" FontSize="13" />
 		</Border>
 
-
-
-		<ScrollViewer     Background="{x:Null}"  Width="265" HorizontalAlignment="Right"    VerticalScrollBarVisibility="Auto">
-
-			<StackPanel IsHitTestVisible="True" Width="265" HorizontalAlignment="Right" >
-					<Border
-							BorderBrush="Black"
-							BorderThickness="2"
-							CornerRadius="5"
-							BoxShadow="5 5 10 5 Black"
-							Padding="0" Margin="0" Background="#80DCDCDC">
-
-						<StackPanel>
-							<!-- Contrast settings for the multi-channel composite. Only
-							     shown while the multi-channel view is enabled; per-image
-							     contrast settings live on each image tile. -->
-							<Expander x:Name="MultiChannelContrastExpander" IsVisible="False" IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
-								<Expander.Header>
-									<Border CornerRadius="2" Height="32" Width="300"  Background="#80DCDCDC">
-										<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" >Contrast settings</TextBlock>
-									</Border>
-								</Expander.Header>
-
-								<StackPanel>
-									<ContentControl Width="250" x:Name="MultiChannelContrastHost"> </ContentControl>
-								</StackPanel>
-
-							</Expander>
-
-							<Expander IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
-								<Expander.Header>
-									<Border Height="32" Width="300"  Background="#80DCDCDC">
-										<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" > Image elements</TextBlock>
-									</Border>
-								</Expander.Header>
-
-								<StackPanel>
-									<ContentControl Width="250" x:Name="RegionContent"> </ContentControl>
-								</StackPanel>
-
-							</Expander>
-
-							<Expander IsHitTestVisible="True" MinHeight="15" Width="260" Background="#80DCDCDC">
-								<Expander.Header>
-									<Border Height="32" Width="300"  Background="#80DCDCDC">
-										<TextBlock Margin="50 0 0 0"  VerticalAlignment="Center" > Multi channel viewer</TextBlock>
-									</Border>
-								</Expander.Header>
-
-								<StackPanel>
-									<ContentControl Width="250" x:Name="MultiChannelConfig"> </ContentControl>
-								</StackPanel>
-
-							</Expander>
-						   </StackPanel>
-					</Border>
-
-			</StackPanel>
-		</ScrollViewer>
-
-
-
-
-		<StackPanel Margin="0 0 0 70" VerticalAlignment="Center" HorizontalAlignment="Left"   x:Name="ImageUtilities"  Orientation="Horizontal"  Height="580" Width="10"   >
-				<Border Background="Gainsboro"
-						BorderBrush="Black"
-						BorderThickness="2"
-						CornerRadius="5"
-						BoxShadow="5 5 10 5 Black"
-						Padding="2" Margin="40" Opacity="0.5">
-					<StackPanel x:Name="imageControls" Orientation="Vertical">
-
-
-
-						<Button x:Name="selectDotButton"  Background="LightGray" Click="OnDotToggled" ToolTip.Tip="Select ROI's. Press once on top of image to add ROI. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection."  VerticalAlignment="Top" Width="30" Height="30">
-							<Button.Content>
-								<Image Width="30" Height="30" Source="/Assets/icons/circle.png"> </Image>
-							</Button.Content>
-						</Button>
-						<Button x:Name="selectLineButton"  Background="LightGray" Click="OnDotToggled" ToolTip.Tip="Line element. Press on selected image to start adding a line element. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection."  VerticalAlignment="Top" Width="30" Height="30">
-							<Button.Content>
-								<Image Width="30" Height="30" Source="/Assets/icons/line.png"> </Image>
-							</Button.Content>
-						</Button>
-						<ToggleButton BorderBrush="#2e2e2e" Background="LightGray"   Width="30" Height="30" x:Name="IsMultiViewEnabled" IsChecked="{Binding MultiViewEnabled}" ToolTip.Tip="Multi channel view. Click to enable composite multi channel view. Click again to disable."
-							VerticalAlignment="Top" Click="OnChangeToMultiChannel">
-							<ToggleButton.Content>
-								<Image Width="30" Height="30" Source="/Assets/icons/multichannel.png"> </Image>
-							</ToggleButton.Content>
-						</ToggleButton>
-
-
-					</StackPanel>
+		<Border Grid.Row="0" Grid.Column="1" ZIndex="10"
+		        HorizontalAlignment="Right" VerticalAlignment="Bottom">
+			<StackPanel Orientation="Horizontal">
+				<Border Classes="dock-card" IsVisible="{Binding #ImageElementsToggle.IsChecked}">
+					<DockPanel>
+						<Border DockPanel.Dock="Top" Classes="dock-card-header">
+							<TextBlock Text="Image elements"/>
+						</Border>
+						<ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+							<ContentControl x:Name="RegionContent" Margin="6"/>
+						</ScrollViewer>
+					</DockPanel>
 				</Border>
+				<Border Classes="dock-card" IsVisible="{Binding #MultiChannelViewerToggle.IsChecked}">
+					<DockPanel>
+						<Border DockPanel.Dock="Top" Classes="dock-card-header">
+							<TextBlock Text="Multi channel viewer"/>
+						</Border>
+						<ScrollViewer MaxHeight="460" VerticalScrollBarVisibility="Auto">
+							<StackPanel Margin="6" Spacing="6">
+								<ContentControl x:Name="MultiChannelConfig"/>
+								<StackPanel x:Name="MultiChannelContrastExpander" IsVisible="False" Spacing="4">
+									<Border BorderBrush="#5f5f5f" BorderThickness="0 1 0 0" Padding="0 6 0 0">
+										<TextBlock Text="Contrast" FontSize="12" Foreground="White"/>
+									</Border>
+									<ContentControl x:Name="MultiChannelContrastHost"/>
+								</StackPanel>
+							</StackPanel>
+						</ScrollViewer>
+					</DockPanel>
+				</Border>
+			</StackPanel>
+		</Border>
 
+		<Border Grid.Row="0" Grid.Column="0" x:Name="ImageUtilities" Width="44"
+		        Background="#3a3a3a" BorderBrush="#2e2e2e" BorderThickness="0 0 1 0">
+			<StackPanel x:Name="imageControls" Orientation="Vertical" Spacing="6" Margin="0 8 0 0">
+				<Button x:Name="selectDotButton" Click="OnDotToggled" ToolTip.Tip="Select ROI's. Press once on top of image to add ROI. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection.">
+					<Image Source="/Assets/icons/circle.png"/>
+				</Button>
+				<Button x:Name="selectLineButton" Click="OnDotToggled" ToolTip.Tip="Line element. Press on selected image to start adding a line element. Ctrl + '+' to increase size, Ctrl + '-' to decrease size. Press Enter to finish selection.">
+					<Image Source="/Assets/icons/line.png"/>
+				</Button>
+				<ToggleButton x:Name="IsMultiViewEnabled" IsChecked="{Binding MultiViewEnabled}" Click="OnChangeToMultiChannel" ToolTip.Tip="Multi channel view. Click to enable composite multi channel view. Click again to disable.">
+					<Image Source="/Assets/icons/multichannel.png"/>
+				</ToggleButton>
+			</StackPanel>
+		</Border>
 
-
-		</StackPanel>
-
-
-
-		<DockPanel Grid.Row="1" Height="25" VerticalAlignment="Bottom"  Background="Gray">
-			<Grid DockPanel.Dock="Left" ColumnDefinitions="180, *, 180" HorizontalAlignment="Stretch">
-				<Button Grid.Column="0" Height="26" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="100" BorderBrush="#2e2e2e" VerticalAlignment="Bottom" Click="OnResetView" > Reset view </Button>
-				<StackPanel ZIndex="0" Margin="70 0 0 0" x:Name="ImageProgress" Grid.Column="1"   HorizontalAlignment="Center" Orientation="Horizontal">
+		<DockPanel Grid.Row="1" Grid.ColumnSpan="2" Height="25" VerticalAlignment="Bottom"  Background="Gray">
+			<Grid DockPanel.Dock="Left" ColumnDefinitions="Auto, *, Auto" HorizontalAlignment="Stretch">
+				<StackPanel Grid.Column="0" Orientation="Horizontal">
+					<Button Height="26" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="100" BorderBrush="#2e2e2e" VerticalAlignment="Bottom" Click="OnResetView" > Reset view </Button>
+				</StackPanel>
+				<StackPanel ZIndex="0" Margin="0" x:Name="ImageProgress" Grid.Column="1"   HorizontalAlignment="Center" Orientation="Horizontal">
 					<Slider Padding="5 0 5 0" ClipToBounds="False" ZIndex="1" Height="40" Margin="0 0 0 0"  VerticalAlignment="Center" IsEnabled="{Binding !ShowLiveView}" IsVisible="{Binding !IsLiveView}"  x:Name="imageSlider" Minimum="0" TickFrequency="1" IsSnapToTickEnabled="True"  Maximum="{Binding LastFrameIndex}" Value="{Binding SelectedFrame, Mode=TwoWay}"   Width="390">
 						<Slider.Styles>
 
@@ -146,14 +173,12 @@
 								<Setter Property="MinWidth" Value="40" />
 								<Setter Property="MinHeight" Value="20" />
 
-
 								<Style Selector="^ Track">
 									<Style Selector="^ #PART_DecreaseButton Border">
 										<Setter Property="CornerRadius" Value="10 0 0 10 "/>
 										<Setter Property="Height" Value="14"/>
 										<Setter Property="Background" Value="#ad76ea"/>
 										<Setter Property="ZIndex" Value="0"/>
-
 
 									</Style>
 
@@ -164,7 +189,6 @@
 										<Setter Property="ZIndex" Value="0"/>
 
 									</Style>
-
 
 									<Style Selector="^ Thumb">
 										<Setter Property="Height" Value="10"/>
@@ -178,7 +202,6 @@
 												<ControlTemplate>
 													<Canvas ZIndex="1" ClipToBounds="False"  Width="5" Height="5">
 														<Ellipse ZIndex="1" ClipToBounds="False" Stroke="Black" StrokeThickness="1" Fill="LightGray" Width="15" Height="15" Canvas.Top="-5" Canvas.Left="-6">
-
 
 														</Ellipse>
 													</Canvas>
@@ -224,7 +247,6 @@
 													<Canvas ZIndex="1" ClipToBounds="False"  Width="5" Height="5">
 														<Ellipse ZIndex="1" ClipToBounds="False" Stroke="Black" StrokeThickness="1" Fill="DarkGray" Width="15" Height="15" Canvas.Top="-5" Canvas.Left="-6">
 
-
 														</Ellipse>
 													</Canvas>
 												</ControlTemplate>
@@ -242,23 +264,17 @@
 
 				</StackPanel>
 
-
-				<StackPanel Grid.Column="2"  VerticalAlignment="Bottom" HorizontalAlignment="Right" Orientation="Horizontal" IsVisible="{Binding !IsLiveView}">
-					<TextBlock VerticalAlignment="Center"> Stage position: </TextBlock>
-					<ComboBox Padding="3 0 3 0" MinHeight="15" Margin="2 0 0 0" FontSize="10" Height="25" SelectedItem="{Binding SelectedStagePosition}" BorderBrush="#2e2e2e" ItemsSource="{Binding AvailableStagePositions}" DisplayMemberBinding="{Binding Name}" Width="80"></ComboBox>
+				<StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 0 4 0">
+					<StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Right" Orientation="Horizontal" IsVisible="{Binding !IsLiveView}">
+						<TextBlock VerticalAlignment="Center"> Stage position: </TextBlock>
+						<ComboBox Padding="3 0 3 0" MinHeight="15" Margin="2 0 0 0" FontSize="10" Height="25" SelectedItem="{Binding SelectedStagePosition}" BorderBrush="#2e2e2e" ItemsSource="{Binding AvailableStagePositions}" DisplayMemberBinding="{Binding Name}" Width="80"></ComboBox>
+					</StackPanel>
+					<ToggleButton x:Name="ImageElementsToggle" Classes="dock-toggle" IsChecked="False" Content="Image elements"/>
+					<ToggleButton x:Name="MultiChannelViewerToggle" Classes="dock-toggle" IsChecked="False" Content="Multi channel viewer" IsEnabled="{Binding !IsLiveView}"/>
 				</StackPanel>
 			</Grid>
 		</DockPanel>
 
 	</Grid>
-
-
-
-
-
-
-
-
-
 
 </UserControl>

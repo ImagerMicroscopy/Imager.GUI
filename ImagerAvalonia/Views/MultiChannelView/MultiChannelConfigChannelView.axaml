@@ -47,7 +47,7 @@
 
 				<Grid Margin="3 0 0 0" ColumnDefinitions="150,20,20">
 
-					<TextBlock FontSize="12" Foreground="Black" Grid.Column="0" Text="Selected Detection"> </TextBlock>
+					<TextBlock FontSize="12" Foreground="#dddddd" Grid.Column="0" Text="Selected Detection"> </TextBlock>
 
 					<Button Click="OnClearDropClick"
 							FontSize="14"
@@ -72,7 +72,7 @@
 				</Grid>
 
 				<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
-					<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Acquisition" Width="80"/>
+					<TextBlock Grid.Column="0"  Foreground="#dddddd"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Acquisition" Width="80"/>
 					<ComboBox HorizontalAlignment="Right" Grid.Column="1" ItemsSource="{Binding FilteredAcquisitions}" DisplayMemberBinding="{Binding Name}" SelectedItem="{Binding AcquisitionInput}"   BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" Width="90">
 						<ComboBox.Styles>
 							<Style Selector="ComboBox ContentPresenter">
@@ -83,7 +83,7 @@
 				</Grid>
 
 				<Grid ColumnDefinitions="80,90"  Margin="20 0 0 0" Width="170">
-					<TextBlock Grid.Column="0"  Foreground="Black"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Detector" Width="80"/>
+					<TextBlock Grid.Column="0"  Foreground="#dddddd"  FontSize="8" HorizontalAlignment="Left" VerticalAlignment = "Center" Text="Detector" Width="80"/>
 					<ComboBox HorizontalAlignment="Right" Grid.Column="1" ItemsSource="{Binding DefinedDetectors}" DisplayMemberBinding="{Binding Name}" SelectedItem="{Binding DetectorInput}"  BorderThickness="0.5" FontSize="8" Padding="0" MinHeight="20" Height="20"  VerticalAlignment = "Center"  Margin="-10 0 0 0" Width="90">
 						<ComboBox.Styles>
 							<Style Selector="ComboBox ContentPresenter">

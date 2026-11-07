@@ -8,43 +8,52 @@
              x:DataType="vm:ImageCanvasViewModel">
 
 	<UserControl.Styles>
-		<!-- The header triangle rotates from "collapsed" (pointing right) to
-		     "open" (pointing down) with the toggle state. -->
-		<Style Selector="ToggleButton#ContrastToggle:checked Path">
-			<Setter Property="RenderTransform">
-				<RotateTransform Angle="90" />
-			</Setter>
+		<Style Selector="ToggleButton#ContrastToggle">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+		<Style Selector="ToggleButton#ContrastToggle /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+		<Style Selector="ToggleButton#ContrastToggle:checked /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#555555"/>
+		</Style>
+		<Style Selector="ToggleButton#ContrastToggle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+			<Setter Property="Background" Value="#606060"/>
+		</Style>
+		<Style Selector="ToggleButton#ContrastToggle Path">
+			<Setter Property="Fill" Value="White"/>
+			<Setter Property="HorizontalAlignment" Value="Center"/>
+			<Setter Property="VerticalAlignment" Value="Center"/>
+		</Style>
+		<Style Selector="ToggleButton#ContrastToggle:checked Path, ToggleButton#ContrastToggle:pointerover Path">
+			<Setter Property="Fill" Value="#ba96e3"/>
 		</Style>
 	</UserControl.Styles>
 
 	<Border x:Name="TileBorder" BorderBrush="#2e2e2e" BorderThickness="1" ClipToBounds="True">
 		<DockPanel>
 
-			<!-- Slot title: acquisition / detector the image was acquired with, with
-			     the per-image contrast/histogram toggle at the left. The toggle sits
-			     on the left because the right edge of the image area is covered by
-			     the floating side panels (image elements, multi-channel viewer). -->
 			<Border DockPanel.Dock="Top" Background="#3a3a3a" Padding="8 3">
 				<Grid ColumnDefinitions="Auto, *">
 					<ToggleButton Grid.Column="0" x:Name="ContrastToggle" Width="22" Height="18" Padding="0"
 					              HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0 0 6 0"
 					              IsChecked="{Binding IsContrastPanelVisible}"
 					              ToolTip.Tip="Show contrast settings and histogram for this image">
-						<Path Data="M 2 0 L 2 10 L 8 5 Z" Fill="White"
-						     RenderTransformOrigin="0.5,0.5" />
+						<Panel>
+							<Path Data="M 0 0 L 0 10 L 6 5 Z"
+							      IsVisible="{Binding !$parent[ToggleButton].IsChecked}" />
+							<Path Data="M 0 0 L 10 0 L 5 6 Z"
+							      IsVisible="{Binding $parent[ToggleButton].IsChecked}" />
+						</Panel>
 					</ToggleButton>
 					<TextBlock Grid.Column="1" Text="{Binding HeaderText}" FontSize="14" Foreground="White" />
 				</Grid>
 			</Border>
 
-			<!-- Tile body. The image and its overlays live in a fixed 800x800 world
-			     panel (see ImageCanvas.axaml.cs); the code centers it in this body
-			     via the same transform that zoom and pan act on, so the overlays
-			     stay glued to the image at every size and zoom level. The panel is
-			     explicitly top-left aligned, and the render transform origin is
-			     pinned to (0,0): Avalonia's default origin is (0.5,0.5), which
-			     would pivot the transform around the world's center and displace
-			     the fitted image toward the lower right. -->
 			<Grid x:Name="TileBody" Background="#454545" ClipToBounds="True">
 				<Panel x:Name="WorldHost" Width="800" Height="800"
 				       HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -55,14 +64,11 @@
 					</Canvas>
 				</Panel>
 
-				<!-- Contrast settings and histogram for this tile's image; revealed
-				     by the header triangle. Anchored top-left: the right side of
-				     the image area is covered by the floating side panels. -->
 				<Border x:Name="ContrastOverlay" IsVisible="{Binding IsContrastPanelVisible}"
 				        HorizontalAlignment="Left" VerticalAlignment="Top"
-				        Margin="6 6 6 6" Width="270" Padding="4"
-				        Background="#C8DCDCDC" BorderBrush="Black" BorderThickness="1"
-				        CornerRadius="4" BoxShadow="4 4 10 2 #60000000">
+				        Margin="6 6 6 6" Width="274" Padding="8"
+				        Background="#F02b2b2b" BorderBrush="#5f5f5f" BorderThickness="1"
+				        CornerRadius="5" BoxShadow="0 4 12 2 #80000000">
 					<ContentControl x:Name="ContrastPanelHost" />
 				</Border>
 			</Grid>

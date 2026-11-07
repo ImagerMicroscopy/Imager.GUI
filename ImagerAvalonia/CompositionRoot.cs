@@ -37,6 +37,7 @@ public static class CompositionRoot
         builder.RegisterType<MISStorageProvider>().As<IStorageProvider>().InstancePerLifetimeScope();
         builder.RegisterType<StageControl>().As<IStageControl>().SingleInstance();
         builder.RegisterType<StageControlPanelViewModel>().SingleInstance();
+        builder.RegisterType<MultiChannelViewModel>().SingleInstance();
         builder.RegisterType<MessagePackAcquisitionHandler>().AsSelf().InstancePerDependency();
 
         builder.RegisterType<ImageDisplayViewModel>().InstancePerDependency().AsSelf().PropertiesAutowired();

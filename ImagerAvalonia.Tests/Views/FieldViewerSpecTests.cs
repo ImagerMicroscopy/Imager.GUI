@@ -580,6 +580,36 @@ public sealed class FieldViewerSpecTests
     }
 
     [AvaloniaFact]
+    public void A_right_click_target_matches_the_rendered_map_when_zoomed_in_a_window()
+    {
+        var vm = new FieldViewerViewModel(StageAt(1000, 2000).Object);
+        var view = CreateView(vm);
+        vm.SetGridData(Pairs(("Acq1", "Det1")));
+        vm.EngageFieldViewer();
+
+        vm.SelectedAcquisition = "Acq1";
+        vm.SelectedDetector = "Det1";
+
+        var window = new Window { Width = 1200, Height = 900, Content = view };
+        window.Show();
+        view.SetMapTransformForTests(2, 100, 50);
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+
+        var canvas = Assert.Single(PairCanvases(view));
+        Assert.True(canvas.IsVisible);
+        Assert.True(canvas.Bounds.Width > 0 && canvas.Bounds.Height > 0);
+
+        var grid = view.FindControl<Grid>("ParentGrid")!;
+        var gridPoint = canvas.TranslatePoint(new Point(730, 520), grid)!.Value;
+
+        Assert.True(view.TryGetMoveTarget(gridPoint, out var stageX, out var stageY));
+        Assert.Equal(1030, stageX, 3);
+        Assert.Equal(2020, stageY, 3);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void A_right_click_target_is_gated_by_the_session_and_anchor()
     {
         var vm = new FieldViewerViewModel(StageAt(1000, 2000).Object);

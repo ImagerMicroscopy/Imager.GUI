@@ -10,14 +10,11 @@ using System.Linq;
 
 using ImagerAvalonia.ViewModels;
 
-
 namespace ImagerAvalonia.Views;
 
 public partial class ContrastPanelView : UserControl
 {
 
-
-   
     private AvaPlot histogram_plot;
     private DispatcherTimer _refreshTimer;
     private ContrastAdjViewModel _viewModel;
@@ -25,23 +22,12 @@ public partial class ContrastPanelView : UserControl
 
     private readonly object _lockHistogram = new();
 
-
-
-
     public event EventHandler? UpdateContrastOnCurrentImage;
 
-    /// <summary>
-    /// Contrast settings per grid cell, addressed by row/column. Used by the field
-    /// viewer, which addresses its cells by index (see GridContrastEventArgs).
-    /// </summary>
     public List<List<ContrastAdjViewModel>> contrastSettings = new();
-
-
 
     public ContrastPanelView()
     {
-        //SliderMaxPanel = this.Find<StackPanel>("SliderMaxPanel");
-        //SliderMinPanel = this.Find<StackPanel>("SliderMinPanel");
 
         _viewModel = new ContrastAdjViewModel();
         _viewModel.OnHistogramUpdateRequested += _viewModel_OnHistogramUpdateRequested;
@@ -51,15 +37,16 @@ public partial class ContrastPanelView : UserControl
         histogram_plot = this.Find<AvaPlot>("HistogramPlot")!;
         if (histogram_plot != null)
         {
-            histogram_plot.Plot.FigureBackground.Color = ScottPlot.Color.Gray(180);
-            histogram_plot.Plot.DataBackground.Color = ScottPlot.Color.Gray(180);
-            histogram_plot.Plot.XLabel("Intensity",10);
+            histogram_plot.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#2b2b2b");
+            histogram_plot.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#333333");
+            histogram_plot.Plot.XLabel("Intensity", 10);
             histogram_plot.Plot.YLabel("Counts", 10);
-            histogram_plot.Plot.Axes.Bottom.TickLabelStyle = new ScottPlot.LabelStyle() { FontSize = 8 };
-            histogram_plot.Plot.Axes.Left.TickLabelStyle = new ScottPlot.LabelStyle() { FontSize = 8 };
+            histogram_plot.Plot.Axes.Bottom.TickLabelStyle.FontSize = 8;
+            histogram_plot.Plot.Axes.Left.TickLabelStyle.FontSize = 8;
+            histogram_plot.Plot.Axes.Color(ScottPlot.Color.FromHex("#bbbbbb"));
+            histogram_plot.Plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#444444");
 
         }
-
 
         DataContextChanged += ContrastPanelView_DataContextChanged;
     }
@@ -70,8 +57,6 @@ public partial class ContrastPanelView : UserControl
             vm.OnHistogramUpdateRequested += _viewModel_OnHistogramUpdateRequested;
         }
     }
-
-
 
     public void _viewModel_OnHistogramUpdateRequested(double[] histogram_vals_x, double[] histogram_vals_y_low, double[] histogram_vals_y)
     {
@@ -87,7 +72,7 @@ public partial class ContrastPanelView : UserControl
 
         while (contrastSettings[row_col_ind.row].Count <= row_col_ind.col)
         {
-            contrastSettings[row_col_ind.row].Add(null); 
+            contrastSettings[row_col_ind.row].Add(null);
         }
 
         contrastSettings[row_col_ind.row][row_col_ind.col] = new ContrastAdjViewModel();
@@ -117,8 +102,6 @@ public partial class ContrastPanelView : UserControl
     {
         var cell = contrastSettings[row_col_ind.row][row_col_ind.col];
 
-        // Re-selecting a cell must not stack duplicate handlers: swap the
-        // subscription to the newly selected cell.
         if (_selectedContrastCell != null)
         {
             _selectedContrastCell.OnContrastValsChanged -= SelectedCell_ContrastValsChanged;
@@ -134,19 +117,16 @@ public partial class ContrastPanelView : UserControl
         UpdateContrastOnCurrentImage?.Invoke(this, e);
     }
 
-
-
-
     public void UpdateHistogram(double[] histogram_vals_y, double[] histogram_vals_x, double[] histogram_vals_y_low)
     {
         lock (_lockHistogram)
         {
-            
+
             histogram_plot.Plot.Clear();
             var fill = histogram_plot.Plot.Add.FillY(histogram_vals_x, histogram_vals_y, histogram_vals_y_low);
-            fill.FillColor = ScottPlot.Colors.Blue.WithAlpha(100);
-            fill.LineColor = ScottPlot.Colors.Blue;
-            fill.MarkerColor = ScottPlot.Colors.Blue;
+            fill.FillColor = ScottPlot.Color.FromHex("#ad76ea").WithAlpha(110);
+            fill.LineColor = ScottPlot.Color.FromHex("#ba96e3");
+            fill.MarkerColor = ScottPlot.Color.FromHex("#ba96e3");
             fill.LineWidth = 2;
             histogram_plot.Plot.Axes.SetLimits(histogram_vals_x.Min(), histogram_vals_x.Max(), 0, histogram_vals_y.Max());
 
@@ -169,10 +149,8 @@ public partial class ContrastPanelView : UserControl
             _refreshTimer.Stop();
             _refreshTimer.Start();
         }
-        
+
     }
-
-
 
     private void InitializeComponent()
     {
@@ -180,18 +158,8 @@ public partial class ContrastPanelView : UserControl
 
     }
 
-
 }
 
-
-
-
-
-
-/// <summary>
-/// Addresses a contrast-settings grid cell by row and column. Used by the field
-/// viewer, whose cells are index-based rather than acquisition/detector-keyed.
-/// </summary>
 public class GridContrastEventArgs : EventArgs
 {
     public int row { get; }

@@ -207,6 +207,17 @@ public partial class ImageCanvas : UserControl
         imageRegions.SubmitSelection();
     }
 
+    internal bool HasRegionSelection => imageRegions.IsSelecting;
+
+    internal void MoveRegionSelectionTo(ImageCanvas target)
+    {
+        if (ReferenceEquals(target, this)) return;
+        if (imageRegions.DetachSelection() is { } region)
+        {
+            target.EnableRegionSelection(region);
+        }
+    }
+
     // --- Tile viewport: fit, zoom, pan -------------------------------------
 
     /// <summary>Scales the world panel so it exactly fits the tile body, centered,
@@ -286,26 +297,53 @@ public partial class ImageCanvas : UserControl
         }
     }
 
+    private const double DragThreshold = 4.0;
+
     private bool _isPanning;
+    private bool _leftDragPending;
+    private Point _pressPosition;
     private Point _lastPanPosition;
 
     private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        // Panning is bound to the middle button only: the left button belongs to
-        // region selection and tile selection, so the gestures cannot collide.
-        if (e.GetCurrentPoint(_tileBody).Properties.IsMiddleButtonPressed)
+        var point = e.GetCurrentPoint(_tileBody);
+        if (point.Properties.IsMiddleButtonPressed)
         {
             _isPanning = true;
             _lastPanPosition = e.GetPosition(_tileBody);
+            e.Pointer.Capture(_tileBody);
             e.Handled = true;
+        }
+        else if (point.Properties.IsLeftButtonPressed && !imageRegions.IsSelecting)
+        {
+            _leftDragPending = true;
+            _pressPosition = e.GetPosition(_tileBody);
         }
     }
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {
+        var position = e.GetPosition(_tileBody);
+
+        if (_leftDragPending)
+        {
+            if (!e.GetCurrentPoint(_tileBody).Properties.IsLeftButtonPressed)
+            {
+                _leftDragPending = false;
+                return;
+            }
+            var moved = position - _pressPosition;
+            if (Math.Abs(moved.X) < DragThreshold && Math.Abs(moved.Y) < DragThreshold) return;
+
+            _leftDragPending = false;
+            _isPanning = true;
+            _lastPanPosition = _pressPosition;
+            e.Pointer.Capture(_tileBody);
+            _tileBody.Cursor = new Cursor(StandardCursorType.SizeAll);
+        }
+
         if (!_isPanning) return;
 
-        var position = e.GetPosition(_tileBody);
         PanBy(position - _lastPanPosition);
         _lastPanPosition = position;
         e.Handled = true;
@@ -313,9 +351,12 @@ public partial class ImageCanvas : UserControl
 
     private void OnPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        _leftDragPending = false;
         if (_isPanning)
         {
             _isPanning = false;
+            e.Pointer.Capture(null);
+            _tileBody.Cursor = Cursor.Default;
             e.Handled = true;
         }
     }

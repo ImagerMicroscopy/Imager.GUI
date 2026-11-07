@@ -7,39 +7,80 @@
              x:Class="ImagerAvalonia.Views.AcquisitionsPanelView"
              x:DataType="vm:MainViewModel">
 	<UserControl.Styles>
-		<!-- Give the detector tabs a distinct tab-panel look: darker tab
-		     headers, the purple selected gradient, and a bordered, darker
-		     content area that reads as the tab body. -->
+		<Style Selector="TabControl.detector-tabs">
+			<Setter Property="Padding" Value="6 6"/>
+			<Setter Property="ItemsPanel">
+				<ItemsPanelTemplate>
+					<WrapPanel Orientation="Horizontal" Margin="0"/>
+				</ItemsPanelTemplate>
+			</Setter>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="#2b2b2b"
+					        BorderBrush="#5f5f5f"
+					        BorderThickness="1"
+					        CornerRadius="5"
+					        ClipToBounds="True">
+						<DockPanel>
+							<Border DockPanel.Dock="Top" Background="Gray">
+								<ItemsPresenter Name="PART_ItemsPresenter"
+								                Margin="0"
+								                ItemsPanel="{TemplateBinding ItemsPanel}"/>
+							</Border>
+							<ContentPresenter Name="PART_SelectedContentHost"
+							                  Margin="{TemplateBinding Padding}"
+							                  Content="{TemplateBinding SelectedContent}"
+							                  ContentTemplate="{TemplateBinding SelectedContentTemplate}"/>
+						</DockPanel>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+
+		<Style Selector="TabControl.detector-tabs /template/ ItemsPresenter#PART_ItemsPresenter">
+			<Setter Property="Margin" Value="0"/>
+		</Style>
+
 		<Style Selector="TabControl.detector-tabs TabItem">
-			<Setter Property="Background" Value="#2e2e2e"/>
+			<Setter Property="Background" Value="Transparent"/>
 			<Setter Property="Foreground" Value="White"/>
-			<Setter Property="FontSize" Value="12"/>
-			<Setter Property="Padding" Value="10 4"/>
-			<Setter Property="MinHeight" Value="24"/>
-			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="FontSize" Value="11"/>
+			<Setter Property="Padding" Value="10 5"/>
+			<Setter Property="MinHeight" Value="0"/>
+			<Setter Property="Margin" Value="0"/>
+			<Setter Property="VerticalAlignment" Value="Stretch"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Panel>
+						<Border Background="{TemplateBinding Background}"/>
+						<Border Name="Accent" Height="2" VerticalAlignment="Top" IsVisible="False">
+							<Border.Background>
+								<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+									<GradientStop Color="#ba96e3" Offset="0.0"/>
+									<GradientStop Color="#ad76ea" Offset="1.0"/>
+								</LinearGradientBrush>
+							</Border.Background>
+						</Border>
+						<ContentPresenter Name="HeaderPresenter"
+						                  Margin="{TemplateBinding Padding}"
+						                  Content="{TemplateBinding Header}"
+						                  ContentTemplate="{TemplateBinding HeaderTemplate}"
+						                  Foreground="{TemplateBinding Foreground}"
+						                  HorizontalContentAlignment="Center"
+						                  VerticalContentAlignment="Center"/>
+					</Panel>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 		<Style Selector="TabControl.detector-tabs TabItem:pointerover">
-			<Setter Property="Background" Value="#5a5a5a"/>
+			<Setter Property="Background" Value="#909090"/>
 		</Style>
 		<Style Selector="TabControl.detector-tabs TabItem:selected">
-			<Setter Property="Background">
-				<Setter.Value>
-					<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
-						<GradientStop Color="#ba96e3" Offset="0.0"/>
-						<GradientStop Color="#ad76ea" Offset="1.0"/>
-					</LinearGradientBrush>
-				</Setter.Value>
-			</Setter>
-			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Background" Value="#2b2b2b"/>
 		</Style>
-		<!-- MainView's TabItem styles paint the header presenter grey; keep it
-		     transparent so the tab header background shows through. -->
-		<Style Selector="TabControl.detector-tabs TabItem /template/ ContentPresenter#PART_ContentPresenter">
-			<Setter Property="Background" Value="Transparent"/>
-		</Style>
-		<!-- Darker body behind the selected tab's content. -->
-		<Style Selector="TabControl.detector-tabs /template/ ContentPresenter#PART_SelectedContentHost">
-			<Setter Property="Background" Value="#333333"/>
+		<Style Selector="TabControl.detector-tabs TabItem:selected /template/ Border#Accent">
+			<Setter Property="IsVisible" Value="True"/>
 		</Style>
 	</UserControl.Styles>
 			<Border Background="#454545" BorderBrush="Black" BorderThickness="2" CornerRadius="5" BoxShadow="2 2 5 2 Black">
@@ -69,8 +110,7 @@
 					</Expander.Header>
 					<StackPanel IsEnabled="{Binding IsEnableExperimentalPanel}"  Width="270" Background="#454545">
 
-
-						<ListBox CornerRadius="5 5 5 5" 
+						<ListBox CornerRadius="5 5 5 5"
 									BorderBrush="Black" BorderThickness="1"
 									Width="266"
 									Background="Gray"
@@ -119,26 +159,24 @@
 									<Setter Property="Padding" Value="0"/>
 									<Setter Property="CornerRadius" Value="5"/>
 								</Style>
-				
+
 							</ListBox.Styles>
 						</ListBox>
 
 						<StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Spacing="146" Margin="2 0 0 0">
 								<Button Height="25" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="60" BorderBrush="#2e2e2e" Command="{Binding	CopyAcquisition}">
 									Copy
-								</Button>	
+								</Button>
 								<Button Height="25" Padding="0 3 0 3" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" Width="60" BorderBrush="#2e2e2e" Command="{Binding RemoveAcquisition}">
 									Remove
-								</Button>			
+								</Button>
 						</StackPanel>
-						
-						<!-- Sources -->
+
 						<TextBlock Margin="5" FontSize="15">Available Sources</TextBlock>
 
-						<!-- Channels -->
 					<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding SelectedAcquisition.Sources}">
 						<ItemsControl.ItemTemplate>
-							
+
 						<DataTemplate x:DataType="vm:SourcesEquipmentViewModel">
 							<ScrollViewer VerticalScrollBarVisibility="Auto">
 
@@ -155,8 +193,6 @@
 										</Grid>
 								</Expander.Header>
 
-
-
 								<ItemsControl Margin="0 2 0 0" Background="Transparent"  ItemsSource="{Binding Channels}">
 									<ItemsControl.ItemTemplate>
 										<DataTemplate>
@@ -165,8 +201,6 @@
 												<TextBlock Foreground="White" ToolTip.Tip="{Binding Name}" FontSize="12" Text="{Binding Name}" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
 												<CheckBox BorderThickness="0.5"  Margin="0 0 10 0" Padding="0"  HorizontalAlignment="Right"  IsChecked="{Binding IsEnabled}" Grid.Row="0" Grid.Column="1"/>
 												<NumericUpDown Classes="custom-numeric-style" HorizontalAlignment="Right" Value="{Binding PowerLevel}" Minimum="0" Maximum="100" Increment="1" Grid.Row="0" Grid.Column="2"/>
-
-
 
 											</Grid>
 										</DataTemplate>
@@ -178,14 +212,11 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
-						<!-- Filter settings -->
 						<TextBlock Margin="4" FontSize="15">Movable components</TextBlock>
-
-
 
 						<ItemsControl Margin="2 0 0 0" ItemsSource="{Binding SelectedAcquisition.FilterWheels}">
 						<ItemsControl.ItemTemplate>
-							
+
 						<DataTemplate x:DataType="vm:MovableEquipmentViewModel">
 							<ScrollViewer VerticalScrollBarVisibility="Auto">
 
@@ -210,19 +241,11 @@
 							</ItemsControl.ItemTemplate>
 						</ItemsControl>
 
-
-
-	
-
-						<!-- Detectors: one tab per detector so that additional cameras
-						     do not consume vertical space in the pane. -->
 						<TextBlock Margin="4" FontSize="15">Detector settings</TextBlock>
 						<TabControl Classes="detector-tabs"
-						            Margin="2 0 0 0"
-						            Background="#333333"
-						            BorderBrush="Black"
-						            BorderThickness="1"
-						            Padding="4"
+						            Width="265"
+						            HorizontalAlignment="Left"
+						            Margin="2 0 0 4"
 						            ItemsSource="{Binding SelectedAcquisition.Detector}">
 							<TabControl.ItemTemplate>
 								<DataTemplate x:DataType="vm:DetectorEquipmentViewModel">
@@ -243,10 +266,6 @@
 							</TabControl.ContentTemplate>
 					</TabControl>
 
-
-
-	
-						
 					</StackPanel>
 				</Expander>
 
